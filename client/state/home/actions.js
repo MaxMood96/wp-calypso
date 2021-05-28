@@ -4,9 +4,7 @@
 import {
 	HOME_LAYOUT_REQUEST,
 	HOME_LAYOUT_SET,
-	HOME_LAYOUT_SKIP_VIEW,
-	HOME_QUICK_LINKS_EXPAND,
-	HOME_QUICK_LINKS_COLLAPSE,
+	HOME_LAYOUT_SKIP_CURRENT_VIEW,
 } from 'calypso/state/action-types';
 
 import 'calypso/state/data-layer/wpcom/sites/home/layout';
@@ -30,12 +28,4 @@ export const setHomeLayout = ( siteId, layout ) => ( {
 	type: HOME_LAYOUT_SET,
 	siteId,
 	layout,
-} );
-
-export const expandHomeQuickLinks = () => ( {
-	type: HOME_QUICK_LINKS_EXPAND,
-} );
-
-export const collapseHomeQuickLinks = () => ( {
-	type: HOME_QUICK_LINKS_COLLAPSE,
 } );
