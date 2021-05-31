@@ -1,8 +1,8 @@
 /**
  * Internal dependencies
  */
-import { LoginPage, MyHomePage } from '../pages';
-import { getAccountCredential } from '../../data-helper';
+import { LoginPage } from '../pages/login-page';
+import { getAccountCredential, getCalypsoURL } from '../../data-helper';
 
 /**
  * Type dependencies
@@ -34,23 +34,43 @@ export class LoginFlow {
 	}
 
 	/**
-	 * Executes the basic log in flow as the specified user.
+	 * Executes the common steps of logging in as any particular user.
 	 *
+	 * @param {Page} page Page on which interactions should occur.
 	 * @returns {Promise<void>} No return value.
 	 */
-	async baseflow(): Promise< void > {
+	async baseflow( page: Page ): Promise< void > {
 		console.log( 'Logging in as ' + this.username );
-		const loginPage = new LoginPage( this.page );
+
+		const loginPage = new LoginPage( page );
 		await loginPage.login( { username: this.username, password: this.password } );
 	}
 
 	/**
-	 * Log in as the user without performing any additional steps.
+	 * Log in as the specified user from the WPCOM Log-In endpoint.
+	 * This is the basic action of logging in.
 	 *
 	 * @returns {Promise<void>} No return value.
 	 */
 	async login(): Promise< void > {
-		await this.baseflow();
-		await MyHomePage.Expect( this.page );
+		await this.page.goto( getCalypsoURL( 'log-in' ) );
+		await this.baseflow( this.page );
+	}
+
+	/**
+	 * Log in as the specified user from a popup, typically triggered while logged out.
+	 *
+	 * @returns {Promise<void>} No return value.
+	 */
+	async loginFromPopup(): Promise< void > {
+		// Popup emits the event 'popup'. Capturing the event obtains the Page object
+		// for the popup page, where the login form is located.
+		const popupPage = await this.page.waitForEvent( 'popup' );
+
+		// Execute the login steps using the popup page, not the base page.
+		await this.baseflow( popupPage );
+
+		// Wait for the popup to be closed before passing control back.
+		await popupPage.waitForEvent( 'close' );
 	}
 }

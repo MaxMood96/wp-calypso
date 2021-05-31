@@ -1,7 +1,7 @@
 /**
  * Internal dependencies
  */
-import * as DataHelper from '../../data-helper';
+// import * as DataHelper from '../../data-helper';
 
 /**
  * Type dependencies
@@ -19,11 +19,11 @@ export class LoginPage {
 	 */
 	constructor( page: Page ) {
 		this.page = page;
-		this.url = DataHelper.getCalypsoURL( 'log-in' );
+		// this.url = DataHelper.getCalypsoURL( 'log-in' );
 	}
 
 	page: Page;
-	url: string;
+	// url: string;
 
 	loginContainerSelector = '.wp-login__container';
 	usernameSelector = '#usernameOrEmail';
@@ -41,7 +41,7 @@ export class LoginPage {
 	 * @throws {Error} If the log in process was unsuccessful for any reason.
 	 */
 	async login( { username, password }: { username: string; password: string } ): Promise< void > {
-		await this.page.goto( this.url, { waitUntil: 'networkidle' } );
+		// await this.page.goto( this.url, { waitUntil: 'networkidle' } );
 
 		const alreadyLoggedIn = await this.page.$( this.changeAccountSelector );
 		if ( alreadyLoggedIn ) {
