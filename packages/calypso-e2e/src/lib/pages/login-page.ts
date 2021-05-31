@@ -1,12 +1,19 @@
 /**
  * Internal dependencies
  */
-// import * as DataHelper from '../../data-helper';
 
 /**
  * Type dependencies
  */
 import { Page } from 'playwright';
+
+const selectors = {
+	loginContainerSelector: '.wp-login__container',
+	usernameSelector: '#usernameOrEmail',
+	passwordSelector: '#password',
+	changeAccountSelector: '#loginAsAnotherUser',
+	alreadyLoggedInSelector: '.continue-as-user',
+};
 
 /**
  * Represents an instance of the calypso Login page.
@@ -19,17 +26,9 @@ export class LoginPage {
 	 */
 	constructor( page: Page ) {
 		this.page = page;
-		// this.url = DataHelper.getCalypsoURL( 'log-in' );
 	}
 
 	page: Page;
-	// url: string;
-
-	loginContainerSelector = '.wp-login__container';
-	usernameSelector = '#usernameOrEmail';
-	passwordSelector = '#password';
-	changeAccountSelector = '#loginAsAnotherUser';
-	alreadyLoggedInSelector = '.continue-as-user';
 
 	/**
 	 * Executes series of interactions on the log-in page to log in as a specific user.
@@ -41,21 +40,18 @@ export class LoginPage {
 	 * @throws {Error} If the log in process was unsuccessful for any reason.
 	 */
 	async login( { username, password }: { username: string; password: string } ): Promise< void > {
-		// await this.page.goto( this.url, { waitUntil: 'networkidle' } );
-
-		const alreadyLoggedIn = await this.page.$( this.changeAccountSelector );
+		const alreadyLoggedIn = await this.page.$( selectors.changeAccountSelector );
 		if ( alreadyLoggedIn ) {
-			await this.page.click( this.changeAccountSelector );
+			await this.page.click( selectors.changeAccountSelector );
 		}
 
 		// Begin the process of logging in.
-		await this.page.fill( this.usernameSelector, username );
+		await this.page.fill( selectors.usernameSelector, username );
 		await this.page.keyboard.press( 'Enter' );
+		await this.page.fill( selectors.passwordSelector, password );
 
-		await this.page.fill( this.passwordSelector, password );
-
-		// Wait for all promises. Add more here as necessary, such as waiting for the request to be
-		// completed, or looking for a specific elemen on page.
+		// Enter submits the form and initiates the log in process. Then wait for the navigation to
+		// settle and complete.
 		await Promise.all( [ this.page.waitForNavigation(), this.page.keyboard.press( 'Enter' ) ] );
 	}
 }
