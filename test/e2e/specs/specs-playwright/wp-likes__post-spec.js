@@ -20,43 +20,43 @@ const quote =
 const user = 'gutenbergSimpleSiteUser';
 
 describe( DataHelper.createSuiteTitle( 'Likes (Post)' ), function () {
-	describe( 'Like a new post', function () {
-		let postLikesComponent;
-		let gutenbergEditorPage;
+	// describe( 'Like a new post', function () {
+	// 	let postLikesComponent;
+	// 	let gutenbergEditorPage;
 
-		it( 'Log in', async function () {
-			const loginFlow = new LoginFlow( this.page, user );
-			await loginFlow.login();
-		} );
+	// 	it( 'Log in', async function () {
+	// 		const loginFlow = new LoginFlow( this.page, user );
+	// 		await loginFlow.login();
+	// 	} );
 
-		it( 'Start new post', async function () {
-			const newPostFlow = new NewPostFlow( this.page );
-			await newPostFlow.newPostFromNavbar();
-		} );
+	// 	it( 'Start new post', async function () {
+	// 		const newPostFlow = new NewPostFlow( this.page );
+	// 		await newPostFlow.newPostFromNavbar();
+	// 	} );
 
-		it( 'Enter post title', async function () {
-			gutenbergEditorPage = await GutenbergEditorPage.Expect( this.page );
-			const title = DataHelper.randomPhrase();
-			await gutenbergEditorPage.enterTitle( title );
-		} );
+	// 	it( 'Enter post title', async function () {
+	// 		gutenbergEditorPage = await GutenbergEditorPage.Expect( this.page );
+	// 		const title = DataHelper.randomPhrase();
+	// 		await gutenbergEditorPage.enterTitle( title );
+	// 	} );
 
-		it( 'Enter post text', async function () {
-			await gutenbergEditorPage.enterText( quote );
-		} );
+	// 	it( 'Enter post text', async function () {
+	// 		await gutenbergEditorPage.enterText( quote );
+	// 	} );
 
-		it( 'Publish and visit post', async function () {
-			await gutenbergEditorPage.publish( { visit: true } );
-		} );
+	// 	it( 'Publish and visit post', async function () {
+	// 		await gutenbergEditorPage.publish( { visit: true } );
+	// 	} );
 
-		it( 'Like post', async function () {
-			postLikesComponent = await PostLikesComponent.Expect( this.page );
-			await postLikesComponent.clickLikePost();
-		} );
+	// 	it( 'Like post', async function () {
+	// 		postLikesComponent = await PostLikesComponent.Expect( this.page );
+	// 		await postLikesComponent.clickLikePost();
+	// 	} );
 
-		it( 'Unlike post', async function () {
-			await postLikesComponent.clickLikePost();
-		} );
-	} );
+	// 	it( 'Unlike post', async function () {
+	// 		await postLikesComponent.clickLikePost();
+	// 	} );
+	// } );
 
 	describe( 'Like an existing post', function () {
 		let postLikesComponent;
@@ -94,9 +94,6 @@ describe( DataHelper.createSuiteTitle( 'Likes (Post)' ), function () {
 
 		before( 'Obtain test site URL', async function () {
 			url = DataHelper.getAccountSiteURL( user );
-		} );
-
-		it( 'Log out', async function () {
 			await BrowserManager.clearCookies( this.page );
 		} );
 

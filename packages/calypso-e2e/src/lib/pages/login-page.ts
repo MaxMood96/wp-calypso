@@ -52,6 +52,6 @@ export class LoginPage {
 
 		// Enter submits the form and initiates the log in process. Then wait for the navigation to
 		// settle and complete.
-		await Promise.all( [ this.page.waitForNavigation(), this.page.keyboard.press( 'Enter' ) ] );
+		await this.page.keyboard.press( 'Enter' );
 	}
 }
