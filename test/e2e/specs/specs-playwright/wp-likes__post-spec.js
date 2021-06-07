@@ -3,6 +3,7 @@
  */
 import {
 	DataHelper,
+	BrowserManager,
 	LoginFlow,
 	NewPostFlow,
 	GutenbergEditorPage,
@@ -79,6 +80,10 @@ describe( DataHelper.createSuiteTitle( 'Likes (Post)' ), function () {
 			postLikesComponent = await PostLikesComponent.Expect( this.page );
 			await postLikesComponent.clickLikePost();
 		} );
+
+		it( 'Unlike post', async function () {
+			await postLikesComponent.clickLikePost();
+		} );
 	} );
 
 	describe( 'Like an existing post as logged out user', function () {
@@ -92,8 +97,7 @@ describe( DataHelper.createSuiteTitle( 'Likes (Post)' ), function () {
 		} );
 
 		it( 'Log out', async function () {
-			const context = await this.page.context();
-			await context.clearCookies();
+			await BrowserManager.clearCookies( this.page );
 		} );
 
 		it( 'Visit site', async function () {
@@ -109,7 +113,7 @@ describe( DataHelper.createSuiteTitle( 'Likes (Post)' ), function () {
 
 		it( 'Like post', async function () {
 			postLikesComponent = await PostLikesComponent.Expect( this.page );
-			loginFlow = new LoginFlow( this.page );
+			loginFlow = new LoginFlow( this.page, user );
 
 			// Clicking the Like button will bring up a new popup, so
 			// specifically call the flow for dealing with logging in from a popup.

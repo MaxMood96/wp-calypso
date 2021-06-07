@@ -74,6 +74,6 @@ export class PostLikesComponent extends BaseContainer {
 		}
 
 		await button.waitForElementState( 'stable' );
-		await this.frame.waitForLoadState( 'networkidle' );
+		await this.page.waitForLoadState( 'networkidle' );
 	}
 }
