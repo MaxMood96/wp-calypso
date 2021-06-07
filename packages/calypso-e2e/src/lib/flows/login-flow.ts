@@ -34,7 +34,8 @@ export class LoginFlow {
 	}
 
 	/**
-	 * Executes the common steps of logging in as any particular user.
+	 * Executes the common steps of logging in as a particular user.
+	 * Other login processes should call this method as the common step.
 	 *
 	 * @param {Page} page Page on which interactions should occur.
 	 * @returns {Promise<void>} No return value.
@@ -42,7 +43,7 @@ export class LoginFlow {
 	async baseflow( page: Page ): Promise< void > {
 		console.log( 'Logging in as ' + this.username );
 
-		const loginPage = new LoginPage( page );
+		const loginPage = await LoginPage.Expect( page );
 		await loginPage.login( { username: this.username, password: this.password } );
 	}
 
@@ -66,6 +67,8 @@ export class LoginFlow {
 		// Popup emits the event 'popup'. Capturing the event obtains the Page object
 		// for the popup page, where the login form is located.
 		const popupPage = await this.page.waitForEvent( 'popup' );
+
+		await popupPage.waitForLoadState( 'networkidle' );
 
 		// Execute the login steps using the popup page, not the base page.
 		await this.baseflow( popupPage );

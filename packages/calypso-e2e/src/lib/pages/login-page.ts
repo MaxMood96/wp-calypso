@@ -1,6 +1,7 @@
 /**
  * Internal dependencies
  */
+import { BaseContainer } from '../base-container';
 
 /**
  * Type dependencies
@@ -8,27 +9,31 @@
 import { Page } from 'playwright';
 
 const selectors = {
-	loginContainerSelector: '.wp-login__container',
-	usernameSelector: '#usernameOrEmail',
-	passwordSelector: '#password',
-	changeAccountSelector: '#loginAsAnotherUser',
-	alreadyLoggedInSelector: '.continue-as-user',
+	loginContainer: '.wp-login__container',
+	username: '#usernameOrEmail',
+	password: '#password',
+	changeAccountButton: '#loginAsAnotherUser',
 };
 
 /**
  * Represents an instance of the calypso Login page.
+ *
+ * @augments {BaseContainer}
  */
-export class LoginPage {
+export class LoginPage extends BaseContainer {
 	/**
 	 * Creates an instance of the Login page.
 	 *
 	 * @param {Page} page Playwright page on which actions are executed.
 	 */
 	constructor( page: Page ) {
-		this.page = page;
+		super( page, selectors.loginContainer );
 	}
 
-	page: Page;
+	async _postInit(): Promise< void > {
+		const container = await this.page.waitForSelector( selectors.loginContainer );
+		await container.waitForElementState( 'stable' );
+	}
 
 	/**
 	 * Executes series of interactions on the log-in page to log in as a specific user.
@@ -40,18 +45,17 @@ export class LoginPage {
 	 * @throws {Error} If the log in process was unsuccessful for any reason.
 	 */
 	async login( { username, password }: { username: string; password: string } ): Promise< void > {
-		const alreadyLoggedIn = await this.page.$( selectors.changeAccountSelector );
+		const alreadyLoggedIn = await this.page.$( selectors.changeAccountButton );
 		if ( alreadyLoggedIn ) {
-			await this.page.click( selectors.changeAccountSelector );
+			await this.page.click( selectors.changeAccountButton );
 		}
 
 		// Begin the process of logging in.
-		await this.page.fill( selectors.usernameSelector, username );
+		await this.page.fill( selectors.username, username );
 		await this.page.keyboard.press( 'Enter' );
-		await this.page.fill( selectors.passwordSelector, password );
+		await this.page.fill( selectors.password, password );
 
-		// Enter submits the form and initiates the log in process. Then wait for the navigation to
-		// settle and complete.
+		// Enter submits the form and initiates the log in process.
 		await this.page.keyboard.press( 'Enter' );
 	}
 }
