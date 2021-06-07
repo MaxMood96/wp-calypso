@@ -14,7 +14,7 @@ import {
  */
 const user = 'gutenbergSimpleSiteUser';
 
-describe( DataHelper.createSuiteTitle( 'Likes (Logged Out) ' ), function () {
+describe( DataHelper.createSuiteTitle( 'Likes (Logged Out)' ), function () {
 	describe( 'Like an existing post as logged out user', function () {
 		let loginFlow;
 		let postLikesComponent;
