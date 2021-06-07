@@ -54,7 +54,6 @@ import ExternalLink from 'calypso/components/external-link';
 import HeaderCart from 'calypso/my-sites/checkout/cart/header-cart';
 import AddDomainButton from 'calypso/my-sites/domains/domain-management/list/add-domain-button';
 import { logmeinUrl } from 'calypso/lib/logmein';
-import getSitesLogmeinAllowedUrls from 'calypso/state/selectors/get-sites-logmein-allowed-urls';
 
 /**
  * Style dependencies
@@ -72,6 +71,7 @@ export class List extends React.Component {
 		context: PropTypes.object,
 		renderAllSites: PropTypes.bool,
 		hasSingleSite: PropTypes.bool,
+		sites: PropTypes.array,
 	};
 
 	static defaultProps = {
@@ -360,7 +360,7 @@ export class List extends React.Component {
 	}
 
 	renderPrimaryDomain() {
-		const { domains, selectedSite, translate, siteUrls } = this.props;
+		const { domains, selectedSite, translate, sites } = this.props;
 		const primaryDomain = find( domains, 'isPrimary' );
 
 		if ( this.isLoading() || ! primaryDomain ) {
@@ -400,7 +400,7 @@ export class List extends React.Component {
 				<div className="list__header-primary-domain-content">
 					<ExternalLink
 						className="list__header-primary-domain-url"
-						href={ logmeinUrl( selectedSite.URL, siteUrls, true ) }
+						href={ logmeinUrl( selectedSite.URL, sites, true ) }
 						title={ translate( 'Launch your site' ) }
 						target="_blank"
 						icon={ true }
@@ -544,7 +544,7 @@ export default connect(
 			hasSingleSite: siteCount === 1,
 			isOnFreePlan,
 			userCanManageOptions,
-			siteUrls: getSitesLogmeinAllowedUrls( state ),
+			sites: getSites( state ),
 		};
 	},
 	( dispatch ) => {
