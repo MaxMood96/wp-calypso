@@ -47,6 +47,11 @@ describe( DataHelper.createSuiteTitle( 'Likes (Comment) ' ), function () {
 			commentsLikesComponent = await CommentsLikesComponent.Expect( this.page );
 			await commentsLikesComponent.clickLikeComment( 1 );
 		} );
+
+		it( 'Unlike a comment', async function () {
+			commentsLikesComponent = await CommentsLikesComponent.Expect( this.page );
+			await commentsLikesComponent.clickLikeComment( 1 );
+		} );
 	} );
 
 	describe( 'Comment and like on a new post', function () {

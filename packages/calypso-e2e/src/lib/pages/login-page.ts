@@ -31,6 +31,7 @@ export class LoginPage extends BaseContainer {
 	}
 
 	async _postInit(): Promise< void > {
+		await this.page.waitForLoadState( 'networkidle' );
 		const container = await this.page.waitForSelector( selectors.loginContainer );
 		await container.waitForElementState( 'stable' );
 	}
@@ -47,6 +48,7 @@ export class LoginPage extends BaseContainer {
 	async login( { username, password }: { username: string; password: string } ): Promise< void > {
 		const alreadyLoggedIn = await this.page.$( selectors.changeAccountButton );
 		if ( alreadyLoggedIn ) {
+			console.log( 'already logged in, selectding "change account' );
 			await this.page.click( selectors.changeAccountButton );
 		}
 
