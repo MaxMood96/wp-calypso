@@ -352,6 +352,12 @@ const REDUX_TRACKING = {
 	'core/notices': {
 		createErrorNotice: trackErrorNotices,
 	},
+	'core/edit-site': {
+		setIsListViewOpened: 'wpcom_block_editor_list_view_click',
+	},
+	'core/edit-post': {
+		setIsListViewOpened: 'wpcom_block_editor_list_view_click',
+	},
 };
 
 /**
