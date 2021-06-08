@@ -314,6 +314,30 @@ const trackErrorNotices = ( content, options ) =>
 		notice_options: JSON.stringify( options ), // Returns undefined if options is undefined.
 	} );
 
+const trackSiteEditorBrowsingSidebarOpen = () => {
+	// We want to make sure the browsing sidebar is closed.
+	// This action is triggered even if the sidebar is open
+	// which we want to avoid tracking.
+	const isOpen = select( 'core/edit-site' ).isNavigationOpened();
+	if ( isOpen ) {
+		return;
+	}
+
+	tracksRecordEvent( 'calypso_editor_sidebar_open' );
+};
+
+const trackSiteEditorCreateTemplate = ( { slug } ) => {
+	tracksRecordEvent( 'calypso_editor_sidebar_item_add', { item_type: 'template', slug } );
+};
+
+const trackSiteEditorChangeTemplate = ( id, slug ) => {
+	tracksRecordEvent( 'calypso_editor_sidebar_item_edit', { item_type: 'template', id, slug } );
+};
+
+const trackSiteEditorChangeTemplatePart = ( id ) => {
+	tracksRecordEvent( 'calypso_editor_sidebar_item_edit', { item_type: 'template_part', id } );
+};
+
 /**
  * Tracker can be
  * - string - which means it is an event name and should be tracked as such automatically
@@ -351,6 +375,12 @@ const REDUX_TRACKING = {
 	},
 	'core/notices': {
 		createErrorNotice: trackErrorNotices,
+	},
+	'core/edit-site': {
+		openNavigationPanelToMenu: trackSiteEditorBrowsingSidebarOpen,
+		addTemplate: trackSiteEditorCreateTemplate,
+		setTemplate: trackSiteEditorChangeTemplate,
+		setTemplatePart: trackSiteEditorChangeTemplatePart,
 	},
 };
 
