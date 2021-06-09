@@ -3,8 +3,12 @@
  */
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { ShoppingCartProvider, useShoppingCart } from '@automattic/shopping-cart';
-import type { RequestCart, ResponseCart } from '@automattic/shopping-cart';
+import {
+	ShoppingCartProvider,
+	useShoppingCart,
+	getEmptyResponseCart,
+} from '@automattic/shopping-cart';
+import type { RequestCart } from '@automattic/shopping-cart';
 
 /**
  * Internal Dependencies
@@ -13,32 +17,41 @@ import wp from 'calypso/lib/wp';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 import getCartKey from './get-cart-key';
 import CartMessages from 'calypso/my-sites/checkout/cart/cart-messages';
+import { isUserLoggedIn } from 'calypso/state/current-user/selectors';
 
-// Aliasing wpcom functions explicitly bound to wpcom is required here;
-// otherwise we get `this is not defined` errors.
-const wpcom = wp.undocumented();
-const wpcomGetCart = ( cartKey: string ) => wpcom.getCart( cartKey );
+const wpcomGetCart = ( cartKey: string ) => wp.req.get( `/me/shopping-cart/${ cartKey }` );
 const wpcomSetCart = ( cartKey: string, cartData: RequestCart ) =>
-	wpcom.setCart( cartKey, cartData );
+	wp.req.post( `/me/shopping-cart/${ cartKey }`, cartData );
+
+const emptyCart = getEmptyResponseCart();
 
 // A convenience wrapper around ShoppingCartProvider to set the necessary props for calypso
 export default function CalypsoShoppingCartProvider( {
 	children,
-	cartKey,
-	getCart,
 }: {
 	children: React.ReactNode;
-	cartKey?: string | number | null | undefined;
-	getCart?: ( cartKey: string ) => Promise< ResponseCart >;
 } ): JSX.Element {
 	const selectedSite = useSelector( getSelectedSite );
+	const isLoggedOutCart = ! useSelector( isUserLoggedIn );
+	const currentUrl = window.location.href;
+	const searchParams = new URLSearchParams( window.location.search );
+	const jetpackPurchaseToken = searchParams.has( 'purchasetoken' );
+	const jetpackPurchaseNonce = searchParams.has( 'purchaseNonce' );
+	const isJetpackCheckout =
+		currentUrl.includes( '/checkout/jetpack' ) &&
+		isLoggedOutCart &&
+		( !! jetpackPurchaseToken || !! jetpackPurchaseNonce );
+	const isNoSiteCart =
+		isJetpackCheckout ||
+		( ! isLoggedOutCart &&
+			currentUrl.includes( '/checkout/no-site' ) &&
+			'no-user' === searchParams.get( 'cart' ) );
 
-	// If cartKey is null, we pass that to ShoppingCartProvider because it is
-	// probably intentional to delay loading. If cartKey is undefined, we try to
-	// get our own.
+	const getCart = isLoggedOutCart || isNoSiteCart ? () => Promise.resolve( emptyCart ) : undefined;
+
 	return (
 		<ShoppingCartProvider
-			cartKey={ cartKey === undefined ? getCartKey( { selectedSite } ) : cartKey }
+			cartKey={ getCartKey( { selectedSite, isLoggedOutCart, isNoSiteCart } ) }
 			getCart={ getCart || wpcomGetCart }
 			setCart={ wpcomSetCart }
 		>
