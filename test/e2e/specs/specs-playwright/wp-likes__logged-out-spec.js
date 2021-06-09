@@ -43,7 +43,7 @@ describe( DataHelper.createSuiteTitle( 'Likes (Logged Out)' ), function () {
 
 			// Clicking the Like button will bring up a new popup, so
 			// specifically call the flow for dealing with logging in from a popup.
-			await Promise.all( [ loginFlow.loginFromPopup(), postLikesComponent.clickLikePost() ] );
+			await Promise.all( [ loginFlow.logInFromPopup(), postLikesComponent.clickLikePost() ] );
 		} );
 
 		it( 'Unlike post', async function () {
