@@ -47,7 +47,9 @@ export function upload( context, next ) {
 		context.store.dispatch( setBackPath( context.prevPath ) );
 	}
 
-	context.primary = <Upload />;
+	const noticeType = context.query.notice;
+
+	context.primary = <Upload noticeType={ noticeType } />;
 	next();
 }
 
