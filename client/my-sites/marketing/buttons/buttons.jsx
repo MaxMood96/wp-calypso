@@ -143,17 +143,17 @@ class SharingButtons extends Component {
 				<QuerySiteSettings siteId={ siteId } />
 				<QuerySharingButtons siteId={ siteId } />
 				{ isJetpack && <QueryJetpackModules siteId={ siteId } /> }
+				<ButtonsOptions
+					settings={ updatedSettings }
+					onChange={ this.handleChange }
+					saving={ isSaving }
+				/>
 				<ButtonsAppearance
 					buttons={ updatedButtons }
 					values={ updatedSettings }
 					onChange={ this.handleChange }
 					onButtonsChange={ this.handleButtonsChange }
 					initialized={ !! buttons && !! settings }
-					saving={ isSaving }
-				/>
-				<ButtonsOptions
-					settings={ updatedSettings }
-					onChange={ this.handleChange }
 					saving={ isSaving }
 				/>
 			</form>
