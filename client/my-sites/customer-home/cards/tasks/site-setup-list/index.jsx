@@ -26,12 +26,12 @@ import getMenusUrl from 'calypso/state/selectors/get-menus-url';
 import { getSiteOption, getSiteSlug } from 'calypso/state/sites/selectors';
 import { requestGuidedTour } from 'calypso/state/guided-tours/actions';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
-import { skipViewHomeLayout } from 'calypso/state/home/actions';
 import NavItem from './nav-item';
 import CurrentTaskItem from './current-task-item';
 import { CHECKLIST_KNOWN_TASKS } from 'calypso/state/data-layer/wpcom/checklist/index.js';
 import { getTask } from './get-task';
-import { getHomeLayout } from 'calypso/state/selectors/get-home-layout';
+import useSkipHomeViewMutation from 'calypso/data/home/use-skip-home-view-mutation';
+import { useCurrentView } from '../../use-current-view';
 
 /**
  * Style dependencies
@@ -67,14 +67,23 @@ const startTask = ( dispatch, task, siteId, advanceToNextIncompleteTask, isPodca
 	}
 };
 
-const skipTask = ( dispatch, task, tasks, siteId, currentView, setIsLoading, isPodcastingSite ) => {
+const skipTask = (
+	dispatch,
+	skipHomeView,
+	task,
+	tasks,
+	siteId,
+	currentView,
+	setIsLoading,
+	isPodcastingSite
+) => {
 	const isLastTask = tasks.filter( ( t ) => ! t.isCompleted ).length === 1;
 
 	if ( isLastTask ) {
 		// When skipping the last task, we request skipping the current layout view so it's refreshed afterwards.
 		// Task will be dismissed server-side to avoid race conditions.
 		setIsLoading( true );
-		dispatch( skipViewHomeLayout( siteId, currentView ) );
+		skipHomeView( siteId, currentView );
 	} else {
 		// Otherwise we simply skip the given task.
 		dispatch( requestSiteChecklistTaskUpdate( siteId, task.id ) );
@@ -113,7 +122,6 @@ const SiteSetupList = ( {
 	tasks,
 	taskUrls,
 	userEmail,
-	currentView,
 } ) => {
 	const [ currentTaskId, setCurrentTaskId ] = useState( null );
 	const [ currentTask, setCurrentTask ] = useState( null );
@@ -122,6 +130,8 @@ const SiteSetupList = ( {
 	const [ showAccordionSelectedTask, setShowAccordionSelectedTask ] = useState( false );
 	const [ isLoading, setIsLoading ] = useState( false );
 	const dispatch = useDispatch();
+	const { skipHomeView } = useSkipHomeViewMutation();
+	const currentView = useCurrentView();
 
 	const isDomainUnverified =
 		tasks.filter(
@@ -228,6 +238,7 @@ const SiteSetupList = ( {
 						setTaskIsManuallySelected( false );
 						skipTask(
 							dispatch,
+							skipHomeView,
 							currentTask,
 							tasks,
 							siteId,
@@ -286,6 +297,7 @@ const SiteSetupList = ( {
 											setTaskIsManuallySelected( false );
 											skipTask(
 												dispatch,
+												skipHomeView,
 												currentTask,
 												tasks,
 												siteId,
@@ -346,6 +358,5 @@ export default connect( ( state ) => {
 		tasks: taskList.getAll(),
 		taskUrls: getChecklistTaskUrls( state, siteId ),
 		userEmail: user?.email,
-		currentView: getHomeLayout( state, siteId )?.view_name,
 	};
 } )( SiteSetupList );
