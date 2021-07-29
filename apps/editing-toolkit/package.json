@@ -130,7 +130,7 @@
 		"@wordpress/primitives": "^1.12.3",
 		"@wordpress/react-i18n": "^1.0.3",
 		"@wordpress/rich-text": "^3.25.3",
-		"@wordpress/scripts": "^15.0.1",
+		"@wordpress/scripts": "^17.1.0",
 		"@wordpress/server-side-render": "^1.21.3",
 		"@wordpress/url": "2.22.2",
 		"classnames": "^2.2.6",
