@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM debian:11
 
 ARG NODE_VERSION=16.7.0
 
