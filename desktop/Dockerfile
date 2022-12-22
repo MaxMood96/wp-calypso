@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM debian:bullseye
 
 ARG NODE_VERSION=16.11.1
 
