@@ -894,7 +894,7 @@ __metadata:
     prop-types: ^15.7.2
     react: ^17.0.2
     react-dom: ^17.0.2
-    react-redux: ^7.2.6
+    react-redux: ^7.2.9
     redux: ^4.1.2
     redux-thunk: ^2.3.0
     webpack: ^5.65.0
@@ -12471,7 +12471,7 @@ __metadata:
     react-live: ^2.3.0
     react-modal: ^3.14.3
     react-query: ^3.32.1
-    react-redux: ^7.2.6
+    react-redux: ^7.2.9
     react-router-dom: ^5.1.2
     react-test-renderer: ^17.0.2
     react-transition-group: ^4.3.0
@@ -30549,9 +30549,9 @@ fsevents@~2.1.2:
   languageName: node
   linkType: hard
 
-"react-redux@npm:^7.2.6":
-  version: 7.2.6
-  resolution: "react-redux@npm:7.2.6"
+"react-redux@npm:^7.2.9":
+  version: 7.2.9
+  resolution: "react-redux@npm:7.2.9"
   dependencies:
     "@babel/runtime": ^7.15.4
     "@types/react-redux": ^7.1.20
@@ -30560,13 +30560,13 @@ fsevents@~2.1.2:
     prop-types: ^15.7.2
     react-is: ^17.0.2
   peerDependencies:
-    react: ^16.8.3 || ^17
+    react: ^16.8.3 || ^17 || ^18
   peerDependenciesMeta:
     react-dom:
       optional: true
     react-native:
       optional: true
-  checksum: f2329642ef6ea95ad9384de08529ded1f836a82098a19f4f09f6afef612d9d5785b4e8aef4f9c9292d3f93812b979f94cd9b8d3aa8747e0a4a10e2600771c3f5
+  checksum: 904fac7f493942585ed7ebbd693b4f6b5c09c292366b4550e887ba1a2e83a92c55f0ddc35161d4ba87e3fadb6c681a59003f58df6335e5d2ddd72b06a557851d
   languageName: node
   linkType: hard
 
