@@ -51,7 +51,7 @@
 		"webpack-cli": "^4.9.2"
 	},
 	"dependencies": {
-		"archiver": "^3.1.1",
+		"archiver": "^4.0.2",
 		"cross-env": "^7.0.3",
 		"electron-fetch": "^1.7.4",
 		"electron-updater": "^4.2.5",
