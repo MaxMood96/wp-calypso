@@ -19,7 +19,7 @@
 	"dependencies": {
 		"5to6-codemod": "^1.8.0",
 		"@babel/core": "^7.17.5",
-		"@babel/preset-env": "^7.16.11",
+		"@babel/preset-env": "^7.22.0",
 		"jscodeshift": "^0.13.0",
 		"lodash": "^4.17.21",
 		"react-codemod": "^5.0.5"
