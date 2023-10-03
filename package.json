@@ -142,7 +142,7 @@
 		"@automattic/components": "workspace:^",
 		"@automattic/data-stores": "workspace:^",
 		"@automattic/design-carousel": "workspace:^",
-		"@automattic/happychat-connection": "workspace:^",
+		"@automattic/happychat-connection": "1.0.0",
 		"@automattic/help-center": "workspace:^",
 		"@automattic/i18n-utils": "workspace:^",
 		"@automattic/languages": "workspace:^",
