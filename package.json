@@ -139,7 +139,7 @@
 		"@automattic/calypso-color-schemes": "workspace:^",
 		"@automattic/calypso-doctor": "workspace:^",
 		"@automattic/color-studio": "2.5.0",
-		"@automattic/components": "workspace:^",
+		"@automattic/components": "2.0.0",
 		"@automattic/data-stores": "workspace:^",
 		"@automattic/design-carousel": "workspace:^",
 		"@automattic/happychat-connection": "workspace:^",
