@@ -146,7 +146,7 @@
 		"@automattic/help-center": "workspace:^",
 		"@automattic/i18n-utils": "workspace:^",
 		"@automattic/languages": "workspace:^",
-		"@automattic/launchpad": "workspace:^",
+		"@automattic/launchpad": "1.0.0",
 		"@automattic/privacy-toolset": "workspace:^",
 		"@automattic/typography": "workspace:^",
 		"@automattic/viewport": "workspace:^",
