@@ -41,7 +41,7 @@
 		"electron-builder": "^22.11.7",
 		"electron-notarize": "^0.1.1",
 		"electron-rebuild": "^2.3.5",
-		"jest": "^27.3.1",
+		"jest": "^28.0.0",
 		"lodash": "^4.17.21",
 		"playwright": "^1.32",
 		"postcss": "^8.4.5",
@@ -62,6 +62,6 @@
 		"superagent": "^3.8.3",
 		"winston": "^3.3.3",
 		"wpcom-xhr-request": "workspace:^",
-		"ws": "^7.3.1"
+		"ws": "^8.17.1"
 	}
 }
