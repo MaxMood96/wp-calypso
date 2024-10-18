@@ -5,11 +5,11 @@ import isSiteWPForTeams from 'calypso/state/selectors/is-site-wpforteams';
 import isVipSite from 'calypso/state/selectors/is-vip-site';
 import { isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
+import isSiteWpcomStaging from './is-site-wpcom-staging';
 import type { AppState } from 'calypso/types';
 
 /**
  * Whether or not the current user can start a site owner transfer.
- *
  * @param {Object} state Global state tree
  * @param {number} siteId Site ID
  * @returns {boolean} Whether current user can start site owner transfer.
@@ -24,13 +24,16 @@ export default function canCurrentUserStartSiteOwnerTransfer(
 		return false;
 	}
 
+	const isNonAtomicJetpackSite =
+		isJetpackSite( state, siteId ) && ! isSiteAutomatedTransfer( state, siteId );
+
 	// These sites can't be transferred.
 	if (
-		isJetpackSite( state, siteId ) ||
+		isNonAtomicJetpackSite ||
 		isSiteP2Hub( state, siteId ) ||
 		isSiteWPForTeams( state, siteId ) ||
 		isVipSite( state, siteId ) ||
-		isSiteAutomatedTransfer( state, siteId )
+		isSiteWpcomStaging( state, siteId )
 	) {
 		return false;
 	}

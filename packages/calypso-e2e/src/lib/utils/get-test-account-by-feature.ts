@@ -1,13 +1,22 @@
 import defaultCriteria from './criteria-for-test-accounts';
 import type { TestAccountName } from '../../secrets';
-import type { JetpackTarget, SupportedEnvVariables } from '../../types/env-variables.types';
+import type {
+	AtomicVariation,
+	JetpackTarget,
+	SupportedEnvVariables,
+} from '../../types/env-variables.types';
 
 export type TestAccountEnvVariables = Pick<
 	SupportedEnvVariables,
-	'GUTENBERG_EDGE' | 'COBLOCKS_EDGE' | 'TEST_ON_ATOMIC' | 'JETPACK_TARGET'
+	| 'GUTENBERG_EDGE'
+	| 'GUTENBERG_NIGHTLY'
+	| 'COBLOCKS_EDGE'
+	| 'TEST_ON_ATOMIC'
+	| 'JETPACK_TARGET'
+	| 'ATOMIC_VARIATION'
 >;
 
-type Env = 'edge' | 'stable';
+type Env = 'edge' | 'stable' | 'nightly';
 
 export type SiteType = 'simple' | 'atomic';
 
@@ -18,6 +27,7 @@ export type FeatureKey = { [ key in Feature ]?: Env | undefined } & {
 	siteType: SiteType;
 	variant?: Variant;
 	jetpackTarget?: JetpackTarget;
+	atomicVariation?: AtomicVariation;
 };
 export type FeatureCriteria = FeatureKey & { accountName: TestAccountName };
 type FeatureMap = Map< string, TestAccountName >;
@@ -123,6 +133,13 @@ export function envToFeatureKey( envVariables: TestAccountEnvVariables ): Featur
 		jetpackTarget = envVariables.JETPACK_TARGET as JetpackTarget;
 	}
 
+	let atomicVariation: AtomicVariation | undefined;
+	if ( ! envVariables.TEST_ON_ATOMIC || envVariables.ATOMIC_VARIATION === 'default' ) {
+		atomicVariation = undefined;
+	} else {
+		atomicVariation = envVariables.ATOMIC_VARIATION;
+	}
+
 	let siteType: SiteType;
 	if ( envVariables.JETPACK_TARGET === 'remote-site' ) {
 		// All remote sites have similar handling to atomic sites in places like the editor,
@@ -132,6 +149,18 @@ export function envToFeatureKey( envVariables: TestAccountEnvVariables ): Featur
 		siteType = envVariables.TEST_ON_ATOMIC ? 'atomic' : 'simple';
 	}
 
+	let gutenbergVersionType: Env;
+	switch ( true ) {
+		case envVariables.GUTENBERG_NIGHTLY:
+			gutenbergVersionType = 'nightly';
+			break;
+		case envVariables.GUTENBERG_EDGE:
+			gutenbergVersionType = 'edge';
+			break;
+		default:
+			gutenbergVersionType = 'stable';
+	}
+
 	return {
 		// CoBlocks doesn't have any rule for "stable" as it re-uses the regular
 		// Gutenberg stable test site, so we just pass `undefined` if the env
@@ -139,8 +168,9 @@ export function envToFeatureKey( envVariables: TestAccountEnvVariables ): Featur
 		// `defaultCriteria` table smaller (as we don't need to declare the
 		// criteria for CoBlocks stable)
 		coblocks: envVariables.COBLOCKS_EDGE ? 'edge' : undefined,
-		gutenberg: envVariables.GUTENBERG_EDGE ? 'edge' : 'stable',
+		gutenberg: gutenbergVersionType,
 		siteType: siteType,
 		jetpackTarget: jetpackTarget,
+		atomicVariation: atomicVariation,
 	};
 }

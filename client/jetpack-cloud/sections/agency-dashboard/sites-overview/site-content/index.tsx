@@ -1,18 +1,21 @@
+import page from '@automattic/calypso-router';
 import { Card } from '@automattic/components';
 import { useMobileBreakpoint } from '@automattic/viewport-react';
-import page from 'page';
-import { useContext, forwardRef, createRef } from 'react';
+import { useContext, forwardRef } from 'react';
 import Pagination from 'calypso/components/pagination';
 import TextPlaceholder from 'calypso/jetpack-cloud/sections/partner-portal/text-placeholder';
-import { addQueryArgs } from 'calypso/lib/route';
+import { addQueryArgs } from 'calypso/lib/url';
 import EditButton from '../../dashboard-bulk-actions/edit-button';
-import { useDashboardShowLargeScreen } from '../../hooks';
+import DashboardDataContext from '../../sites-overview/dashboard-data-context';
 import SitesOverviewContext from '../context';
+import useDefaultSiteColumns from '../hooks/use-default-site-columns';
+import LicenseInfoModal from '../license-info-modal';
 import SiteBulkSelect from '../site-bulk-select';
 import SiteCard from '../site-card';
 import SiteSort from '../site-sort';
 import SiteTable from '../site-table';
-import { formatSites, siteColumns } from '../utils';
+import { Site } from '../types';
+import useFormattedSites from './hooks/use-formatted-sites';
 
 import './style.scss';
 
@@ -23,7 +26,9 @@ const addPageArgs = ( pageNumber: number ) => {
 };
 
 interface Props {
-	data: { sites: Array< any >; total: number; perPage: number; totalFavorites: number } | undefined;
+	data:
+		| { sites: Array< Site >; total: number; perPage: number; totalFavorites: number }
+		| undefined;
 	isLoading: boolean;
 	currentPage: number;
 	isFavoritesTab: boolean;
@@ -32,30 +37,24 @@ interface Props {
 const SiteContent = ( { data, isLoading, currentPage, isFavoritesTab }: Props, ref: any ) => {
 	const isMobile = useMobileBreakpoint();
 
-	const { isBulkManagementActive } = useContext( SitesOverviewContext );
+	const { isBulkManagementActive, currentLicenseInfo } = useContext( SitesOverviewContext );
 
-	const sites = formatSites( data?.sites );
+	const { isLargeScreen } = useContext( DashboardDataContext );
+
+	const sites = useFormattedSites( data?.sites ?? [] );
 
 	const handlePageClick = ( pageNumber: number ) => {
 		addPageArgs( pageNumber );
 	};
 
-	const siteTableRef = createRef< HTMLTableElement >();
-
-	const isLargeScreen = useDashboardShowLargeScreen( siteTableRef, ref );
-
+	const siteColumns = useDefaultSiteColumns( isLargeScreen );
 	const firstColumn = siteColumns[ 0 ];
 
 	return (
 		<>
 			{ isLargeScreen ? (
 				<div className="site-content__large-screen-view">
-					<SiteTable
-						ref={ siteTableRef }
-						isLoading={ isLoading }
-						columns={ siteColumns }
-						items={ sites }
-					/>
+					<SiteTable ref={ ref } isLoading={ isLoading } columns={ siteColumns } items={ sites } />
 				</div>
 			) : (
 				<div className="site-content__small-screen-view">
@@ -89,7 +88,6 @@ const SiteContent = ( { data, isLoading, currentPage, isFavoritesTab }: Props, r
 					</div>
 				</div>
 			) }
-
 			{ data && data?.total > 0 && (
 				<Pagination
 					compact={ isMobile }
@@ -99,6 +97,7 @@ const SiteContent = ( { data, isLoading, currentPage, isFavoritesTab }: Props, r
 					pageClick={ handlePageClick }
 				/>
 			) }
+			{ currentLicenseInfo && <LicenseInfoModal currentLicenseInfo={ currentLicenseInfo } /> }
 		</>
 	);
 };

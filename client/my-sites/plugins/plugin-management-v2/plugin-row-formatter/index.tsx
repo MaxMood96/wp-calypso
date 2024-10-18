@@ -1,7 +1,6 @@
 import { Button } from '@automattic/components';
 import { Icon, plugins } from '@wordpress/icons';
 import { useTranslate } from 'i18n-calypso';
-import { useDispatch, useSelector } from 'react-redux';
 import FormInputCheckbox from 'calypso/components/forms/form-checkbox';
 import { useLocalizedMoment } from 'calypso/components/localized-moment';
 import { INSTALL_PLUGIN, UPDATE_PLUGIN } from 'calypso/lib/plugins/constants';
@@ -9,6 +8,7 @@ import PluginActivateToggle from 'calypso/my-sites/plugins/plugin-activate-toggl
 import PluginAutoupdateToggle from 'calypso/my-sites/plugins/plugin-autoupdate-toggle';
 import PluginInstallButton from 'calypso/my-sites/plugins/plugin-install-button';
 import UpdatePlugin from 'calypso/my-sites/plugins/plugin-management-v2/update-plugin';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import { getBillingInterval } from 'calypso/state/marketplace/billing-interval/selectors';
 import {
@@ -33,6 +33,7 @@ interface Props {
 	isSmallScreen?: boolean;
 	className?: string;
 	updatePlugin?: ( plugin: PluginComponentProps ) => void;
+	siteCount?: number;
 }
 
 export default function PluginRowFormatter( {
@@ -47,6 +48,7 @@ export default function PluginRowFormatter( {
 	const dispatch = useDispatch();
 
 	const billingPeriod = useSelector( getBillingInterval );
+	const pluginId = item.id || item.slug; // Plugin ID only available on Site plugin item object
 
 	const PluginDetailsButton = (
 		props: PropsWithChildren< { className: string; onClick?: MouseEventHandler } >
@@ -87,7 +89,7 @@ export default function PluginRowFormatter( {
 
 	const installInProgress = useSelector(
 		( state ) =>
-			selectedSite && isPluginActionInProgress( state, selectedSite.ID, item.id, INSTALL_PLUGIN )
+			selectedSite && isPluginActionInProgress( state, selectedSite.ID, pluginId, INSTALL_PLUGIN )
 	);
 
 	if ( selectedSite ) {
@@ -105,7 +107,7 @@ export default function PluginRowFormatter( {
 	const allStatuses = getPluginActionStatuses( state );
 
 	let currentSiteStatuses = allStatuses.filter(
-		( status ) => status.pluginId === item.id && status.action !== UPDATE_PLUGIN
+		( status ) => status.pluginId === pluginId && status.action !== UPDATE_PLUGIN
 	);
 
 	if ( 'site-name' === columnKey ) {
@@ -154,7 +156,7 @@ export default function PluginRowFormatter( {
 								id={ item.slug }
 								onClick={ item.onClick }
 								checked={ item.isSelected }
-								readOnly={ true }
+								readOnly
 							/>
 						) }
 						{ item.icon ? (
@@ -247,6 +249,7 @@ export default function PluginRowFormatter( {
 					selectedSite={ selectedSite }
 					className={ className }
 					updatePlugin={ updatePlugin }
+					siteCount={ siteCount }
 				/>
 			);
 		case 'install':

@@ -1,4 +1,3 @@
-import { FEATURE_SOCIAL_MASTODON_CONNECTION } from '@automattic/calypso-products';
 import { localizeUrl } from '@automattic/i18n-utils';
 import { ExternalLink } from '@wordpress/components';
 import { localize } from 'i18n-calypso';
@@ -6,11 +5,13 @@ import { includes } from 'lodash';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
+import nextdoorExample from 'calypso/assets/images/connections/connections-nextdoor.png';
+import threadsExample from 'calypso/assets/images/connections/connections-threads.png';
 import googleDriveExample from 'calypso/assets/images/connections/google-drive-screenshot.jpg';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
-import siteHasFeature from 'calypso/state/selectors/site-has-feature';
 import { isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSite, getSelectedSiteId } from 'calypso/state/ui/selectors';
+import Bluesky from './bluesky';
 import GooglePlusDeprication from './google-plus-deprecation';
 import Mastodon from './mastodon';
 import ServiceExample from './service-example';
@@ -24,7 +25,6 @@ import './service-examples.scss';
  *
  * When adding examples for more services, please update the list in addition to adding
  * a method with the example's content.
- *
  * @type {string[]}
  */
 const SERVICES_WITH_EXAMPLES = [
@@ -36,13 +36,16 @@ const SERVICES_WITH_EXAMPLES = [
 	'instagram-basic-display',
 	'linkedin',
 	'tumblr',
+	'nextdoor',
 	'twitter',
+	'threads',
 	'google_photos',
 	'google-drive',
 	'mailchimp',
 	'p2_slack',
 	'p2_github',
 	'mastodon',
+	'bluesky',
 ];
 
 class SharingServiceExamples extends Component {
@@ -188,7 +191,7 @@ class SharingServiceExamples extends Component {
 		const label = (
 			<>
 				{ this.props.translate(
-					'Drive engagement and save time by automatically sharing images and video reels to Instagram when you publish blog posts.'
+					'Drive engagement and save time by automatically sharing images to Instagram when you publish blog posts.'
 				) }
 				<div className="instagram-business__requirements">
 					<h4>{ this.props.translate( 'Requirements for connecting Instagram:' ) }</h4>
@@ -236,11 +239,13 @@ class SharingServiceExamples extends Component {
 			{
 				image: {
 					src: '/calypso/images/google-my-business/stats-screenshot-cropped.png',
-					alt: this.props.translate( 'Manage Google My Business locations', { textOnly: true } ),
+					alt: this.props.translate( 'Manage Google Business Profile locations', {
+						textOnly: true,
+					} ),
 				},
 				label: this.props.translate(
 					'{{strong}}Connect{{/strong}} to view stats and other useful information from your ' +
-						'Google My Business account inside WordPress.com.',
+						'Google Business Profile account inside WordPress.com.',
 					{
 						components: {
 							strong: <strong />,
@@ -256,16 +261,16 @@ class SharingServiceExamples extends Component {
 			{
 				image: {
 					src: '/calypso/images/sharing/connections-instagram.png',
-					alt: this.props.translate( 'Add an Instagram widget', { textOnly: true } ),
+					alt: this.props.translate( 'Add the Latest Instagram Posts block', { textOnly: true } ),
 				},
 				label: this.props.translate(
-					'Add an {{link}}Instagram widget{{/link}} to display your latest photos.',
+					'Add the {{link}}Latest Instagram Posts block{{/link}} to display your latest photos.',
 					{
 						components: {
 							link: (
 								<a
 									href={ localizeUrl(
-										'https://wordpress.com/support/instagram/instagram-widget/'
+										'https://wordpress.com/support/instagram/#embed-a-feed-of-instagram-posts'
 									) }
 								/>
 							),
@@ -320,6 +325,46 @@ class SharingServiceExamples extends Component {
 						image,
 					},
 			  ];
+	}
+
+	nextdoor() {
+		const label = this.props.translate(
+			'Connect with friends, neighbors, and local businesses by automatically sharing your posts to Nextdoor.'
+		);
+		const image = {
+			src: nextdoorExample,
+			alt: this.props.translate( 'Share posts with your local community on Nextdoor.', {
+				textOnly: true,
+			} ),
+		};
+		return [
+			{
+				label,
+			},
+			{
+				image,
+			},
+		];
+	}
+
+	threads() {
+		const label = this.props.translate(
+			'Increase your presence in social media by sharing your posts automatically to Threads.'
+		);
+		const image = {
+			src: threadsExample,
+			alt: this.props.translate( 'Share posts to your Threads feed.', {
+				textOnly: true,
+			} ),
+		};
+		return [
+			{
+				label,
+			},
+			{
+				image,
+			},
+		];
 	}
 
 	tumblr() {
@@ -503,9 +548,21 @@ class SharingServiceExamples extends Component {
 			return <GooglePlusDeprication />;
 		}
 
-		if ( 'mastodon' === this.props.service.ID && this.props.isMastodonEligible ) {
+		if ( 'mastodon' === this.props.service.ID ) {
 			return (
 				<Mastodon
+					service={ this.props.service }
+					action={ this.props.action }
+					connectAnother={ this.props.connectAnother }
+					connections={ this.props.connections }
+					isConnecting={ this.props.isConnecting }
+				/>
+			);
+		}
+
+		if ( 'bluesky' === this.props.service.ID ) {
+			return (
+				<Bluesky
 					service={ this.props.service }
 					action={ this.props.action }
 					connectAnother={ this.props.connectAnother }
@@ -539,11 +596,8 @@ class SharingServiceExamples extends Component {
 }
 
 export default connect( ( state ) => {
-	const siteId = getSelectedSiteId( state );
-
 	return {
 		site: getSelectedSite( state ),
 		hasJetpack: ! isJetpackCloud() || isJetpackSite( state, getSelectedSiteId( state ) ),
-		isMastodonEligible: siteHasFeature( state, siteId, FEATURE_SOCIAL_MASTODON_CONNECTION ),
 	};
 } )( localize( SharingServiceExamples ) );

@@ -59,11 +59,11 @@ describe( DataHelper.createSuiteTitle( 'Plugins: Browse' ), function () {
 		await pluginsPage.validateHasHeaderTitle( PluginsPage.freeSection );
 	} );
 
-	it( 'Can return via breadcrumb', async function () {
+	it( 'Can return via category', async function () {
 		if ( envVariables.VIEWPORT_NAME !== 'mobile' ) {
-			await pluginsPage.clickPluginsBreadcrumb();
+			await pluginsPage.clickCategory( 'Discover' );
 		} else {
-			await pluginsPage.clickBackBreadcrumb();
+			await pluginsPage.clickDropdownCategory( 'Discover' );
 		}
 		await pluginsPage.validateHasSection( PluginsPage.freeSection );
 	} );
@@ -77,9 +77,9 @@ describe( DataHelper.createSuiteTitle( 'Plugins: Browse' ), function () {
 
 		it( 'Can return via breadcrumb from premium plugins', async function () {
 			if ( envVariables.VIEWPORT_NAME !== 'mobile' ) {
-				await pluginsPage.clickPluginsBreadcrumb();
+				await pluginsPage.clickCategory( 'Discover' );
 			} else {
-				await pluginsPage.clickBackBreadcrumb();
+				await pluginsPage.clickDropdownCategory( 'Discover' );
 			}
 			await pluginsPage.validateHasSection( PluginsPage.paidSection );
 		} );
@@ -91,7 +91,6 @@ describe( DataHelper.createSuiteTitle( 'Plugins: Browse' ), function () {
 
 	it.each( [
 		'WooCommerce',
-		'Yoast SEO',
 		'MailPoet – emails and newsletters in WordPress',
 		'Jetpack CRM – Clients, Invoices, Leads, & Billing for WordPress',
 	] )( 'Featured Plugins section should show the %s plugin', async function ( plugin: string ) {
@@ -103,6 +102,7 @@ describe( DataHelper.createSuiteTitle( 'Plugins: Browse' ), function () {
 			'Search Engine Optimization',
 			envVariables.VIEWPORT_NAME !== 'mobile' ? true : false
 		);
+		await page.waitForURL( new RegExp( `/plugins/browse/seo/${ siteUrl }$` ) );
 	} );
 
 	it.each( [ 'Yoast SEO' ] )(

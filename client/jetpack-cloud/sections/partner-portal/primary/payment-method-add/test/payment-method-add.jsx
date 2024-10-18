@@ -9,7 +9,7 @@ import { createStore } from 'redux';
 import PaymentMethodAdd from '../index';
 
 describe( '<PaymentMethodAdd>', () => {
-	test( 'should render correctly and match the snapshot', async () => {
+	test( 'should render correctly', async () => {
 		const promise = Promise.resolve();
 		const queryClient = new QueryClient();
 		const initialState = {
@@ -17,6 +17,11 @@ describe( '<PaymentMethodAdd>', () => {
 			documentHead: { unreadCount: 1 },
 			sites: { items: {} },
 			currentUser: { capabilities: {} },
+			partnerPortal: {
+				partner: {
+					isPartnerOAuthTokenLoaded: true,
+				},
+			},
 		};
 
 		const store = createStore( ( state ) => state, initialState );

@@ -2,7 +2,6 @@ import { getEmptyResponseCartProduct } from '@automattic/shopping-cart';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { LineItemSublabelAndPrice } from '../src/checkout-line-items';
-import '@testing-library/jest-dom/extend-expect';
 
 describe( 'LineItemSublabelAndPrice', () => {
 	describe( 'DIFM product', () => {
@@ -29,7 +28,6 @@ describe( 'LineItemSublabelAndPrice', () => {
 			quantity: 6,
 			item_original_cost_integer: 49900 + ( 6 - 5 ) * 6900,
 			item_original_cost_for_quantity_one_integer: 49900,
-			item_original_cost_for_quantity_one_display: '$499',
 		};
 
 		const difmProductWithMoreThanFiveExtraPagesPlural = {
@@ -38,7 +36,6 @@ describe( 'LineItemSublabelAndPrice', () => {
 			quantity: 7,
 			item_original_cost_integer: 49900 + ( 7 - 5 ) * 6900,
 			item_original_cost_for_quantity_one_integer: 49900,
-			item_original_cost_for_quantity_one_display: '$499',
 		};
 
 		test( 'should return null if product does not support tiered pricing', async () => {

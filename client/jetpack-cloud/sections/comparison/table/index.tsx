@@ -2,7 +2,7 @@ import { TERM_ANNUALLY, PLAN_JETPACK_FREE } from '@automattic/calypso-products';
 import { Button } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
 import { Fragment, useCallback, useMemo } from 'react';
-import { useDispatch } from 'react-redux';
+import { usePresalesChat } from 'calypso/lib/presales-chat';
 import CalypsoShoppingCartProvider from 'calypso/my-sites/checkout/calypso-shopping-cart-provider';
 import ProductLightbox from 'calypso/my-sites/plans/jetpack-plans/product-lightbox';
 import StoreItemInfoContext, {
@@ -13,6 +13,7 @@ import { useStoreItemInfo } from 'calypso/my-sites/plans/jetpack-plans/product-s
 import { ItemPrice } from 'calypso/my-sites/plans/jetpack-plans/product-store/item-price';
 import { MoreInfoLink } from 'calypso/my-sites/plans/jetpack-plans/product-store/more-info-link';
 import slugToSelectorProduct from 'calypso/my-sites/plans/jetpack-plans/slug-to-selector-product';
+import { useDispatch } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions/record';
 import { getPurchaseURLCallback } from '../../../../my-sites/plans/jetpack-plans/get-purchase-url-callback';
 import { TableWithStoreContextProps } from '../types';
@@ -32,6 +33,8 @@ export const Table: React.FC = () => {
 	const { currentProduct, setCurrentProduct, onClickMoreInfoFactory } = useProductLightbox();
 	const { getCheckoutURL, getCtaLabel, getIsExternal, getOnClickPurchase } =
 		useStoreItemInfoContext();
+
+	usePresalesChat( 'jpGeneral' );
 
 	const sectionHeadingColSpan = productsToCompare.length + 1;
 

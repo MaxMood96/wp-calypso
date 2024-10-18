@@ -1,40 +1,98 @@
+import { Onboard, useLaunchpad } from '@automattic/data-stores';
+import { isAssemblerDesign } from '@automattic/design-picker';
+import { FREE_FLOW } from '@automattic/onboarding';
+import { useSelect, useDispatch } from '@wordpress/data';
+import { useEffect } from '@wordpress/element';
 import { translate } from 'i18n-calypso';
+import { useLaunchpadDecider } from 'calypso/landing/stepper/declarative-flow/internals/hooks/use-launchpad-decider';
 import {
 	setSignupCompleteSlug,
 	persistSignupDestination,
 	setSignupCompleteFlowName,
 } from 'calypso/signup/storageUtils';
 import { useQuery } from '../hooks/use-query';
+import { useSiteIdParam } from '../hooks/use-site-id-param';
 import { useSiteSlug } from '../hooks/use-site-slug';
-import { recordSubmitStep } from './internals/analytics/record-submit-step';
-import DesignSetup from './internals/steps-repository/design-setup';
-import Processing from './internals/steps-repository/processing-step';
+import { ONBOARD_STORE } from '../stores';
+import { STEPS } from './internals/steps';
+import { ProcessingResult } from './internals/steps-repository/processing-step/constants';
 import { ProvidedDependencies } from './internals/types';
 import type { Flow } from './internals/types';
+import type { OnboardSelect } from '@automattic/data-stores';
 
 const updateDesign: Flow = {
 	name: 'update-design',
 	get title() {
 		return translate( 'Choose Design' );
 	},
+	isSignupFlow: false,
 	useSteps() {
-		return [
-			{ slug: 'designSetup', component: DesignSetup },
-			{ slug: 'processing', component: Processing },
-		];
+		return [ STEPS.DESIGN_SETUP, STEPS.PATTERN_ASSEMBLER, STEPS.PROCESSING, STEPS.ERROR ];
 	},
+	useSideEffect() {
+		const { setIntent } = useDispatch( ONBOARD_STORE );
 
+		useEffect( () => {
+			setIntent( Onboard.SiteIntent.UpdateDesign );
+		}, [] );
+	},
 	useStepNavigation( currentStep, navigate ) {
-		const flowName = this.name;
+		const siteId = useSiteIdParam();
 		const siteSlug = useSiteSlug();
-		const flowToReturnTo = useQuery().get( 'flowToReturnTo' ) || 'free';
+		const flowToReturnTo = useQuery().get( 'flowToReturnTo' ) || FREE_FLOW;
+		const { setPendingAction } = useDispatch( ONBOARD_STORE );
+		const selectedDesign = useSelect(
+			( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getSelectedDesign(),
+			[]
+		);
+		const { data: { launchpad_screen: launchpadScreenOption } = {} } = useLaunchpad( siteSlug );
 
-		function submit( providedDependencies: ProvidedDependencies = {} ) {
-			recordSubmitStep( providedDependencies, 'update-design', flowName, currentStep );
+		const exitFlow = ( to: string ) => {
+			setPendingAction( () => {
+				return new Promise( () => {
+					window.location.assign( to );
+				} );
+			} );
+
+			return navigate( 'processing' );
+		};
+
+		const { getPostFlowUrl, initializeLaunchpadState } = useLaunchpadDecider( {
+			exitFlow,
+			navigate,
+		} );
+
+		function submit( providedDependencies: ProvidedDependencies = {}, ...results: string[] ) {
 			switch ( currentStep ) {
 				case 'processing':
+					initializeLaunchpadState( {
+						siteId,
+						siteSlug: ( providedDependencies?.siteSlug ?? siteSlug ) as string,
+					} );
+
+					if ( results.some( ( result ) => result === ProcessingResult.FAILURE ) ) {
+						return navigate( 'error' );
+					}
+
+					if ( isAssemblerDesign( selectedDesign ) ) {
+						const params = new URLSearchParams( {
+							canvas: 'edit',
+							assembler: '1',
+						} );
+
+						return exitFlow( `/site-editor/${ siteSlug }?${ params }` );
+					}
+
+					if ( launchpadScreenOption === 'skipped' ) {
+						return window.location.assign( `/home/${ siteSlug }` );
+					}
+
 					return window.location.assign(
-						`/setup/${ flowToReturnTo }/launchpad?siteSlug=${ siteSlug }`
+						getPostFlowUrl( {
+							flow: flowToReturnTo,
+							siteId,
+							siteSlug: siteSlug as string,
+						} )
 					);
 
 				case 'designSetup':
@@ -53,11 +111,27 @@ const updateDesign: Flow = {
 							) }?redirect_to=${ returnUrl }&signup=1`
 						);
 					}
+
+					if ( providedDependencies?.shouldGoToAssembler ) {
+						return navigate( 'pattern-assembler' );
+					}
+
 					return navigate( `processing?siteSlug=${ siteSlug }&flowToReturnTo=${ flowToReturnTo }` );
+
+				case 'pattern-assembler': {
+					return navigate( `processing?siteSlug=${ siteSlug }&flowToReturnTo=${ flowToReturnTo }` );
+				}
 			}
 		}
 
-		return { submit };
+		const goBack = () => {
+			switch ( currentStep ) {
+				case 'pattern-assembler':
+					return navigate( 'designSetup' );
+			}
+		};
+
+		return { submit, goBack };
 	},
 };
 

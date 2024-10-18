@@ -5,9 +5,13 @@
 	font-family: $sans;
 	flex-direction: row;
 	height: auto;
-	justify-content: flex-end;
+	justify-content: flex-start;
 	list-style-type: none;
 	margin: 10px 0 0;
+
+	@include breakpoint-deprecated( "<660px" ) {
+		justify-content: space-around;
+	}
 }
 
 .reader-post-actions:not(.has-views) .reader-post-actions__item {
@@ -17,7 +21,6 @@
 }
 
 .reader-post-actions .reader-post-actions__item {
-	height: 20px;
 	margin-right: 24px;
 
 	&.reader-post-actions__visit {
@@ -27,14 +30,16 @@
 			display: flex;
 			gap: 4px;
 		}
+		@include breakpoint-deprecated( "<660px" ) {
+			display: none;
+		}
 	}
 
 	&.reader-post-actions__views {
 		flex: 1;
-	}
-
-	&:last-child {
-		margin-right: 0;
+		@include breakpoint-deprecated( "<660px" ) {
+			display: none;
+		}
 	}
 
 	& > button {
@@ -54,5 +59,21 @@
 
 	.follow-button__label {
 		display: none;
+	}
+
+	@include breakpoint-deprecated( "<660px" ) {
+		margin-right: 18px;
+		height: auto;
+		&:first-of-type {
+			margin-left: 18px;
+		}
+
+		.reader-share__button,
+		.like-button,
+		.comment-button {
+			display: flex;
+			flex-direction: column;
+			height: auto;
+		}
 	}
 }

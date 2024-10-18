@@ -14,12 +14,12 @@ import { Gridicon } from '@automattic/components';
 import { useShoppingCart } from '@automattic/shopping-cart';
 import { useTranslate } from 'i18n-calypso';
 import { useCallback, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
 import { getPurchaseByProductSlug } from 'calypso/lib/purchases/utils';
 import reactNodeToString from 'calypso/lib/react-node-to-string';
 import OwnerInfo from 'calypso/me/purchases/purchase-item/owner-info';
 import useCartKey from 'calypso/my-sites/checkout/use-cart-key';
+import { useDispatch, useSelector } from 'calypso/state';
 import { successNotice } from 'calypso/state/notices/actions';
 import { getSitePurchases } from 'calypso/state/purchases/selectors';
 import { useIsUserPurchaseOwner } from 'calypso/state/purchases/utils';
@@ -30,7 +30,11 @@ import {
 	isJetpackCloudCartEnabled,
 	isJetpackSiteMultiSite,
 } from 'calypso/state/sites/selectors';
-import { EXTERNAL_PRODUCTS_LIST, ITEM_TYPE_PLAN } from '../../constants';
+import {
+	EXTERNAL_PRODUCTS_LIST,
+	INDIRECT_CHECKOUT_PRODUCTS_LIST,
+	ITEM_TYPE_PLAN,
+} from '../../constants';
 import { buildCheckoutURL } from '../../get-purchase-url-callback';
 import productButtonLabel from '../../product-card/product-button-label';
 import { SelectorProduct } from '../../types';
@@ -40,6 +44,10 @@ const getIsDeprecated = ( item: SelectorProduct ) => Boolean( item.legacy );
 
 const getIsExternal = ( item: SelectorProduct ) =>
 	EXTERNAL_PRODUCTS_LIST.includes( item.productSlug );
+
+// Indirect checkout products have more checkout flows, such as selecting plans on another page before being directed to the cart.
+const getIsIndirectCheckout = ( item: SelectorProduct ) =>
+	INDIRECT_CHECKOUT_PRODUCTS_LIST.includes( item.productSlug );
 
 const getIsMultisiteCompatible = ( item: SelectorProduct ) => {
 	if ( isJetpackPlanSlug( item.productSlug ) ) {
@@ -253,12 +261,13 @@ export const useStoreItemInfo = ( {
 
 				shoppingCartTracker( 'calypso_jetpack_shopping_cart_add_product', {
 					productSlug: item.productSlug,
+					quantity: item.quantity,
 				} );
 
 				const addedToCartText = translate( 'added to cart' );
 				const productName = reactNodeToString( item.displayName );
 				dispatch( successNotice( `${ productName } ${ addedToCartText }`, { duration: 5000 } ) );
-				return addProductsToCart( [ { product_slug: item.productSlug } ] );
+				return addProductsToCart( [ { product_slug: item.productSlug, quantity: item.quantity } ] );
 			}
 
 			if ( item.type === 'item-type-plan' ) {
@@ -393,6 +402,7 @@ export const useStoreItemInfo = ( {
 			getCtaAriaLabel,
 			getIsDeprecated,
 			getIsExternal,
+			getIsIndirectCheckout,
 			getIsIncludedInPlan,
 			getIsIncludedInPlanOrSuperseded,
 			getIsMultisiteCompatible,

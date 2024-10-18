@@ -1,11 +1,18 @@
-import { GlobalStylesContext } from '@wordpress/edit-site/build-module/components/global-styles/context';
-import { mergeBaseAndUserConfigs } from '@wordpress/edit-site/build-module/components/global-styles/global-styles-provider';
+import { PLAN_PREMIUM, getPlan } from '@automattic/calypso-products';
+import { PremiumBadge } from '@automattic/components';
+import { useHasEnTranslation } from '@automattic/i18n-utils';
 import { useState } from '@wordpress/element';
 import { ENTER } from '@wordpress/keycodes';
-import classnames from 'classnames';
-import { translate } from 'i18n-calypso';
+import clsx from 'clsx';
+import { translate, TranslateResult } from 'i18n-calypso';
 import { useMemo, useContext } from 'react';
 import { DEFAULT_GLOBAL_STYLES_VARIATION_SLUG } from '../../constants';
+import {
+	GlobalStylesContext,
+	mergeBaseAndUserConfigs,
+	withExperimentalBlockEditorProvider,
+} from '../../gutenberg-bridge';
+import { useRegisterCoreBlocks } from '../../hooks';
 import GlobalStylesVariationPreview from './preview';
 import type { GlobalStylesObject } from '../../types';
 import './style.scss';
@@ -13,7 +20,6 @@ import './style.scss';
 interface GlobalStylesVariationProps {
 	globalStylesVariation: GlobalStylesObject;
 	isActive: boolean;
-	premiumBadge?: React.ReactNode;
 	showOnlyHoverView?: boolean;
 	onSelect: () => void;
 }
@@ -21,8 +27,10 @@ interface GlobalStylesVariationProps {
 interface GlobalStylesVariationsProps {
 	globalStylesVariations: GlobalStylesObject[];
 	selectedGlobalStylesVariation: GlobalStylesObject | null;
-	premiumBadge?: React.ReactNode;
+	description?: TranslateResult;
 	showOnlyHoverViewDefaultVariation?: boolean;
+	splitDefaultVariation?: boolean;
+	needsUpgrade?: boolean;
 	onSelect: ( globalStylesVariation: GlobalStylesObject ) => void;
 }
 
@@ -32,7 +40,6 @@ const isDefaultGlobalStyleVariationSlug = ( globalStylesVariation: GlobalStylesO
 const GlobalStylesVariation = ( {
 	globalStylesVariation,
 	isActive,
-	premiumBadge,
 	showOnlyHoverView,
 	onSelect,
 }: GlobalStylesVariationProps ) => {
@@ -47,18 +54,16 @@ const GlobalStylesVariation = ( {
 			merged: mergeBaseAndUserConfigs( base, globalStylesVariation ),
 			inline_css: baseInlineCss + globalStylesVariationInlineCss,
 		};
-	}, [ globalStylesVariation, base ] );
-
+	}, [ globalStylesVariation.slug, base ] );
 	const selectOnEnter = ( event: React.KeyboardEvent ) => {
 		if ( event.keyCode === ENTER ) {
 			event.preventDefault();
 			onSelect();
 		}
 	};
-
 	return (
 		<div
-			className={ classnames( 'global-styles-variations__item', {
+			className={ clsx( 'global-styles-variations__item', {
 				'is-active': isActive,
 			} ) }
 			role="button"
@@ -75,7 +80,6 @@ const GlobalStylesVariation = ( {
 				} ) as string
 			}
 		>
-			{ premiumBadge }
 			<div className="global-styles-variation__item-preview">
 				<GlobalStylesContext.Provider value={ context }>
 					<GlobalStylesVariationPreview
@@ -93,10 +97,19 @@ const GlobalStylesVariation = ( {
 const GlobalStylesVariations = ( {
 	globalStylesVariations,
 	selectedGlobalStylesVariation,
-	premiumBadge,
+	description,
 	showOnlyHoverViewDefaultVariation,
+	splitDefaultVariation = true,
+	needsUpgrade = true,
 	onSelect,
 }: GlobalStylesVariationsProps ) => {
+	const hasEnTranslation = useHasEnTranslation();
+	const isRegisteredCoreBlocks = useRegisterCoreBlocks();
+	const premiumStylesDescription = translate(
+		'Unlock style variations and tons of other features with the %(planName)s plan, or try them out now for free.',
+		{ args: { planName: getPlan( PLAN_PREMIUM )?.getTitle() ?? '' } }
+	);
+
 	const baseGlobalStyles = useMemo(
 		() =>
 			globalStylesVariations.find( ( globalStylesVariation ) =>
@@ -104,7 +117,6 @@ const GlobalStylesVariations = ( {
 			) ?? ( {} as GlobalStylesObject ),
 		[ globalStylesVariations ]
 	);
-
 	const globalStylesVariationsWithoutDefault = useMemo(
 		() =>
 			globalStylesVariations.filter(
@@ -113,31 +125,90 @@ const GlobalStylesVariations = ( {
 		[ globalStylesVariations ]
 	);
 
+	const nonDefaultStylesDescription = description ?? premiumStylesDescription;
+	const nonDefaultStyles = globalStylesVariationsWithoutDefault.map(
+		( globalStylesVariation, index ) => (
+			<GlobalStylesVariation
+				key={ index }
+				globalStylesVariation={ globalStylesVariation }
+				isActive={ globalStylesVariation.slug === selectedGlobalStylesVariation?.slug }
+				onSelect={ () => onSelect( globalStylesVariation ) }
+			/>
+		)
+	);
+
+	const headerText = splitDefaultVariation ? translate( 'Default Style' ) : translate( 'Styles' );
+
+	if ( ! isRegisteredCoreBlocks ) {
+		return null;
+	}
+
 	return (
 		<GlobalStylesContext.Provider value={ { base: baseGlobalStyles } }>
-			<div className="global-styles-variations">
-				<GlobalStylesVariation
-					key="base"
-					globalStylesVariation={ baseGlobalStyles }
-					isActive={
-						! selectedGlobalStylesVariation ||
-						isDefaultGlobalStyleVariationSlug( selectedGlobalStylesVariation )
-					}
-					showOnlyHoverView={ showOnlyHoverViewDefaultVariation }
-					onSelect={ () => onSelect( baseGlobalStyles ) }
-				/>
-				{ globalStylesVariationsWithoutDefault.map( ( globalStylesVariation, index ) => (
-					<GlobalStylesVariation
-						key={ index }
-						globalStylesVariation={ globalStylesVariation }
-						premiumBadge={ premiumBadge }
-						isActive={ globalStylesVariation.slug === selectedGlobalStylesVariation?.slug }
-						onSelect={ () => onSelect( globalStylesVariation ) }
-					/>
-				) ) }
+			<div className="global-styles-variations__container">
+				<div
+					className={ clsx( 'global-styles-variations__type', {
+						'combined-variations': ! splitDefaultVariation,
+					} ) }
+				>
+					<div className="global-styles-variations__header">
+						<h2>
+							<span>{ headerText }</span>
+							{ ! splitDefaultVariation && ! needsUpgrade && (
+								<PremiumBadge
+									shouldHideTooltip
+									shouldCompactWithAnimation
+									labelText={ translate( 'Included in your plan' ) }
+								/>
+							) }
+						</h2>
+						{ ! splitDefaultVariation && (
+							<div>
+								<p>{ translate( 'You can change your style at any time.' ) }</p>
+							</div>
+						) }
+					</div>
+					<div className="global-styles-variations">
+						<GlobalStylesVariation
+							key="base"
+							globalStylesVariation={ baseGlobalStyles }
+							isActive={
+								! selectedGlobalStylesVariation ||
+								isDefaultGlobalStyleVariationSlug( selectedGlobalStylesVariation )
+							}
+							showOnlyHoverView={ showOnlyHoverViewDefaultVariation }
+							onSelect={ () => onSelect( baseGlobalStyles ) }
+						/>
+						{ ! splitDefaultVariation && nonDefaultStyles }
+					</div>
+				</div>
+				{ splitDefaultVariation && (
+					<div className="global-styles-variations__type">
+						<div className="global-styles-variations__header">
+							<h2>
+								<span>
+									{ hasEnTranslation( 'Style Variations' )
+										? translate( 'Style Variation', 'Style Variations', {
+												count: nonDefaultStyles.length,
+										  } )
+										: translate( 'Premium Style', 'Premium Styles', {
+												count: nonDefaultStyles.length,
+										  } ) }
+								</span>
+								<PremiumBadge
+									shouldHideTooltip
+									shouldCompactWithAnimation
+									labelText={ translate( 'Upgrade' ) }
+								/>
+							</h2>
+							<p>{ nonDefaultStylesDescription }</p>
+						</div>
+						<div className="global-styles-variations">{ nonDefaultStyles }</div>
+					</div>
+				) }
 			</div>
 		</GlobalStylesContext.Provider>
 	);
 };
 
-export default GlobalStylesVariations;
+export default withExperimentalBlockEditorProvider( GlobalStylesVariations );

@@ -40,6 +40,7 @@ export function createReceiptObject(
 		currency: data.currency,
 		priceInteger: data.price_integer,
 		priceFloat: data.price_float,
+		isGravatarDomain: Boolean( data.is_gravatar_domain ),
 		purchases: purchases.map( ( purchase ) => {
 			return {
 				delayedProvisioning: Boolean( purchase.delayed_provisioning ),
@@ -58,6 +59,8 @@ export function createReceiptObject(
 				isRenewal: Boolean( purchase.is_renewal ),
 				willAutoRenew: Boolean( purchase.will_auto_renew ),
 				saasRedirectUrl: purchase.saas_redirect_url ?? '',
+				blogId: purchase.blog_id,
+				priceInteger: purchase.price_integer ?? 0,
 			};
 		} ),
 		failedPurchases: failedPurchases.map( ( purchase ) => {

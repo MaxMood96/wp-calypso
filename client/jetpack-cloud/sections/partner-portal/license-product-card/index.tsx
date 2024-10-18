@@ -1,40 +1,47 @@
 import { Gridicon } from '@automattic/components';
-import formatCurrency from '@automattic/format-currency';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
 import { useCallback, useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import { APIProductFamilyProduct } from '../../../../state/partner-portal/types';
-import { useProductDescription } from '../hooks';
+import { useProductDescription, useURLQueryParams } from '../hooks';
+import { LICENSE_INFO_MODAL_ID } from '../lib';
+import getProductShortTitle from '../lib/get-product-short-title';
 import LicenseLightbox from '../license-lightbox';
 import LicenseLightboxLink from '../license-lightbox-link';
-import { getProductTitle } from '../utils';
+import ProductPriceWithDiscount from '../primary/product-price-with-discount-info';
 
 import './style.scss';
 
 interface Props {
-	tabIndex: number;
 	product: APIProductFamilyProduct;
 	isSelected: boolean;
 	isDisabled?: boolean;
-	onSelectProduct: ( value: APIProductFamilyProduct | string ) => void | null;
+	onSelectProduct: ( value: APIProductFamilyProduct ) => void | null;
 	suggestedProduct?: string | null;
 	isMultiSelect?: boolean;
+	hideDiscount?: boolean;
+	quantity?: number;
 }
 
 export default function LicenseProductCard( props: Props ) {
 	const {
-		tabIndex,
 		product,
 		isSelected,
 		isDisabled,
 		onSelectProduct,
 		suggestedProduct,
 		isMultiSelect,
+		hideDiscount,
+		quantity,
 	} = props;
-	const productTitle = getProductTitle( product.name );
-	const [ showLightbox, setShowLightbox ] = useState( false );
+
+	const { setParams, resetParams, getParamValue } = useURLQueryParams();
+	const modalParamValue = getParamValue( LICENSE_INFO_MODAL_ID );
+	const productTitle = getProductShortTitle( product );
+
+	const [ showLightbox, setShowLightbox ] = useState( modalParamValue === product.slug );
 	const translate = useTranslate();
 	const dispatch = useDispatch();
 
@@ -48,8 +55,8 @@ export default function LicenseProductCard( props: Props ) {
 
 	const onKeyDown = useCallback(
 		( e: any ) => {
-			// Spacebar
-			if ( 32 === e.keyCode ) {
+			// Enter
+			if ( 13 === e.keyCode ) {
 				onSelect();
 			}
 		},
@@ -79,14 +86,21 @@ export default function LicenseProductCard( props: Props ) {
 				} )
 			);
 
+			setParams( [
+				{
+					key: LICENSE_INFO_MODAL_ID,
+					value: product.slug,
+				},
+			] );
 			setShowLightbox( true );
 		},
-		[ dispatch, product ]
+		[ dispatch, product.slug, setParams ]
 	);
 
 	const onHideLightbox = useCallback( () => {
+		resetParams( [ LICENSE_INFO_MODAL_ID ] );
 		setShowLightbox( false );
-	}, [] );
+	}, [ resetParams ] );
 
 	return (
 		<>
@@ -94,10 +108,10 @@ export default function LicenseProductCard( props: Props ) {
 				onClick={ onSelect }
 				onKeyDown={ onKeyDown }
 				role={ isMultiSelect ? 'checkbox' : 'radio' }
-				tabIndex={ tabIndex }
+				tabIndex={ 0 }
 				aria-checked={ isSelected }
 				aria-disabled={ isDisabled }
-				className={ classNames( {
+				className={ clsx( {
 					'license-product-card': true,
 					selected: isSelected,
 					disabled: isDisabled,
@@ -109,37 +123,38 @@ export default function LicenseProductCard( props: Props ) {
 							<div className="license-product-card__heading">
 								<h3 className="license-product-card__title">{ productTitle }</h3>
 
+								<div className="license-product-card__pricing is-compact">
+									<ProductPriceWithDiscount
+										product={ product }
+										hideDiscount={ hideDiscount }
+										quantity={ quantity }
+										compact
+									/>
+								</div>
+
 								<div className="license-product-card__description">{ productDescription }</div>
 
-								<LicenseLightboxLink productName={ productTitle } onClick={ onShowLightbox } />
+								{ ! /^jetpack-backup-addon-storage-/.test( product.slug ) && (
+									<LicenseLightboxLink productName={ productTitle } onClick={ onShowLightbox } />
+								) }
 							</div>
 
 							<div
-								className={ classNames( 'license-product-card__select-button', {
+								className={ clsx( 'license-product-card__select-button', {
 									'license-product-card_multi-select': isMultiSelect,
 								} ) }
 							>
 								{ isSelected && <Gridicon icon="checkmark" /> }
 							</div>
 						</div>
-
-						<div className="license-product-card__pricing">
-							<div className="license-product-card__price">
-								{ formatCurrency( product.amount, product.currency ) }
-							</div>
-							<div className="license-product-card__price-interval">
-								{ product.price_interval === 'day' && translate( '/USD per license per day' ) }
-								{ product.price_interval === 'month' && translate( '/USD per license per month' ) }
-							</div>
-						</div>
 					</div>
 				</div>
 			</div>
-
 			{ showLightbox && (
 				<LicenseLightbox
 					product={ product }
-					ctaLabel={ isSelected ? translate( 'Unselect License' ) : translate( 'Select License' ) }
+					quantity={ quantity }
+					ctaLabel={ isSelected ? translate( 'Unselect license' ) : translate( 'Select license' ) }
 					isCTAPrimary={ ! isSelected }
 					isDisabled={ isDisabled }
 					onActivate={ onSelectProduct }

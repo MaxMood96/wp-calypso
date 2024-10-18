@@ -8,16 +8,19 @@ import {
 import { useSelect, useDispatch } from '@wordpress/data';
 import { useI18n } from '@wordpress/react-i18n';
 import { addQueryArgs, getQueryArg } from '@wordpress/url';
+import { useState } from 'react';
 import { StepContainer } from 'calypso/../packages/onboarding/src';
 import QueryProductsList from 'calypso/components/data/query-products-list';
 import RegisterDomainStep from 'calypso/components/domains/register-domain-step';
 import { recordUseYourDomainButtonClick } from 'calypso/components/domains/register-domain-step/analytics';
 import FormattedHeader from 'calypso/components/formatted-header';
+import { useSite } from 'calypso/landing/stepper/hooks/use-site';
 import { ONBOARD_STORE } from 'calypso/landing/stepper/stores';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
 import { domainRegistration } from 'calypso/lib/cart-values/cart-items';
 import { getSuggestionsVendor } from 'calypso/lib/domains/suggestions';
 import CalypsoShoppingCartProvider from 'calypso/my-sites/checkout/calypso-shopping-cart-provider';
+import useChangeSiteDomainIfNeeded from '../../../../hooks/use-change-site-domain-if-needed';
 import type { Step } from '../../types';
 import type { OnboardSelect, DomainSuggestion } from '@automattic/data-stores';
 import './style.scss';
@@ -35,7 +38,12 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 		} ),
 		[]
 	);
-	const siteSlug = getQueryArg( window.location.search, 'siteSlug' );
+	const [ isCartPendingUpdate, setIsCartPendingUpdate ] = useState( false );
+	const [ isCartPendingUpdateDomain, setIsCartPendingUpdateDomain ] =
+		useState< DomainSuggestion >();
+	const site = useSite();
+
+	const changeSiteDomainIfNeeded = useChangeSiteDomainIfNeeded();
 
 	const getDefaultStepContent = () => <h1>Choose a domain step</h1>;
 
@@ -43,13 +51,6 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 	const onAddDomain = ( selectedDomain: any ) => {
 		setDomain( selectedDomain );
 		submit?.( { domain: selectedDomain } );
-	};
-
-	const getInitialSuggestion = function () {
-		const wpcomSubdomainWithRandomNumberSuffix = /^(.+?)([0-9]{5,})\.wordpress\.com$/i;
-		const [ , strippedHostname ] =
-			String( siteSlug ).match( wpcomSubdomainWithRandomNumberSuffix ) || [];
-		return strippedHostname ?? String( siteSlug ).split( '.' )[ 0 ];
 	};
 
 	const onSkip = async () => {
@@ -77,6 +78,9 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 	};
 
 	const submitWithDomain = async ( suggestion: DomainSuggestion | undefined ) => {
+		setIsCartPendingUpdate( true );
+		setIsCartPendingUpdateDomain( suggestion );
+
 		setDomain( suggestion );
 
 		if ( suggestion?.is_free ) {
@@ -92,20 +96,28 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 			setDomainCartItem( domainCartItem );
 		}
 
+		if ( suggestion?.is_free && suggestion?.domain_name ) {
+			changeSiteDomainIfNeeded( suggestion?.domain_name );
+		}
+
 		submit?.( { freeDomain: suggestion?.is_free, domainName: suggestion?.domain_name } );
 	};
 
 	const getBlogOnboardingFlowStepContent = () => {
+		const siteName = site?.name;
+		const domainSuggestion = siteName && siteName !== 'Site Title' ? siteName : '';
+
 		return (
 			<CalypsoShoppingCartProvider>
 				<RegisterDomainStep
-					suggestion={ getInitialSuggestion() }
-					domainsWithPlansOnly={ true }
+					key={ domainSuggestion }
+					suggestion={ domainSuggestion }
+					domainsWithPlansOnly
 					onAddDomain={ submitWithDomain }
-					includeWordPressDotCom={ true }
+					includeWordPressDotCom
 					offerUnavailableOption={ false }
 					showAlreadyOwnADomain={ false }
-					isSignupStep={ true }
+					isSignupStep
 					basePath=""
 					products={ productsList }
 					vendor={ getSuggestionsVendor( {
@@ -114,6 +126,8 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 						flowName: flow || undefined,
 					} ) }
 					handleClickUseYourDomain={ onClickUseYourDomain }
+					isCartPendingUpdate={ isCartPendingUpdate }
+					isCartPendingUpdateDomain={ isCartPendingUpdateDomain }
 				/>
 			</CalypsoShoppingCartProvider>
 		);
@@ -128,15 +142,16 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 					vendor={ flow }
 					basePath=""
 					suggestion={ domainSuggestion }
-					domainsWithPlansOnly={ true }
-					isSignupStep={ true }
-					includeWordPressDotCom={ true }
+					domainsWithPlansOnly
+					isSignupStep
+					includeWordPressDotCom
 					includeDotBlogSubdomain={ false }
 					showAlreadyOwnADomain={ false }
 					onAddDomain={ onAddDomain }
 					onSkip={ onSkip }
 					products={ productsList }
-					useProvidedProductsList={ true }
+					useProvidedProductsList
+					isReskinned
 				/>
 				<div className="aside-sections">
 					<div className="aside-section">
@@ -213,10 +228,7 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 					subHeaderText={
 						<>
 							{ __( 'Help your blog stand out with a custom domain. Not sure yet?' ) }
-							<button
-								className="button navigation-link step-container__navigation-link has-underline is-borderless"
-								onClick={ onSkip }
-							>
+							<button className="formatted-header__subtitle has-underline" onClick={ onSkip }>
 								{ __( 'Decide later.' ) }
 							</button>
 						</>
@@ -232,11 +244,12 @@ const ChooseADomain: Step = function ChooseADomain( { navigation, flow } ) {
 			<QueryProductsList />
 			<StepContainer
 				stepName="chooseADomain"
-				shouldHideNavButtons={ isVideoPressFlow || isBlogOnboardingFlow( flow ) }
+				shouldHideNavButtons={ isVideoPressFlow }
+				hideSkip={ isBlogOnboardingFlow( flow ) }
 				goBack={ goBack }
 				goNext={ goNext }
 				isHorizontalLayout={ false }
-				isWideLayout={ true }
+				isWideLayout
 				isLargeSkipLayout={ false }
 				stepContent={ getStepContent() }
 				recordTracksEvent={ recordTracksEvent }

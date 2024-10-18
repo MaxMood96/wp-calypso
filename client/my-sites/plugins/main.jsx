@@ -3,26 +3,26 @@ import {
 	WPCOM_FEATURES_MANAGE_PLUGINS,
 	WPCOM_FEATURES_UPLOAD_PLUGINS,
 } from '@automattic/calypso-products/src';
-import { Button } from '@automattic/components';
+import page from '@automattic/calypso-router';
+import { Button, Count } from '@automattic/components';
 import { subscribeIsWithinBreakpoint, isWithinBreakpoint } from '@automattic/viewport';
 import { Icon, upload } from '@wordpress/icons';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import { capitalize, find, flow, isEmpty } from 'lodash';
-import page from 'page';
 import { Component } from 'react';
 import { connect } from 'react-redux';
-import Count from 'calypso/components/count';
 import DocumentHead from 'calypso/components/data/document-head';
 import QueryJetpackSitesFeatures from 'calypso/components/data/query-jetpack-sites-features';
 import QueryPlugins from 'calypso/components/data/query-plugins';
 import QuerySiteFeatures from 'calypso/components/data/query-site-features';
 import EmptyContent from 'calypso/components/empty-content';
-import FixedNavigationHeader from 'calypso/components/fixed-navigation-header';
+import NavigationHeader from 'calypso/components/navigation-header';
 import Search from 'calypso/components/search';
 import SectionNav from 'calypso/components/section-nav';
 import NavItem from 'calypso/components/section-nav/item';
 import NavTabs from 'calypso/components/section-nav/tabs';
+import MissingPaymentNotification from 'calypso/jetpack-cloud/components/missing-payment-notification';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import urlSearch from 'calypso/lib/url-search';
 import { getVisibleSites, siteObjectsToSiteIds } from 'calypso/my-sites/plugins/utils';
@@ -139,9 +139,6 @@ export class PluginsMain extends Component {
 			{
 				label: this.props.translate( 'Plugins' ),
 				href: `/plugins/${ selectedSiteSlug || '' }`,
-				helpBubble: this.props.translate(
-					'Add new functionality and integrations to your site with plugins.'
-				),
 			},
 			{
 				label: this.props.translate( 'Installed Plugins' ),
@@ -299,25 +296,28 @@ export class PluginsMain extends Component {
 	}
 
 	getEmptyContentData() {
-		const { translate } = this.props;
-		let emptyContentData = {
-			illustration: '/calypso/images/illustrations/illustration-empty-results.svg',
-		};
-
-		switch ( this.props.filter ) {
-			case 'active':
-				emptyContentData.title = translate( 'No plugins are active.', { textOnly: true } );
-				break;
-			case 'inactive':
-				emptyContentData.title = translate( 'No plugins are inactive.', { textOnly: true } );
-				break;
-			case 'updates':
-				emptyContentData = this.getEmptyContentUpdateData();
-				break;
-			default:
-				return null;
+		const { filter } = this.props;
+		if ( filter === 'update' ) {
+			return this.getEmptyContentUpdateData();
 		}
-		return emptyContentData;
+
+		const { translate } = this.props;
+		const illustration = '/calypso/images/illustrations/illustration-empty-results.svg';
+		if ( filter === 'active' ) {
+			return {
+				title: translate( 'No plugins are active.', { textOnly: true } ),
+				illustration,
+			};
+		}
+
+		if ( filter === 'inactive' ) {
+			return {
+				title: translate( 'No plugins are inactive.', { textOnly: true } ),
+				illustration,
+			};
+		}
+
+		return null;
 	}
 
 	getUpdatesTabVisibility() {
@@ -449,16 +449,19 @@ export class PluginsMain extends Component {
 
 		const { isJetpackCloud, selectedSite } = this.props;
 
-		const pageTitle = isJetpackCloud
-			? this.props.translate( 'Plugins', { textOnly: true } )
-			: this.props.translate( 'Installed Plugins', { textOnly: true } );
+		let pageTitle;
+		if ( isJetpackCloud ) {
+			pageTitle = this.props.translate( 'Plugins', { textOnly: true } );
+		} else {
+			pageTitle = this.props.translate( 'Installed Plugins', { textOnly: true } );
+		}
 
 		const { title, count } = this.getSelectedText();
 
 		const selectedTextContent = (
 			<span>
 				{ title }
-				{ count ? <Count count={ count } compact={ true } /> : null }
+				{ count ? <Count count={ count } compact /> : null }
 			</span>
 		);
 
@@ -474,75 +477,96 @@ export class PluginsMain extends Component {
 					<QueryJetpackSitesFeatures />
 				) }
 				{ this.renderPageViewTracking() }
-				{ ! isJetpackCloud && (
-					<FixedNavigationHeader
-						className="plugin__header"
-						compactBreadcrumb={ false }
-						navigationItems={ this.props.breadcrumbs }
-					/>
-				) }
-				<div
-					className={ classNames( 'plugins__top-container', {
-						'plugins__top-container-wp': ! isJetpackCloud,
-					} ) }
-				>
-					<div className="plugins__content-wrapper">
-						<div className="plugins__page-title-container">
-							<div className="plugins__header-left-content">
-								<h2 className="plugins__page-title">{ pageTitle }</h2>
-								<div className="plugins__page-subtitle">
-									{ this.props.selectedSite
-										? this.props.translate( 'Manage all plugins installed on %(selectedSite)s', {
-												args: {
-													selectedSite: this.props.selectedSite.domain,
-												},
-										  } )
-										: this.props.translate( 'Manage plugins installed on all sites' ) }
-								</div>
-							</div>
+				<div className="plugin-management-wrapper">
+					{ ! isJetpackCloud && (
+						<NavigationHeader
+							navigationItems={ [] }
+							title={ pageTitle }
+							subtitle={
+								this.props.selectedSite
+									? this.props.translate( 'Manage all plugins installed on %(selectedSite)s', {
+											args: {
+												selectedSite: this.props.selectedSite.domain,
+											},
+									  } )
+									: this.props.translate( 'Manage plugins installed on all sites' )
+							}
+						>
 							{ ! isJetpackCloud && (
-								<div className="plugins__header-right-content">
+								<>
 									{ this.renderAddPluginButton() }
 									{ this.renderUploadPluginButton() }
 									<UpdatePlugins isWpCom plugins={ currentPlugins } />
+								</>
+							) }
+						</NavigationHeader>
+					) }
+					<div
+						className={ clsx( 'plugins__top-container', {
+							'plugins__top-container-jc': isJetpackCloud,
+						} ) }
+					>
+						<div className="plugins__content-wrapper">
+							<MissingPaymentNotification />
+
+							{ isJetpackCloud && (
+								<div className="plugins__page-title-container">
+									<div className="plugins__header-left-content">
+										<h2 className="plugins__page-title">{ pageTitle }</h2>
+										<div className="plugins__page-subtitle">
+											{ this.props.selectedSite
+												? this.props.translate(
+														'Manage all plugins installed on %(selectedSite)s',
+														{
+															args: {
+																selectedSite: this.props.selectedSite.domain,
+															},
+														}
+												  )
+												: this.props.translate( 'Manage plugins installed on all sites' ) }
+										</div>
+									</div>
 								</div>
 							) }
-						</div>
-
-						<div className="plugins__main plugins__main-updated">
-							<div className="plugins__main-header">
-								<SectionNav
-									applyUpdatedStyles
-									selectedText={ selectedTextContent }
-									className="plugins-section-nav"
-								>
-									<NavTabs selectedText={ title } selectedCount={ count }>
-										{ navItems }
-									</NavTabs>
-								</SectionNav>
+							<div className="plugins__main plugins__main-updated">
+								<div className="plugins__main-header">
+									<SectionNav
+										applyUpdatedStyles
+										selectedText={ selectedTextContent }
+										className="plugins-section-nav"
+									>
+										<NavTabs selectedText={ title } selectedCount={ count }>
+											{ navItems }
+										</NavTabs>
+									</SectionNav>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
-				<div className="plugins__main-content">
-					<div className="plugins__content-wrapper">
-						{
-							// Hide the search box only when the request to fetch plugins fail, and there are no sites.
-							! ( this.props.requestPluginsError && ! currentPlugins?.length ) && (
-								<div className="plugins__search">
-									<Search
-										hideFocus
-										isOpen
-										onSearch={ this.props.doSearch }
-										initialValue={ this.props.search }
-										hideClose={ ! this.props.search }
-										analyticsGroup="Plugins"
-										placeholder={ this.props.translate( 'Search plugins' ) }
-									/>
-								</div>
-							)
-						}
-						{ this.renderPluginsContent() }
+					<div
+						className={ clsx( 'plugins__main-content', {
+							'plugins__main-content-jc': isJetpackCloud,
+						} ) }
+					>
+						<div className="plugins__content-wrapper">
+							{
+								// Hide the search box only when the request to fetch plugins fail, and there are no sites.
+								! ( this.props.requestPluginsError && ! currentPlugins?.length ) && (
+									<div className="plugins__search">
+										<Search
+											hideFocus
+											isOpen
+											onSearch={ this.props.doSearch }
+											initialValue={ this.props.search }
+											hideClose={ ! this.props.search }
+											analyticsGroup="Plugins"
+											placeholder={ this.props.translate( 'Search plugins' ) }
+										/>
+									</div>
+								)
+							}
+							{ this.renderPluginsContent() }
+						</div>
 					</div>
 				</div>
 			</>

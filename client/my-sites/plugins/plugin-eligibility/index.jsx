@@ -1,5 +1,5 @@
+import page from '@automattic/calypso-router';
 import { localize } from 'i18n-calypso';
-import page from 'page';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
@@ -46,7 +46,7 @@ class PluginEligibility extends Component {
 		return (
 			<MainComponent>
 				<PageViewTracker path="/plugins/:plugin/eligibility/:site" title="Plugins > Eligibility" />
-				<HeaderCake isCompact={ true } onClick={ this.goBack }>
+				<HeaderCake isCompact onClick={ this.goBack }>
 					{ translate( 'Install plugin' ) }
 				</HeaderCake>
 				<EligibilityWarnings
@@ -59,8 +59,9 @@ class PluginEligibility extends Component {
 }
 
 // It was 2:45AM, I wanted to deploy, and @dmsnell made me do it... props to @dmsnell :)
-const withNavigation = ( WrappedComponent ) => ( props ) =>
-	<WrappedComponent { ...{ ...props, navigateTo: page } } />;
+const withNavigation = ( WrappedComponent ) => ( props ) => (
+	<WrappedComponent { ...{ ...props, navigateTo: page } } />
+);
 
 const mapStateToProps = ( state ) => {
 	const siteId = getSelectedSiteId( state );

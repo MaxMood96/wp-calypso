@@ -20,8 +20,10 @@ export class InstagramBlockFlow implements BlockFlow {
 		this.configurationData = configurationData;
 	}
 
-	blockSidebarName = 'Instagram';
+	blockSidebarName = 'Instagram Embed';
+	blockTestFallBackName = 'Instagram';
 	blockEditorSelector = '[aria-label="Block: Embed"]:has-text("Instagram URL")';
+	noSearch = false;
 
 	/**
 	 * Configure the block in the editor with the configuration data from the constructor
@@ -42,7 +44,7 @@ export class InstagramBlockFlow implements BlockFlow {
 			} )
 			.click();
 
-		await editorCanvas.getByTitle( 'Embedded content from instagram.com' ).waitFor();
+		await editorCanvas.getByTitle( 'Embedded content from www.instagram.com' ).waitFor();
 	}
 
 	/**

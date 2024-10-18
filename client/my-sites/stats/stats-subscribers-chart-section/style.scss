@@ -1,5 +1,5 @@
 @import "@wordpress/base-styles/breakpoints";
-@import "@automattic/components/src/highlight-cards/variables.scss";
+@import "@automattic/components/src/highlight-cards/variables";
 
 .subscribers-section {
 	margin: 1em 0;
@@ -18,6 +18,7 @@
 	justify-content: space-between;
 	margin-bottom: 16px;
 	box-shadow: none; // override .highlight-cards styling
+	background-color: transparent;
 
 	> .highlight-cards-heading {
 		margin-bottom: 0;
@@ -33,7 +34,7 @@
 .subscribers-section-legend {
 	display: flex;
 
-	@media ( max-width: $custom-mobile-breakpoint ) {
+	@media (max-width: $custom-mobile-breakpoint) {
 		margin-left: $font-body-small;
 		margin-right: $font-body-small;
 
@@ -45,6 +46,11 @@
 	.u-legend {
 		display: flex;
 		justify-content: right;
+	}
+
+	.u-value {
+		vertical-align: middle;
+		display: inline-block;
 	}
 }
 

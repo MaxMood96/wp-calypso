@@ -15,7 +15,7 @@ export function makeLayoutMiddleware( LayoutComponent ) {
 			query,
 			primary,
 			secondary,
-			headerSection,
+			renderHeaderSection,
 			showGdprBanner,
 			cachedMarkup,
 		} = context;
@@ -36,7 +36,7 @@ export function makeLayoutMiddleware( LayoutComponent ) {
 					currentQuery={ query }
 					primary={ primary }
 					secondary={ secondary }
-					headerSection={ headerSection }
+					renderHeaderSection={ renderHeaderSection }
 					redirectUri={ context.originalUrl }
 					showGdprBanner={ showGdprBanner }
 				/>
@@ -70,16 +70,14 @@ export function setLocaleMiddleware( param = 'lang' ) {
 			context.lang = paramsLocale;
 			context.store.dispatch( setLocale( paramsLocale ) );
 		}
-
 		next();
 	};
 }
 
 /**
  * Composes multiple handlers into one.
- *
- * @param { ...( context, Function ) => void } handlers - A list of route handlers to compose
- * @returns  { ( context, Function ) => void } - A new route handler that executes the handlers in succession
+ * @param {Object[]} handlers { ...( context, Function ) => void } - A list of route handlers to compose
+ * @returns {Function} { ( context, Function ) => void } - A new route handler that executes the handlers in succession
  */
 export function composeHandlers( ...handlers ) {
 	return ( context, next ) => {

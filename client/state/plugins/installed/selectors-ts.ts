@@ -11,7 +11,7 @@ import type {
 	InstalledPluginData,
 	Plugin,
 	PluginFilter,
-	PluginSites,
+	PluginSite,
 	PluginStatus,
 } from './types';
 import type { AppState } from 'calypso/types';
@@ -34,7 +34,7 @@ export function isEqualSlugOrId( pluginSlug: string, plugin: Plugin ) {
 	return plugin.slug === pluginSlug || plugin?.id?.split( '/' ).shift() === pluginSlug;
 }
 
-export function isRequesting( state: AppState, siteId: number ) {
+export function isRequesting( state: AppState, siteId: number ): boolean {
 	if ( typeof state.plugins.installed.isRequesting[ siteId ] === 'undefined' ) {
 		return false;
 	}
@@ -46,7 +46,7 @@ export function isRequestingForSites( state: AppState, sites: number[] ) {
 	return sites.some( ( siteId ) => isRequesting( state, siteId ) );
 }
 
-export function isRequestingForAllSites( state: AppState ) {
+export function isRequestingForAllSites( state: AppState ): boolean {
 	return state.plugins.installed.isRequestingAll;
 }
 
@@ -174,47 +174,38 @@ export const getAllPluginsIndexedBySiteId = createSelector(
 		getAllPluginsIndexedByPluginSlug( state ),
 		getSiteIdsThatHavePlugins( state ),
 	]
-) as { ( state: AppState ): { [ siteId: number ]: { [ pluginSlug: string ]: Plugin } } };
+);
 
 export const getFilteredAndSortedPlugins = createSelector(
 	( state: AppState, siteIds: number[], pluginFilter?: PluginFilter ) => {
 		const allPluginsIndexedBySiteId = getAllPluginsIndexedBySiteId( state );
 
-		// Properties on the objects in allPluginsIndexedBySiteId will be modified and the
-		// selector memoization always returns the same object, so use `structuredClone` to avoid
-		// altering it for everyone.
-		const allPluginsForSites: { [ pluginSlug: string ]: Plugin } = structuredClone(
-			siteIds
-				.map( ( siteId: number ) => allPluginsIndexedBySiteId[ siteId ] )
-				.filter( Boolean )
-				.reduce( ( accumulator, current ) => ( { ...accumulator, ...current } ), {} )
-		);
+		const allPluginsForSites: { [ pluginSlug: string ]: Plugin } = siteIds
+			.map( ( siteId: number ) => allPluginsIndexedBySiteId[ siteId ] )
+			.filter( Boolean )
+			.reduce( ( accumulator, current ) => ( { ...accumulator, ...current } ), {} );
 
 		// Filter the sites object on the plugins so that only data for the requested siteIds is present
 		for ( const pluginSlug of Object.keys( allPluginsForSites ) ) {
-			allPluginsForSites[ pluginSlug ].sites = Object.entries(
-				allPluginsForSites[ pluginSlug ].sites
-			)
-				.filter( ( [ siteId ] ) => siteIds.includes( Number( siteId ) ) )
-				.reduce( ( obj, [ siteId, site ] ) => {
-					obj[ siteId ] = site;
-					return obj;
-				}, {} as PluginSites );
+			const plugin = allPluginsForSites[ pluginSlug ];
+			const filteredSites = Object.fromEntries(
+				Object.entries( plugin.sites ).filter( ( [ siteId ] ) =>
+					siteIds.includes( Number( siteId ) )
+				)
+			);
+			// Mutates the existing `appPluginsForSites` object, which is a local variable, but creates
+			// a shallow copy of the values, which are immutable values coming from `getAllPluginsIndexedBySiteId`.
+			allPluginsForSites[ pluginSlug ] = { ...plugin, sites: filteredSites };
 		}
 
 		// Filter the plugins using the pluginFilter if it is set
-		const pluginList =
-			pluginFilter && _filters[ pluginFilter ]
-				? Object.values( allPluginsForSites )
-						.filter( ( plugin ) => _filters[ pluginFilter ]( plugin ) )
-						.reduce( ( obj, plugin ) => {
-							obj[ plugin.slug ] = plugin;
-							return obj;
-						}, {} as { [ pluginSlug: string ]: Plugin } )
-				: allPluginsForSites;
+		let pluginList = Object.values( allPluginsForSites );
+		if ( pluginFilter && _filters[ pluginFilter ] ) {
+			pluginList = pluginList.filter( ( plugin ) => _filters[ pluginFilter ]( plugin ) );
+		}
 
 		// Sort the plugins alphabetically by slug
-		const sortedPluginListEntries = Object.values( pluginList ).sort( ( pluginA, pluginB ) => {
+		const sortedPluginListEntries = pluginList.sort( ( pluginA, pluginB ) => {
 			const pluginSlugALower = pluginA.slug.toLowerCase();
 			const pluginSlugBLower = pluginB.slug.toLowerCase();
 			return getSortCompareNumber( pluginSlugALower, pluginSlugBLower );
@@ -264,11 +255,11 @@ export const getPluginOnSite = createSelector(
 	( state: AppState, siteId: number, pluginSlug: string ) => {
 		const plugin = getAllPluginsIndexedByPluginSlug( state )[ pluginSlug ];
 
-		const { sites, ...pluginWithoutSites } = plugin;
-
 		if ( ! plugin || ! plugin.sites[ siteId ] ) {
 			return undefined;
 		}
+
+		const { sites, ...pluginWithoutSites } = plugin;
 
 		// To keep compatibility with some behavior that existed before the refactor
 		// in #73296 the returned object has the site specific data lifted onto it, and
@@ -280,7 +271,7 @@ export const getPluginOnSite = createSelector(
 		};
 	},
 	( state: AppState ) => [ getAllPluginsIndexedByPluginSlug( state ) ]
-);
+) as ( state: AppState, siteId: number, pluginSlug: string ) => Plugin & PluginSite;
 
 export const getPluginsOnSite = createSelector(
 	( state: AppState, siteId: number, pluginSlugs: string[] ) => {
@@ -290,7 +281,7 @@ export const getPluginsOnSite = createSelector(
 		...pluginSlugs.map( ( pluginSlug ) => getPluginOnSite( state, siteId, pluginSlug ) ),
 	],
 	( state: AppState, siteId: number, pluginSlugs: string[] ) => [ siteId, ...pluginSlugs ].join()
-);
+) as ( state: AppState, siteId: number, pluginSlugs: string[] ) => ( Plugin & PluginSite )[];
 
 export const getSitesWithPlugin = createSelector(
 	( state: AppState, siteIds: number[], pluginSlug: string ) => {
@@ -353,7 +344,11 @@ export const getSiteObjectsWithoutPlugin = createSelector(
 	( state: AppState, siteIds: number[], pluginSlug: string ) => [ pluginSlug, ...siteIds ].join()
 );
 
-export function getStatusForPlugin( state: AppState, siteId: number, pluginId: string ) {
+export function getStatusForPlugin(
+	state: AppState,
+	siteId: number,
+	pluginId: string
+): PluginStatus | undefined {
 	if ( typeof state.plugins.installed.status[ siteId ]?.[ pluginId ] === 'undefined' ) {
 		return undefined;
 	}
@@ -367,7 +362,6 @@ export function getStatusForPlugin( state: AppState, siteId: number, pluginId: s
 
 /**
  * Whether the plugin's status for one or more recent actions matches a specified status.
- *
  * @param  {Object}       state    Global state tree
  * @param  {number}       siteId   ID of the site
  * @param  {string}       pluginId ID of the plugin
@@ -389,12 +383,11 @@ export function isPluginActionStatus(
 	}
 
 	const actions = Array.isArray( action ) ? action : [ action ];
-	return actions.includes( pluginStatus.action ) && status === pluginStatus.status;
+	return actions.includes( pluginStatus?.action ) && status === pluginStatus.status;
 }
 
 /**
  * Whether the plugin's status for one or more recent actions is in progress.
- *
  * @param  {Object}       state    Global state tree
  * @param  {number}       siteId   ID of the site
  * @param  {string}       pluginId ID of the plugin
@@ -413,7 +406,6 @@ export function isPluginActionInProgress(
 
 /**
  * Retrieve all plugin statuses of a certain type.
- *
  * @param  {Object} state    Global state tree
  * @param  {string} status   Status of interest
  * @returns {Array}          Array of plugin status objects
@@ -441,3 +433,24 @@ export const getPluginStatusesByType = createSelector(
 	},
 	( state: AppState ) => state.plugins.installed.status
 );
+
+/**
+ * Returns true if a particular plugin is installed and active for a specified site.
+ * This is useful for Jetpack connected sites.
+ * @param {Object} state - Global state tree
+ * @param {number} siteId - Site ID
+ * @param {string} pluginSlug - Plugin slug
+ * @returns {boolean} - True if that plugin is active for that site, false otherwise.
+ */
+export const isPluginActive = createSelector(
+	( state: AppState, siteId: number, pluginSlug: string ) => {
+		const sitePlugin = getAllPluginsIndexedBySiteId( state )[ siteId ]?.[ pluginSlug ];
+
+		if ( ! sitePlugin ) {
+			return false;
+		}
+
+		return sitePlugin.sites[ siteId ]?.active;
+	},
+	( state: AppState ) => [ getAllPluginsIndexedBySiteId( state ) ]
+) as ( state: AppState, siteId: number, pluginSlug: string ) => boolean;

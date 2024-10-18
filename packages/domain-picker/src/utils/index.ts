@@ -4,6 +4,9 @@ import {
 	LINK_IN_BIO_TLD_FLOW,
 	ECOMMERCE_FLOW,
 	WOOEXPRESS_FLOW,
+	DOMAIN_FOR_GRAVATAR_FLOW,
+	isDomainForGravatarFlow,
+	isHundredYearDomainFlow,
 } from '@automattic/onboarding';
 import type { DomainSuggestions } from '@automattic/data-stores';
 
@@ -30,7 +33,6 @@ export function mockDomainSuggestion(
 
 /**
  * Get the suggestions vendor
- *
  * @param {Object} [options={}] Options to determine the suggestion vendor
  * @param {boolean} [options.isSignup=false] Flag to indicate that we're in a signup context
  * @param {boolean} [options.isDomainOnly=false] Flag to indicate that we're in a domain-only context
@@ -46,7 +48,8 @@ interface DomainSuggestionsVendorOptions {
 		| typeof LINK_IN_BIO_FLOW
 		| typeof LINK_IN_BIO_TLD_FLOW
 		| typeof ECOMMERCE_FLOW
-		| typeof WOOEXPRESS_FLOW;
+		| typeof WOOEXPRESS_FLOW
+		| typeof DOMAIN_FOR_GRAVATAR_FLOW;
 }
 type DomainSuggestionsVendor =
 	| 'variation2_front'
@@ -55,11 +58,19 @@ type DomainSuggestionsVendor =
 	| 'link-in-bio'
 	| 'link-in-bio-tld'
 	| 'newsletter'
-	| 'ecommerce';
+	| 'ecommerce'
+	| 'gravatar'
+	| '100-year-domains';
 
 export function getDomainSuggestionsVendor(
 	options: DomainSuggestionsVendorOptions = {}
 ): DomainSuggestionsVendor {
+	if ( isDomainForGravatarFlow( options.flowName ) ) {
+		return 'gravatar';
+	}
+	if ( isHundredYearDomainFlow( options.flowName ) ) {
+		return '100-year-domains';
+	}
 	if ( options.flowName === LINK_IN_BIO_FLOW ) {
 		return 'link-in-bio';
 	}

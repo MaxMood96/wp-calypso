@@ -1,65 +1,46 @@
-import { isEnabled } from '@automattic/calypso-config';
 import { Onboard } from '@automattic/data-stores';
-import { Design, isBlankCanvasDesign } from '@automattic/design-picker';
+import { Design, isAssemblerDesign, isAssemblerSupported } from '@automattic/design-picker';
+import { MIGRATION_FLOW } from '@automattic/onboarding';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { useEffect } from 'react';
-import { useDispatch as reduxDispatch, useSelector } from 'react-redux';
 import wpcomRequest from 'wpcom-proxy-request';
-import { ImporterMainPlatform } from 'calypso/blocks/import/types';
+import { isTargetSitePlanCompatible } from 'calypso/blocks/importer/util';
+import { useIsSiteAssemblerEnabled } from 'calypso/data/site-assembler';
+import { useIsBigSkyEligible } from 'calypso/landing/stepper/hooks/use-is-site-big-sky-eligible';
 import { useQuery } from 'calypso/landing/stepper/hooks/use-query';
+import { ImporterMainPlatform } from 'calypso/lib/importer/types';
 import { addQueryArgs } from 'calypso/lib/route';
+import { useDispatch as reduxDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
-import { getCurrentUser } from 'calypso/state/current-user/selectors';
 import { getActiveTheme, getCanonicalTheme } from 'calypso/state/themes/selectors';
 import { WRITE_INTENT_DEFAULT_DESIGN } from '../constants';
 import { useIsPluginBundleEligible } from '../hooks/use-is-plugin-bundle-eligible';
-import { useSite } from '../hooks/use-site';
-import { useSiteIdParam } from '../hooks/use-site-id-param';
-import { useSiteSetupFlowProgress } from '../hooks/use-site-setup-flow-progress';
-import { useSiteSlugParam } from '../hooks/use-site-slug-param';
+import { useSiteData } from '../hooks/use-site-data';
 import { useCanUserManageOptions } from '../hooks/use-user-can-manage-options';
-import { ONBOARD_STORE, SITE_STORE, USER_STORE } from '../stores';
-import { recordSubmitStep } from './internals/analytics/record-submit-step';
-import StartingPointStep from './internals/steps-repository/blogger-starting-point';
-import BusinessInfo from './internals/steps-repository/business-info';
-import CoursesStep from './internals/steps-repository/courses';
-import DesignSetup from './internals/steps-repository/design-setup';
-import DIFMStartingPoint from './internals/steps-repository/difm-starting-point';
-import EditEmail from './internals/steps-repository/edit-email';
-import ErrorStep from './internals/steps-repository/error-step';
-import GoalsStep from './internals/steps-repository/goals';
-import ImportStep from './internals/steps-repository/import';
+import { ONBOARD_STORE, SITE_STORE, USER_STORE, STEPPER_INTERNAL_STORE } from '../stores';
+import { shouldRedirectToSiteMigration } from './helpers';
+import { useLaunchpadDecider } from './internals/hooks/use-launchpad-decider';
+import { STEPS } from './internals/steps';
 import { redirect } from './internals/steps-repository/import/util';
-import ImportLight from './internals/steps-repository/import-light';
-import ImportList from './internals/steps-repository/import-list';
-import ImportReady from './internals/steps-repository/import-ready';
-import ImportReadyNot from './internals/steps-repository/import-ready-not';
-import ImportReadyPreview from './internals/steps-repository/import-ready-preview';
-import ImportReadyWpcom from './internals/steps-repository/import-ready-wpcom';
-import ImporterBlogger from './internals/steps-repository/importer-blogger';
-import ImporterMedium from './internals/steps-repository/importer-medium';
-import ImporterSquarespace from './internals/steps-repository/importer-squarespace';
-import ImporterWix from './internals/steps-repository/importer-wix';
-import ImporterWordpress from './internals/steps-repository/importer-wordpress';
-import IntentStep from './internals/steps-repository/intent-step';
-import PatternAssembler from './internals/steps-repository/pattern-assembler/lazy';
-import ProcessingStep from './internals/steps-repository/processing-step';
 import { ProcessingResult } from './internals/steps-repository/processing-step/constants';
-import SiteOptions from './internals/steps-repository/site-options';
-import StoreAddress from './internals/steps-repository/store-address';
-import WooConfirm from './internals/steps-repository/woo-confirm';
-import WooInstallPlugins from './internals/steps-repository/woo-install-plugins';
-import WooTransfer from './internals/steps-repository/woo-transfer';
-import WooVerifyEmail from './internals/steps-repository/woo-verify-email';
 import {
 	AssertConditionResult,
 	AssertConditionState,
 	Flow,
 	ProvidedDependencies,
 } from './internals/types';
-import type { OnboardSelect, SiteSelect, UserSelect } from '@automattic/data-stores';
+import type {
+	OnboardSelect,
+	SiteSelect,
+	UserSelect,
+	StepperInternalSelect,
+} from '@automattic/data-stores';
 
 const SiteIntent = Onboard.SiteIntent;
+
+type ExitFlowOptions = {
+	skipLaunchpad?: boolean;
+};
 
 function isLaunchpadIntent( intent: string ) {
 	return intent === SiteIntent.Write || intent === SiteIntent.Build;
@@ -67,6 +48,7 @@ function isLaunchpadIntent( intent: string ) {
 
 const siteSetupFlow: Flow = {
 	name: 'site-setup',
+	isSignupFlow: false,
 
 	useSideEffect( currentStep, navigate ) {
 		const selectedDesign = useSelect(
@@ -76,7 +58,7 @@ const siteSetupFlow: Flow = {
 
 		useEffect( () => {
 			// Require to start the flow from the first step
-			if ( currentStep === 'patternAssembler' && ! selectedDesign ) {
+			if ( currentStep === 'pattern-assembler' && ! selectedDesign ) {
 				navigate( 'goals' );
 			}
 		}, [] );
@@ -84,46 +66,40 @@ const siteSetupFlow: Flow = {
 
 	useSteps() {
 		return [
-			{ slug: 'goals', component: GoalsStep },
-			{ slug: 'intent', component: IntentStep },
-			{ slug: 'options', component: SiteOptions },
-			{ slug: 'designSetup', component: DesignSetup },
-			{ slug: 'patternAssembler', component: PatternAssembler },
-			{ slug: 'bloggerStartingPoint', component: StartingPointStep },
-			{ slug: 'courses', component: CoursesStep },
-			{ slug: 'import', component: ImportStep },
-			...( isEnabled( 'onboarding/import-light' )
-				? [ { slug: 'importLight', component: ImportLight } ]
-				: [] ),
-			{ slug: 'importList', component: ImportList },
-			{ slug: 'importReady', component: ImportReady },
-			{ slug: 'importReadyNot', component: ImportReadyNot },
-			{ slug: 'importReadyWpcom', component: ImportReadyWpcom },
-			{ slug: 'importReadyPreview', component: ImportReadyPreview },
-			{ slug: 'importerWix', component: ImporterWix },
-			{ slug: 'importerBlogger', component: ImporterBlogger },
-			{ slug: 'importerMedium', component: ImporterMedium },
-			{ slug: 'importerSquarespace', component: ImporterSquarespace },
-			{ slug: 'importerWordpress', component: ImporterWordpress },
-			{ slug: 'businessInfo', component: BusinessInfo },
-			{ slug: 'storeAddress', component: StoreAddress },
-			{ slug: 'processing', component: ProcessingStep },
-			{ slug: 'error', component: ErrorStep },
-			{ slug: 'wooTransfer', component: WooTransfer },
-			{ slug: 'wooInstallPlugins', component: WooInstallPlugins },
-			...( isEnabled( 'signup/woo-verify-email' )
-				? [ { slug: 'wooVerifyEmail', component: WooVerifyEmail } ]
-				: [] ),
-			{ slug: 'wooConfirm', component: WooConfirm },
-			{ slug: 'editEmail', component: EditEmail },
-			...( isEnabled( 'signup/woo-verify-email' )
-				? [ { slug: 'editEmail', component: EditEmail } ]
-				: [] ),
-			{ slug: 'difmStartingPoint', component: DIFMStartingPoint },
+			STEPS.GOALS,
+			STEPS.INTENT,
+			STEPS.OPTIONS,
+			STEPS.DESIGN_CHOICES,
+			STEPS.DESIGN_SETUP,
+			STEPS.PATTERN_ASSEMBLER,
+			STEPS.BLOGGER_STARTING_POINT,
+			STEPS.COURSES,
+			STEPS.IMPORT,
+			STEPS.IMPORT_LIGHT,
+			STEPS.IMPORT_LIST,
+			STEPS.IMPORT_READY,
+			STEPS.IMPORT_READY_NOT,
+			STEPS.IMPORT_READY_WPCOM,
+			STEPS.IMPORT_READY_PREVIEW,
+			STEPS.IMPORTER_WIX,
+			STEPS.IMPORTER_BLOGGER,
+			STEPS.IMPORTER_MEDIUM,
+			STEPS.IMPORTER_SQUARESPACE,
+			STEPS.IMPORTER_WORDPRESS,
+			STEPS.LAUNCH_BIG_SKY,
+			STEPS.VERIFY_EMAIL,
+			STEPS.TRIAL_ACKNOWLEDGE,
+			STEPS.PROCESSING,
+			STEPS.ERROR,
+			STEPS.DIFM_STARTING_POINT,
 		];
 	},
 	useStepNavigation( currentStep, navigate ) {
-		const flowName = this.name;
+		const stepData = useSelect(
+			( select ) => ( select( STEPPER_INTERNAL_STORE ) as StepperInternalSelect ).getStepData(),
+			[]
+		);
+
 		const intent = useSelect(
 			( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getIntent(),
 			[]
@@ -141,24 +117,24 @@ const siteSetupFlow: Flow = {
 			( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getStartingPoint(),
 			[]
 		);
-		const siteSlugParam = useSiteSlugParam();
-		const site = useSite();
-		const currentUser = useSelector( getCurrentUser );
+
+		const { site, siteSlug, siteId } = useSiteData();
+		const isSitePlanCompatible = site && isTargetSitePlanCompatible( site );
 		const currentThemeId = useSelector( ( state ) => getActiveTheme( state, site?.ID || -1 ) );
 		const currentTheme = useSelector( ( state ) =>
 			getCanonicalTheme( state, site?.ID || -1, currentThemeId )
 		);
+
 		const isLaunched = site?.launch_status === 'launched' ? true : false;
 
 		const urlQueryParams = useQuery();
 		const isPluginBundleEligible = useIsPluginBundleEligible();
 
-		let siteSlug: string | null = null;
-		if ( siteSlugParam ) {
-			siteSlug = siteSlugParam;
-		} else if ( site ) {
-			siteSlug = new URL( site.URL ).host;
-		}
+		const origin = urlQueryParams.get( 'origin' );
+		const from = urlQueryParams.get( 'from' );
+		const backToStep = urlQueryParams.get( 'backToStep' );
+		const backToFlow = urlQueryParams.get( 'backToFlow' );
+		const skippedCheckout = urlQueryParams.get( 'skippedCheckout' );
 
 		const adminUrl = useSelect(
 			( select ) =>
@@ -173,18 +149,43 @@ const siteSetupFlow: Flow = {
 			( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getStoreType(),
 			[]
 		);
-		const { setPendingAction, setStepProgress, resetOnboardStoreWithSkipFlags, setIntent } =
+
+		const isSiteAssemblerEnabled = useIsSiteAssemblerEnabled();
+
+		const { isEligible: isBigSkyEligible } = useIsBigSkyEligible();
+
+		const isDesignChoicesStepEnabled =
+			( isAssemblerSupported() && isSiteAssemblerEnabled ) || isBigSkyEligible;
+
+		const { setPendingAction, resetOnboardStoreWithSkipFlags, setIntent } =
 			useDispatch( ONBOARD_STORE );
 		const { setDesignOnSite } = useDispatch( SITE_STORE );
 		const dispatch = reduxDispatch();
 
-		const flowProgress = useSiteSetupFlowProgress( currentStep, intent );
+		const getLaunchpadScreenValue = (
+			intent: string,
+			shouldSkip: boolean
+		): 'full' | 'skipped' | 'off' => {
+			if ( ! isLaunchpadIntent( intent ) || isLaunched ) {
+				return 'off';
+			}
 
-		if ( flowProgress ) {
-			setStepProgress( flowProgress );
-		}
+			if ( shouldSkip ) {
+				return 'skipped';
+			}
 
-		const exitFlow = ( to: string ) => {
+			return 'full';
+		};
+
+		const goToFlow = ( fullStepPath: string ) => {
+			const path = `/setup/${ fullStepPath }`.replace( /([^:])(\/\/+)/g, '$1/' );
+
+			return window.location.assign(
+				addQueryArgs( { siteSlug, from, origin: `site-setup/${ currentStep }` }, path )
+			);
+		};
+
+		const exitFlow = ( to: string, options: ExitFlowOptions = {} ) => {
 			setPendingAction( () => {
 				/**
 				 * This implementation seems very hacky.
@@ -216,17 +217,23 @@ const siteSetupFlow: Flow = {
 
 					// Update Launchpad option based on site intent
 					if ( typeof siteId === 'number' ) {
-						const launchpadScreen =
-							isLaunchpadIntent( siteIntent ) && ! isLaunched ? 'full' : 'off';
-
-						settings.launchpad_screen = launchpadScreen;
+						settings.launchpad_screen = getLaunchpadScreenValue(
+							siteIntent,
+							options.skipLaunchpad ?? false
+						);
 					}
 
 					let redirectionUrl = to;
 
 					// Forcing cache invalidation to retrieve latest launchpad_screen option value
 					if ( isLaunchpadIntent( siteIntent ) ) {
-						redirectionUrl = addQueryArgs( { showLaunchpad: true }, to );
+						redirectionUrl = addQueryArgs(
+							{
+								showLaunchpad: true,
+								...( skippedCheckout && { skippedCheckout: 1 } ),
+							},
+							to
+						);
 					}
 
 					formData.push( [ 'settings', JSON.stringify( settings ) ] );
@@ -251,9 +258,12 @@ const siteSetupFlow: Flow = {
 			resetOnboardStoreWithSkipFlags( [ 'skipPendingAction', 'skipIntent' ] );
 		};
 
-		function submit( providedDependencies: ProvidedDependencies = {}, ...params: string[] ) {
-			recordSubmitStep( providedDependencies, intent, flowName, currentStep );
+		const { getPostFlowUrl, initializeLaunchpadState } = useLaunchpadDecider( {
+			exitFlow,
+			navigate,
+		} );
 
+		function submit( providedDependencies: ProvidedDependencies = {}, ...params: string[] ) {
 			switch ( currentStep ) {
 				case 'options': {
 					if ( intent === 'sell' ) {
@@ -268,14 +278,14 @@ const siteSetupFlow: Flow = {
 				}
 
 				case 'designSetup': {
-					const _selectedDesign = providedDependencies?.selectedDesign as Design;
-					if ( _selectedDesign?.design_type === 'assembler' ) {
-						return navigate( 'patternAssembler' );
+					const { selectedDesign: _selectedDesign } = providedDependencies;
+					if ( isAssemblerDesign( _selectedDesign as Design ) && isAssemblerSupported() ) {
+						return navigate( 'pattern-assembler' );
 					}
 
 					return navigate( 'processing' );
 				}
-				case 'patternAssembler':
+				case 'pattern-assembler':
 					return navigate( 'processing' );
 
 				case 'processing': {
@@ -286,7 +296,7 @@ const siteSetupFlow: Flow = {
 					}
 
 					// End of Pattern Assembler flow
-					if ( isBlankCanvasDesign( selectedDesign ) ) {
+					if ( isAssemblerDesign( selectedDesign ) ) {
 						const params = new URLSearchParams( {
 							canvas: 'edit',
 							assembler: '1',
@@ -308,13 +318,6 @@ const siteSetupFlow: Flow = {
 					if ( intent === 'sell' && storeType === 'power' ) {
 						dispatch( recordTracksEvent( 'calypso_woocommerce_dashboard_redirect' ) );
 
-						if (
-							isEnabled( 'signup/woo-verify-email' ) &&
-							currentUser &&
-							! currentUser.email_verified
-						) {
-							return navigate( 'wooVerifyEmail' );
-						}
 						return exitFlow( `${ adminUrl }admin.php?page=wc-admin` );
 					}
 
@@ -331,22 +334,28 @@ const siteSetupFlow: Flow = {
 					}
 
 					if ( isLaunchpadIntent( intent ) ) {
-						return exitFlow( `/setup/${ intent }/launchpad?siteSlug=${ siteSlug }` );
+						initializeLaunchpadState( { siteId, siteSlug } );
+						const url = getPostFlowUrl( { flow: intent, siteId, siteSlug } );
+						return exitFlow( url );
 					}
-					return exitFlow( `/home/${ siteSlug }` );
+
+					return exitFlow( `/home/${ siteId ?? siteSlug }` );
 				}
 
 				case 'bloggerStartingPoint': {
 					const intent = params[ 0 ];
 					switch ( intent ) {
 						case 'firstPost': {
-							return exitFlow( `https://wordpress.com/post/${ siteSlug }` );
+							const exitUrl = addQueryArgs( { new_prompt: true }, `/post/${ siteSlug }` );
+							return exitFlow( exitUrl );
 						}
 						case 'courses': {
 							return navigate( 'courses' );
 						}
 						case 'skip-to-my-home': {
-							return exitFlow( `/home/${ siteSlug }` );
+							return exitFlow( `/home/${ siteId ?? siteSlug }`, {
+								skipLaunchpad: true,
+							} );
 						}
 						default: {
 							return navigate( intent );
@@ -359,22 +368,31 @@ const siteSetupFlow: Flow = {
 
 					switch ( intent ) {
 						case SiteIntent.Import:
-							return navigate( 'import' );
+							return exitFlow( `/setup/site-migration?siteSlug=${ siteSlug }&ref=goals` );
+
 						case SiteIntent.DIFM:
 							return navigate( 'difmStartingPoint' );
 						case SiteIntent.Write:
 						case SiteIntent.Sell:
 							return navigate( 'options' );
-						default:
+						default: {
+							if ( isDesignChoicesStepEnabled ) {
+								return navigate( 'design-choices' );
+							}
 							return navigate( 'designSetup' );
+						}
 					}
+				}
+
+				case 'design-choices': {
+					return navigate( providedDependencies.destination as string );
 				}
 
 				case 'intent': {
 					const submittedIntent = params[ 0 ];
 					switch ( submittedIntent ) {
 						case 'wpadmin': {
-							return exitFlow( `https://wordpress.com/home/${ siteSlug }` );
+							return exitFlow( `https://wordpress.com/home/${ siteId ?? siteSlug }` );
 						}
 						case 'build': {
 							return navigate( 'designSetup' );
@@ -397,55 +415,35 @@ const siteSetupFlow: Flow = {
 					}
 				}
 
-				case 'storeAddress':
-					return navigate( 'businessInfo' );
-
-				case 'businessInfo': {
-					if ( isAtomic ) {
-						return navigate( 'wooInstallPlugins' );
-					}
-					return navigate( 'wooConfirm' );
-				}
-
-				case 'wooConfirm': {
-					const [ checkoutUrl ] = params;
-
-					if ( checkoutUrl ) {
-						window.location.replace( checkoutUrl.toString() );
-					}
-
-					return navigate( 'wooTransfer' );
-				}
-
-				case 'wooTransfer':
-					return navigate( 'processing' );
-
-				case 'wooInstallPlugins':
-					return navigate( 'processing' );
-
-				case 'editEmail':
-					return navigate( 'wooVerifyEmail' );
-
-				case 'wooVerifyEmail': {
-					if ( params[ 0 ] === 'edit-email' ) {
-						return navigate( 'editEmail' );
-					}
-
-					return navigate( 'wooVerifyEmail' );
-				}
-
 				case 'courses': {
 					return exitFlow( `/post/${ siteSlug }` );
 				}
 
+				case 'importList':
 				case 'importReady': {
 					const depUrl = ( providedDependencies?.url as string ) || '';
+					const { platform } = providedDependencies as { platform: ImporterMainPlatform };
+
+					if ( shouldRedirectToSiteMigration( currentStep, platform, origin ) ) {
+						return window.location.assign(
+							addQueryArgs(
+								{ siteSlug, siteId, from },
+								'/setup/site-migration/' + STEPS.SITE_MIGRATION_IMPORT_OR_MIGRATE.slug
+							)
+						);
+					}
 
 					if (
 						depUrl.startsWith( 'http' ) ||
-						[ 'blogroll', 'ghost', 'tumblr', 'livejournal', 'movabletype', 'xanga' ].indexOf(
-							providedDependencies?.platform as ImporterMainPlatform
-						) !== -1
+						[
+							'blogroll',
+							'ghost',
+							'tumblr',
+							'livejournal',
+							'movabletype',
+							'xanga',
+							'substack',
+						].indexOf( providedDependencies?.platform as ImporterMainPlatform ) !== -1
 					) {
 						return exitFlow( providedDependencies?.url as string );
 					}
@@ -459,14 +457,49 @@ const siteSetupFlow: Flow = {
 				case 'importerWix':
 				case 'importerBlogger':
 				case 'importerMedium':
-				case 'importerSquarespace':
-				case 'importerWordpress': {
+				case 'importerSquarespace': {
 					if ( providedDependencies?.type === 'redirect' ) {
 						return exitFlow( providedDependencies?.url as string );
 					}
 
 					return navigate( providedDependencies?.url as string );
 				}
+
+				case 'importerWordpress': {
+					if ( providedDependencies?.type === 'redirect' ) {
+						return exitFlow( providedDependencies?.url as string );
+					}
+					switch ( providedDependencies?.action ) {
+						case 'verify-email':
+							return navigate( `verifyEmail?${ urlQueryParams.toString() }` );
+						case 'checkout':
+							return exitFlow( providedDependencies?.checkoutUrl as string );
+						case 'customized-action-go-to-flow': {
+							const customizedActionGoToFlow = urlQueryParams.get( 'customizedActionGoToFlow' );
+							if ( customizedActionGoToFlow ) {
+								return goToFlow( customizedActionGoToFlow );
+							}
+						}
+						default:
+							return navigate( providedDependencies?.url as string );
+					}
+				}
+
+				case 'trialAcknowledge': {
+					switch ( providedDependencies?.action ) {
+						case 'verify-email':
+							return navigate( `verifyEmail?${ urlQueryParams.toString() }` );
+						case 'importer':
+							return navigate( `importerWordpress?${ urlQueryParams.toString() }` );
+						case 'checkout':
+							return exitFlow( providedDependencies?.checkoutUrl as string );
+						default:
+							return;
+					}
+				}
+
+				case 'verifyEmail':
+					return navigate( `importerWordpress?${ urlQueryParams.toString() }` );
 
 				case 'difmStartingPoint': {
 					return exitFlow( `/start/website-design-services/?siteSlug=${ siteSlug }` );
@@ -479,15 +512,6 @@ const siteSetupFlow: Flow = {
 				case 'bloggerStartingPoint':
 					return navigate( 'options' );
 
-				case 'storeAddress':
-					return navigate( 'options' );
-
-				case 'businessInfo':
-					return navigate( 'storeAddress' );
-
-				case 'wooConfirm':
-					return navigate( 'businessInfo' );
-
 				case 'courses':
 					return navigate( 'bloggerStartingPoint' );
 
@@ -499,44 +523,90 @@ const siteSetupFlow: Flow = {
 							return navigate( 'options' );
 						case SiteIntent.Write:
 							return navigate( 'bloggerStartingPoint' );
-						default:
+						default: {
+							if ( isDesignChoicesStepEnabled ) {
+								return navigate( 'design-choices' );
+							}
 							return navigate( 'goals' );
+						}
 					}
 
-				case 'patternAssembler':
-					return navigate( 'designSetup' );
+				case 'design-choices': {
+					return navigate( 'goals' );
+				}
 
-				case 'editEmail':
-					return navigate( 'wooVerifyEmail' );
+				case 'pattern-assembler': {
+					if ( stepData?.previousStep ) {
+						return navigate( stepData?.previousStep );
+					}
+
+					return navigate( 'designSetup' );
+				}
 
 				case 'importList':
-					// eslint-disable-next-line no-case-declarations
-					const backToStep = urlQueryParams.get( 'backToStep' );
-
 					if ( backToStep ) {
 						return navigate( `${ backToStep }?siteSlug=${ siteSlug }` );
 					}
 
-					return navigate( 'import' );
+					if ( backToFlow ) {
+						return goToFlow( backToFlow );
+					}
 
+					return navigate( `import?siteSlug=${ siteSlug }` );
+
+				case 'importerBlogger':
+				case 'importerMedium':
+				case 'importerSquarespace':
+					if ( backToFlow ) {
+						if ( urlQueryParams.get( 'ref' ) === MIGRATION_FLOW ) {
+							return goToFlow( backToFlow );
+						}
+						return navigate( `importList?siteSlug=${ siteSlug }&backToFlow=${ backToFlow }` );
+					}
+					return navigate( `importList?siteSlug=${ siteSlug }` );
+
+				case 'importerWordpress':
+					if ( backToFlow ) {
+						return goToFlow( backToFlow );
+					}
+
+					if ( urlQueryParams.get( 'option' ) === 'content' ) {
+						return navigate( `importList?siteSlug=${ siteSlug }` );
+					}
+
+					if ( urlQueryParams.has( 'showModal' ) ) {
+						// remove the siteSlug in case they want to change the destination site
+						urlQueryParams.delete( 'siteSlug' );
+						urlQueryParams.delete( 'showModal' );
+						return navigate( `import?siteSlug=${ siteSlug }` );
+					}
+
+					if ( ! isSitePlanCompatible ) {
+						urlQueryParams.set( 'showModal', 'true' );
+						return navigate( `importerWordpress?${ urlQueryParams.toString() }` );
+					}
+
+					return navigate( `import?siteSlug=${ siteSlug }` );
+				case 'importerWix':
 				case 'importReady':
 				case 'importReadyNot':
 				case 'importReadyWpcom':
 				case 'importReadyPreview':
-					return navigate( 'import' );
+					if ( backToFlow && urlQueryParams.get( 'ref' ) === MIGRATION_FLOW ) {
+						return goToFlow( backToFlow );
+					}
 
-				case 'importerWix':
-				case 'importerBlogger':
-				case 'importerMedium':
-				case 'importerSquarespace':
-				case 'importerWordpress':
-					return navigate( 'import' );
+					return navigate( `import?siteSlug=${ siteSlug }` );
 
 				case 'options':
 					return navigate( 'goals' );
 
 				case 'import':
 					return navigate( 'goals' );
+
+				case 'verifyEmail':
+				case 'trialAcknowledge':
+					return navigate( `importerWordpress?${ urlQueryParams.toString() }` );
 
 				case 'difmStartingPoint':
 					return navigate( 'goals' );
@@ -555,12 +625,14 @@ const siteSetupFlow: Flow = {
 					return navigate( 'bloggerStartingPoint' );
 
 				case 'intent':
-					return exitFlow( `/home/${ siteSlug }` );
+					return exitFlow( `/home/${ siteId ?? siteSlug }` );
 
 				case 'goals':
 					// Skip to dashboard must have been pressed
 					setIntent( SiteIntent.Build );
-					return exitFlow( `/home/${ siteSlug }` );
+					return exitFlow( `/home/${ siteId ?? siteSlug }`, {
+						skipLaunchpad: true,
+					} );
 
 				case 'import':
 					return navigate( 'importList' );
@@ -574,15 +646,20 @@ const siteSetupFlow: Flow = {
 		};
 
 		const goToStep = ( step: string ) => {
-			navigate( step );
+			switch ( step ) {
+				case 'import':
+					return navigate( `import?siteSlug=${ siteSlug }` );
+
+				default:
+					return navigate( step );
+			}
 		};
 
 		return { goNext, goBack, goToStep, submit, exitFlow };
 	},
 
 	useAssertConditions(): AssertConditionResult {
-		const siteSlug = useSiteSlugParam();
-		const siteId = useSiteIdParam();
+		const { siteSlug, siteId } = useSiteData();
 		const userIsLoggedIn = useSelect(
 			( select ) => ( select( USER_STORE ) as UserSelect ).isCurrentUserLoggedIn(),
 			[]
@@ -617,8 +694,8 @@ const siteSetupFlow: Flow = {
 			};
 		}
 
-		const canManageOptions = useCanUserManageOptions();
-		if ( canManageOptions === 'requesting' ) {
+		const { canManageOptions, isLoading } = useCanUserManageOptions();
+		if ( isLoading ) {
 			result = {
 				state: AssertConditionState.CHECKING,
 			};

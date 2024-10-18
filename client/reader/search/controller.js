@@ -1,4 +1,4 @@
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { stringify } from 'qs';
 import AsyncLoad from 'calypso/components/async-load';
 import {
@@ -8,6 +8,8 @@ import {
 } from 'calypso/reader/controller-helper';
 import { SEARCH_TYPES } from 'calypso/reader/search-stream/search-stream-header';
 import { recordTrack } from 'calypso/reader/stats';
+import getCurrentRoute from 'calypso/state/selectors/get-current-route';
+import renderHeaderSection from '../lib/header-section';
 
 const analyticsPageTitle = 'Reader';
 
@@ -25,6 +27,7 @@ const exported = {
 		const basePath = '/read/search';
 		const fullAnalyticsPageTitle = analyticsPageTitle + ' > Search';
 		const mcKey = 'search';
+		const state = context.store.getState();
 
 		const { sort = 'relevance', q, show = SEARCH_TYPES.POSTS } = context.query;
 		const searchSlug = q;
@@ -43,7 +46,11 @@ const exported = {
 				sort,
 			} );
 		} else {
-			recordTrack( 'calypso_reader_search_loaded' );
+			recordTrack(
+				'calypso_reader_search_loaded',
+				{},
+				{ pathnameOverride: getCurrentRoute( state ) }
+			);
 		}
 
 		const autoFocusInput = ! searchSlug || context.query.focus === '1';
@@ -55,30 +62,37 @@ const exported = {
 		function reportSortChange( newSort ) {
 			replaceSearchUrl( searchSlug, newSort !== 'relevance' ? newSort : undefined );
 		}
+		context.renderHeaderSection = renderHeaderSection;
 
 		context.primary = (
-			<AsyncLoad
-				require="calypso/reader/search-stream"
-				key="search"
-				streamKey={ streamKey }
-				isSuggestion={ isQuerySuggestion }
-				query={ searchSlug }
-				sort={ sort }
-				trackScrollPage={ trackScrollPage.bind(
-					null,
-					basePath,
-					fullAnalyticsPageTitle,
-					analyticsPageTitle,
-					mcKey
-				) }
-				onUpdatesShown={ trackUpdatesLoaded.bind( null, mcKey ) }
-				showBack={ false }
-				showPrimaryFollowButtonOnCards={ false }
-				autoFocusInput={ autoFocusInput }
-				onQueryChange={ reportQueryChange }
-				onSortChange={ reportSortChange }
-				searchType={ show }
-			/>
+			<>
+				<div>
+					<div>
+						<AsyncLoad
+							require="calypso/reader/search-stream"
+							key="search"
+							streamKey={ streamKey }
+							isSuggestion={ isQuerySuggestion }
+							query={ searchSlug }
+							sort={ sort }
+							trackScrollPage={ trackScrollPage.bind(
+								null,
+								basePath,
+								fullAnalyticsPageTitle,
+								analyticsPageTitle,
+								mcKey
+							) }
+							onUpdatesShown={ trackUpdatesLoaded.bind( null, mcKey ) }
+							showBack={ false }
+							autoFocusInput={ autoFocusInput }
+							onQueryChange={ reportQueryChange }
+							onSortChange={ reportSortChange }
+							searchType={ show }
+							trendingTags={ context.params.trendingTags }
+						/>
+					</div>
+				</div>
+			</>
 		);
 		next();
 	},

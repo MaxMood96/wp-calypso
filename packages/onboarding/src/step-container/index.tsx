@@ -1,8 +1,9 @@
 import { WordPressLogo, JetpackLogo, WooCommerceWooLogo } from '@automattic/components';
-import classNames from 'classnames';
-import { useTranslate } from 'i18n-calypso';
-import { ReactChild, ReactElement } from 'react';
+import clsx from 'clsx';
+import { TranslateResult, useTranslate } from 'i18n-calypso';
+import { ReactElement } from 'react';
 import ActionButtons from '../action-buttons';
+import SenseiLogo from '../sensei-logo';
 import StepNavigationLink from '../step-navigation-link';
 import VideoPressLogo from '../videopress-logo';
 import './style.scss';
@@ -19,9 +20,9 @@ interface Props {
 	hideNext?: boolean;
 	skipButtonAlign?: 'top' | 'bottom';
 	skipHeadingText?: string;
-	backLabelText?: string | ReactChild;
-	skipLabelText?: string | ReactChild;
-	nextLabelText?: string | ReactChild;
+	backLabelText?: TranslateResult;
+	skipLabelText?: TranslateResult;
+	nextLabelText?: TranslateResult;
 	formattedHeader?: ReactElement;
 	hideFormattedHeader?: boolean;
 	headerImageUrl?: string;
@@ -32,19 +33,21 @@ interface Props {
 	headerButton?: ReactElement;
 	customizedActionButtons?: ReactElement;
 	isWideLayout?: boolean;
+	isExtraWideLayout?: boolean;
 	isFullLayout?: boolean;
 	isHorizontalLayout?: boolean;
 	goBack?: () => void;
 	goNext?: () => void;
 	flowName?: string;
 	intent?: string;
-	stepProgress?: { count: number; progress: number };
 	recordTracksEvent: ( eventName: string, eventProperties: object ) => void;
 	showHeaderJetpackPowered?: boolean;
 	showJetpackPowered?: boolean;
 	showHeaderWooCommercePowered?: boolean;
 	showFooterWooCommercePowered?: boolean;
+	showSenseiPowered?: boolean;
 	showVideoPressPowered?: boolean;
+	backUrl?: string;
 }
 
 const StepContainer: React.FC< Props > = ( {
@@ -69,9 +72,11 @@ const StepContainer: React.FC< Props > = ( {
 	isHorizontalLayout,
 	isFullLayout,
 	isWideLayout,
+	isExtraWideLayout,
 	isExternalBackUrl,
 	isLargeSkipLayout,
 	customizedActionButtons,
+	backUrl,
 	goBack,
 	goNext,
 	flowName,
@@ -81,6 +86,7 @@ const StepContainer: React.FC< Props > = ( {
 	showHeaderJetpackPowered,
 	showHeaderWooCommercePowered,
 	showJetpackPowered,
+	showSenseiPowered,
 	showVideoPressPowered,
 	showFooterWooCommercePowered,
 } ) => {
@@ -104,13 +110,15 @@ const StepContainer: React.FC< Props > = ( {
 	};
 
 	function BackButton() {
-		if ( shouldHideNavButtons ) {
+		// Hide back button if goBack is falsy, it won't do anything in that case.
+		if ( shouldHideNavButtons || ( ! goBack && ! backUrl ) ) {
 			return null;
 		}
 		return (
 			<StepNavigationLink
 				direction="back"
 				handleClick={ goBack }
+				backUrl={ backUrl }
 				label={ backLabelText }
 				hasBackIcon
 				rel={ isExternalBackUrl ? 'external' : '' }
@@ -133,10 +141,10 @@ const StepContainer: React.FC< Props > = ( {
 					direction="forward"
 					handleClick={ goNext }
 					label={ skipLabelText }
-					cssClass={ classNames( 'step-container__navigation-link', 'has-underline', {
+					cssClass={ clsx( 'step-container__navigation-link', 'has-underline', {
 						'has-skip-heading': skipHeadingText,
 					} ) }
-					borderless={ true }
+					borderless
 					recordClick={ () => recordClick( 'forward' ) }
 				/>
 			</div>
@@ -160,18 +168,19 @@ const StepContainer: React.FC< Props > = ( {
 		);
 	}
 
-	const classes = classNames( 'step-container', className, flowName, stepName, {
+	const classes = clsx( 'step-container', className, flowName, stepName, {
 		'is-horizontal-layout': isHorizontalLayout,
 		'is-wide-layout': isWideLayout,
 		'is-full-layout': isFullLayout,
 		'is-large-skip-layout': isLargeSkipLayout,
 		'has-navigation': ! shouldHideNavButtons,
+		'is-extra-wide-layout': isExtraWideLayout,
 	} );
 
 	return (
 		<div className={ classes }>
 			<ActionButtons
-				className={ classNames( 'step-container__navigation', {
+				className={ clsx( 'step-container__navigation', {
 					'should-hide-nav-buttons': shouldHideNavButtons,
 					'should-sticky-nav-buttons': shouldStickyNavButtons,
 					'has-sticky-nav-buttons-padding': hasStickyNavButtonsPadding,
@@ -226,6 +235,13 @@ const StepContainer: React.FC< Props > = ( {
 					<WooCommerceWooLogo /> <span>{ translate( 'WooCommerce powered' ) }</span>
 				</div>
 			) }
+
+			{ showSenseiPowered && (
+				<div className="step-container__sensei-powered">
+					<SenseiLogo /> <span>{ translate( 'Powered by Sensei' ) }</span>
+				</div>
+			) }
+
 			{ showVideoPressPowered && (
 				<div className="step-container__videopress-powered">
 					<VideoPressLogo size={ 24 } /> <span>{ translate( 'Powered by VideoPress' ) }</span>

@@ -1,15 +1,45 @@
+@import "@wordpress/base-styles/breakpoints";
+@import "@wordpress/base-styles/mixins";
+@import "@wordpress/base-styles/variables";
+
+.is-section-reader .tag-stream__header {
+	&.has-description {
+		.info-popover {
+			display: none;
+		}
+		.formatted-header__subtitle {
+			display: inline-block;
+		}
+	}
+
+	.navigation-header {
+		margin: 0 auto;
+		padding: 0 0 16px 0;
+
+		@include breakpoint-deprecated( "<660px" ) {
+			padding: 0 16px 16px;
+		}
+	}
+}
+
+// .has-header-section only applies for logged out views
+.layout.has-header-section.is-section-reader .tag-stream__header .navigation-header h1 {
+	@extend .wp-brand-font;
+	font-weight: 600;
+	font-size: 2.25rem;
+	line-height: 48px;
+	margin-bottom: 4px;
+}
+
 .tag-stream__header {
-	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
-	align-items: baseline;
 	margin-bottom: 10px;
+	.tag-stream__header-follow .follow-button {
+		background: inherit;
+	}
 }
 
 .reader__content .tag-stream__header {
-	border-bottom: 1px solid #e9e9ea;
-	margin-bottom: 0;
-	padding-bottom: 55px;
+	margin-bottom: 24px;
 }
 
 .reader__content .tag-stream__header.has-description {
@@ -17,9 +47,8 @@
 }
 
 .tag-stream__header-title-group {
-	display: flex;
-	flex-wrap: wrap;
-	margin-right: 6px;
+	display: block;
+	padding-bottom: 40px;
 }
 
 .tag-stream__header-title {
@@ -29,6 +58,20 @@
 	font-weight: 600;
 	line-height: 24px;
 	margin-bottom: 4px;
+}
+
+.tag-stream__header-controls {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+
+	@include breakpoint-deprecated( "<660px" ) {
+		margin: 0 16px;
+	}
+}
+
+.tag-stream__header-sort-picker {
+	width: 200px;
 }
 
 .has-description .tag-stream__header-title {
@@ -52,25 +95,23 @@
 	.button.header-cake__back {
 		padding: 0;
 	}
+
+	@include breakpoint-deprecated( "<660px" ) {
+		margin: 0 16px 16px;
+	}
+}
+
+.is-reader-page .reader-feed-header.has-back-button .card.header-cake {
+	@include breakpoint-deprecated( "<660px" ) {
+		margin: 32px 0;
+	}
 }
 
 .is-reader-page .main .tag-stream__empty-content {
 	margin-top: 15px;
-}
 
-// specific rule to override existing rules
-.layout.has-header-section.is-section-reader .layout__header-section-content .tag-stream__page-header {
-	text-align: center;
-
-	h2 {
-		font-size: 18px; /* stylelint-disable-line declaration-property-unit-allowed-list */
-		font-weight: 500;
-		margin-bottom: 10px;
-	}
-
-	h1 {
-		font-size: 40px; /* stylelint-disable-line declaration-property-unit-allowed-list */
-		font-weight: 500;
+	.tag-stream__empty-content-message {
+		margin: 16px 0 24px;
 	}
 }
 

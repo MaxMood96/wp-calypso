@@ -9,17 +9,33 @@ import { gaRecordEvent } from 'calypso/lib/analytics/ga';
 import { identifyUser } from 'calypso/lib/analytics/identify-user';
 import { addToQueue } from 'calypso/lib/analytics/queue';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
+import { setSignupStartTime, getSignupCompleteElapsedTime } from 'calypso/signup/storageUtils';
 
 const signupDebug = debug( 'calypso:analytics:signup' );
 
 export function recordSignupStart( flow, ref, optionalProps ) {
+	setSignupStartTime();
+
 	// Tracks
-	recordTracksEvent( 'calypso_signup_start', { flow, ref, ...optionalProps } );
+	recordTracksEvent( 'calypso_signup_start', {
+		flow,
+		ref,
+		...optionalProps,
+	} );
 	// Google Analytics
 	gaRecordEvent( 'Signup', 'calypso_signup_start' );
 	// Marketing
 	adTrackSignupStart( flow );
 }
+
+// domain sources for calypso_signup_complete tracks event
+export const SIGNUP_DOMAIN_ORIGIN = {
+	USE_YOUR_DOMAIN: 'use-your-domain',
+	CHOOSE_LATER: 'choose-later',
+	FREE: 'free',
+	CUSTOM: 'custom',
+	NOT_SET: 'not-set',
+};
 
 export function recordSignupComplete(
 	{
@@ -36,6 +52,10 @@ export function recordSignupComplete(
 		startingPoint,
 		isTransfer,
 		isMapping,
+		signupDomainOrigin,
+		elapsedTimeSinceStart = null,
+		framework,
+		isNewishUser,
 	},
 	now
 ) {
@@ -47,6 +67,7 @@ export function recordSignupComplete(
 			'signup',
 			'recordSignupComplete',
 			{
+				elapsedTimeSinceStart: elapsedTimeSinceStart ?? getSignupCompleteElapsedTime(),
 				flow,
 				siteId,
 				isNewUser,
@@ -60,6 +81,9 @@ export function recordSignupComplete(
 				startingPoint,
 				isTransfer,
 				isMapping,
+				signupDomainOrigin,
+				framework,
+				isNewishUser,
 			},
 			true
 		);
@@ -70,6 +94,7 @@ export function recordSignupComplete(
 	// blog_id instead of site_id here. We keep using "siteId" otherwise since
 	// all the other fields still refer with "site". e.g. isNewSite
 	recordTracksEvent( 'calypso_signup_complete', {
+		elapsed_time_since_start: elapsedTimeSinceStart ?? getSignupCompleteElapsedTime(),
 		flow,
 		blog_id: siteId,
 		is_new_user: isNewUser,
@@ -83,6 +108,8 @@ export function recordSignupComplete(
 		starting_point: startingPoint,
 		is_transfer: isTransfer,
 		is_mapping: isMapping,
+		signup_domain_origin: signupDomainOrigin,
+		framework,
 	} );
 
 	// Google Analytics
@@ -100,7 +127,13 @@ export function recordSignupComplete(
 		const device = resolveDeviceTypeByViewPort();
 
 		// Tracks
-		recordTracksEvent( 'calypso_new_user_site_creation', { flow, device } );
+		recordTracksEvent( 'calypso_new_user_site_creation', {
+			flow,
+			device,
+			framework,
+			is_new_user: isNewUser,
+			is_newish_user: isNewishUser,
+		} );
 		// Google Analytics
 		gaRecordEvent( 'Signup', 'calypso_new_user_site_creation' );
 	}
@@ -130,7 +163,6 @@ export function recordSignupInvalidStep( flow, step ) {
 
 /**
  * Records registration event.
- *
  * @param {Object} param {}
  * @param {Object} param.userData User data
  * @param {string} param.flow Registration flow
@@ -153,10 +185,9 @@ export function recordRegistration( { userData, flow, type } ) {
 
 /**
  * Records loading of the processing screen
- *
  * @param {string} flow Signup flow name
  * @param {string} previousStep The step before the processing screen
- * @param {string} optionalProps Extra properties to record
+ * @param {Object} optionalProps Extra properties to record
  */
 export function recordSignupProcessingScreen( flow, previousStep, optionalProps ) {
 	const device = resolveDeviceTypeByViewPort();
@@ -170,7 +201,6 @@ export function recordSignupProcessingScreen( flow, previousStep, optionalProps 
 
 /**
  * Records plan change in signup flow
- *
  * @param {string} flow Signup flow name
  * @param {string} step The step when the user changes the plan
  * @param {string} previousPlanName The plan name before changing

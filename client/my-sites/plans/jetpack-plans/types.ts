@@ -5,6 +5,14 @@ import type {
 	TERM_MONTHLY,
 	TERM_BIENNIALLY,
 	TERM_TRIENNIALLY,
+	TERM_QUADRENNIALLY,
+	TERM_QUINQUENNIALLY,
+	TERM_SEXENNIALLY,
+	TERM_SEPTENNIALLY,
+	TERM_OCTENNIALLY,
+	TERM_NOVENNIALLY,
+	TERM_DECENNIALLY,
+	TERM_CENTENNIALLY,
 	JetpackProductCategory,
 	JetpackTag,
 	FAQ,
@@ -17,7 +25,15 @@ export type Duration =
 	| typeof TERM_ANNUALLY
 	| typeof TERM_MONTHLY
 	| typeof TERM_BIENNIALLY
-	| typeof TERM_TRIENNIALLY;
+	| typeof TERM_TRIENNIALLY
+	| typeof TERM_QUADRENNIALLY
+	| typeof TERM_QUINQUENNIALLY
+	| typeof TERM_SEXENNIALLY
+	| typeof TERM_SEPTENNIALLY
+	| typeof TERM_OCTENNIALLY
+	| typeof TERM_NOVENNIALLY
+	| typeof TERM_DECENNIALLY
+	| typeof TERM_CENTENNIALLY;
 export type DurationString = 'annual' | 'monthly';
 export type ItemType = typeof ITEM_TYPE_PLAN | typeof ITEM_TYPE_PRODUCT;
 
@@ -102,6 +118,7 @@ export type SelectorProductFeatures = {
 
 export interface SelectorProduct extends SelectorProductCost {
 	productSlug: string;
+	productAlias?: string;
 	annualOptionSlug?: string;
 	monthlyOptionSlug?: string;
 	iconSlug: string;
@@ -125,6 +142,7 @@ export interface SelectorProduct extends SelectorProductCost {
 	externalUrl?: string;
 	displayTerm?: Duration;
 	displayPrice?: number;
+	displayPriceText?: TranslateResult | null;
 	displayCurrency?: string;
 	displayFrom?: boolean;
 	belowPriceText?: TranslateResult;
@@ -140,13 +158,18 @@ export interface SelectorProduct extends SelectorProductCost {
 	faqs?: Array< FAQ >;
 	recommendedFor?: Array< JetpackTag >;
 	forceNoYearlyUpgrade?: boolean;
+	moreAboutUrl?: string;
+	indirectCheckoutUrl?: string;
+	quantity?: number | null;
+}
+
+export interface PartnerSelectorProduct {
+	shortName: TranslateResult;
+	productSlug: string;
+	moreAboutUrl: string;
+	externalUrl?: string;
 }
 
 export type SiteProduct = {
 	tierUsage: number;
-};
-
-export type ProductDescription = {
-	value: TranslateResult;
-	calloutText?: TranslateResult;
 };

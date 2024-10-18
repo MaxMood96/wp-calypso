@@ -1,18 +1,17 @@
-import config, { isEnabled } from '@automattic/calypso-config';
-import { FEATURE_SOCIAL_MASTODON_CONNECTION } from '@automattic/calypso-products';
+import config from '@automattic/calypso-config';
+import { Badge, FoldableCard } from '@automattic/components';
 import { localizeUrl } from '@automattic/i18n-utils';
 import requestExternalAccess from '@automattic/request-external-access';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import { isEqual, find, some, get } from 'lodash';
 import PropTypes from 'prop-types';
 import { Component, cloneElement } from 'react';
 import { connect } from 'react-redux';
-import Badge from 'calypso/components/badge';
 import ExternalLink from 'calypso/components/external-link';
-import FoldableCard from 'calypso/components/foldable-card';
 import Notice from 'calypso/components/notice';
 import SocialLogo from 'calypso/components/social-logo';
+import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
 import { recordGoogleEvent, recordTracksEvent } from 'calypso/state/analytics/actions';
 import { getCurrentUserId } from 'calypso/state/current-user/selectors';
 import { successNotice, errorNotice, warningNotice } from 'calypso/state/notices/actions';
@@ -55,7 +54,6 @@ import ServiceTip from './service-tip';
 
 /**
  * Check if the connection is broken or requires reauth.
- *
  * @param {Object} connection Publicize connection.
  * @returns {boolean} True if connection is broken or requires reauthentication.
  */
@@ -84,6 +82,7 @@ export class SharingService extends Component {
 		warningNotice: PropTypes.func,
 		isP2HubSite: PropTypes.bool,
 		isJetpack: PropTypes.bool,
+		hasMultiConnections: PropTypes.bool,
 		isNew: PropTypes.bool,
 	};
 
@@ -106,6 +105,7 @@ export class SharingService extends Component {
 		warningNotice: () => {},
 		isP2HubSite: false,
 		isJetpack: false,
+		hasMultiConnections: false,
 		isNew: false,
 	};
 
@@ -150,14 +150,12 @@ export class SharingService extends Component {
 
 	/**
 	 * Handle external access provided by the user.
-	 *
 	 * @param {number} keyringConnectionId Keyring connection ID.
 	 */
 	externalAccessProvided = ( keyringConnectionId ) => {}; // eslint-disable-line no-unused-vars
 
 	/**
 	 * Establishes a new connection.
-	 *
 	 * @param {Object} service             Service to connect to.
 	 * @param {number} keyringConnectionId Keyring conneciton ID.
 	 * @param {number} externalUserId      Optional. User ID for the service. Default: 0.
@@ -227,12 +225,11 @@ export class SharingService extends Component {
 
 	/**
 	 * Create or update the connection
-	 *
 	 * @param {number} keyringConnectionId Keyring conneciton ID.
 	 * @param {number} externalUserId      Optional. User ID for the service. Default: 0.
 	 */
 	createOrUpdateConnection = ( keyringConnectionId, externalUserId = 0 ) => {
-		if ( isEnabled( 'jetpack-social/multiple-connections' ) ) {
+		if ( this.props.hasMultiConnections ) {
 			return this.props.createSiteConnection(
 				this.props.siteId,
 				keyringConnectionId,
@@ -271,7 +268,6 @@ export class SharingService extends Component {
 
 	/**
 	 * Sets a connection to be site-wide or not.
-	 *
 	 * @param  {Object}   connection Connection to update.
 	 * @param  {boolean}  shared     Whether the connection can be used by other users.
 	 * @returns {Function}            Action thunk
@@ -281,7 +277,6 @@ export class SharingService extends Component {
 
 	/**
 	 * Lets users re-authenticate their Keyring connections if lost.
-	 *
 	 * @param {Array} connections Optional. Broken connections.
 	 *                            Default: All broken connections for this service.
 	 */
@@ -324,7 +319,6 @@ export class SharingService extends Component {
 
 	/**
 	 * Fetch connections
-	 *
 	 * @param {Object} connection Connection to update.
 	 * @returns {Function} Action thunk
 	 */
@@ -333,7 +327,6 @@ export class SharingService extends Component {
 
 	/**
 	 * Checks whether any connection can be removed.
-	 *
 	 * @returns {boolean} true if there's any removable; otherwise, false.
 	 */
 	canRemoveConnection = () => {
@@ -342,7 +335,6 @@ export class SharingService extends Component {
 
 	/**
 	 * Deletes the passed connections.
-	 *
 	 * @param {Array} connections Optional. Connections to be deleted.
 	 *                            Default: All connections for this service.
 	 */
@@ -399,7 +391,6 @@ export class SharingService extends Component {
 
 	/**
 	 * Get current connections
-	 *
 	 * @param  {Array} overrides Optional. If it is passed, just return the argument
 	 *                           instead of the default connections.
 	 * @returns {Array} connections
@@ -411,7 +402,6 @@ export class SharingService extends Component {
 	/**
 	 * Given a service name and optional site ID, returns the current status of the
 	 * service's connection.
-	 *
 	 * @param {string} service The name of the service to check
 	 * @returns {string} Connection status.
 	 */
@@ -451,7 +441,6 @@ export class SharingService extends Component {
 	/**
 	 * Given a service name and optional site ID, returns whether the Keyring
 	 * authorization attempt succeeded in creating new Keyring account options.
-	 *
 	 * @param {Array} externalAccounts Props to check on if a keyring connection succeeded.
 	 * @returns {boolean} Whether the Keyring authorization attempt succeeded
 	 */
@@ -543,7 +532,7 @@ export class SharingService extends Component {
 		const serviceStatus = this.props.service.status ?? 'ok';
 		const connectionStatus = this.getConnectionStatus( this.props.service.ID, serviceStatus );
 		const earliestExpiry = this.getConnectionExpiry();
-		const classNames = classnames( 'sharing-service', this.props.service.ID, connectionStatus, {
+		const classNames = clsx( 'sharing-service', this.props.service.ID, connectionStatus, {
 			'is-open': this.state.isOpen,
 		} );
 		const accounts = this.state.isSelectingAccount ? this.props.availableExternalAccounts : [];
@@ -606,18 +595,28 @@ export class SharingService extends Component {
 					/>
 					<Notice isCompact status="is-error" className="sharing-service__unsupported">
 						{ this.props.translate(
-							'Twitter is no longer supported. {{a}}Learn more about this{{/a}}',
+							'X (Twitter) is {{a}}no longer supported{{/a}}. You can still use our quick {{a2}}manual sharing{{/a2}} feature from the post editor to share to it!',
 							{
 								components: {
 									a: (
 										<ExternalLink
 											target="_blank"
-											icon={ true }
+											icon
 											iconSize={ 14 }
 											href={ localizeUrl(
-												this.props.isJetpack
+												this.props.isJetpack || isJetpackCloud()
 													? 'https://jetpack.com/2023/04/29/the-end-of-twitter-auto-sharing/'
 													: 'https://wordpress.com/blog/2023/04/29/why-twitter-auto-sharing-is-coming-to-an-end/'
+											) }
+										/>
+									),
+									a2: (
+										<ExternalLink
+											target="_blank"
+											icon
+											iconSize={ 14 }
+											href={ localizeUrl(
+												'https://jetpack.com/redirect/?source=jetpack-social-manual-sharing-help'
 											) }
 										/>
 									),
@@ -647,13 +646,13 @@ export class SharingService extends Component {
 					compact
 					summary={ action }
 					expandedSummary={
-						this.props.isMastodonEligible && this.props.service.ID === 'mastodon'
+						this.props.service.ID === 'mastodon' || this.props.service.ID === 'bluesky'
 							? cloneElement( action, { isExpanded: true } )
 							: action
 					}
 				>
 					<div
-						className={ classnames( 'sharing-service__content', {
+						className={ clsx( 'sharing-service__content', {
 							'is-placeholder': this.props.isFetching,
 						} ) }
 					>
@@ -703,7 +702,6 @@ export class SharingService extends Component {
 
 /**
  * Connect a SharingService component to a Redux store.
- *
  * @param  {Component} sharingService     A SharingService component
  * @param  {Function}  mapStateToProps    Optional. A function to pick props from the state.
  *                                        It should return a plain object, which will be merged into the component's props.
@@ -736,7 +734,7 @@ export function connectFor( sharingService, mapStateToProps, mapDispatchToProps 
 				isExpanded: isServiceExpanded( state, service ),
 				isP2HubSite: isSiteP2Hub( state, siteId ),
 				isJetpack: isJetpackSite( state, siteId ),
-				isMastodonEligible: siteHasFeature( state, siteId, FEATURE_SOCIAL_MASTODON_CONNECTION ),
+				hasMultiConnections: siteHasFeature( state, siteId, 'social-multi-connections' ),
 			};
 			return typeof mapStateToProps === 'function' ? mapStateToProps( state, props ) : props;
 		},

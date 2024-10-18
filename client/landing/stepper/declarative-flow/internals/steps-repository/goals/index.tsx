@@ -18,6 +18,7 @@ type TracksGoalsSelectEventProperties = {
 	total: number;
 	write?: number;
 	'paid-subscribers'?: number;
+	'import-subscribers'?: number;
 	promote?: number;
 	sell?: number;
 	difm?: number;
@@ -133,7 +134,7 @@ const GoalsStep: Step = ( { navigation } ) => {
 				goNext={ navigation.goNext }
 				skipLabelText={ translate( 'Skip to dashboard' ) }
 				skipButtonAlign="top"
-				hideBack={ true }
+				hideBack
 				stepContent={ stepContent }
 				recordTracksEvent={ recordTracksEvent }
 			/>

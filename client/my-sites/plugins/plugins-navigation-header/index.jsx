@@ -8,8 +8,7 @@ import { Icon, upload } from '@wordpress/icons';
 import { useTranslate } from 'i18n-calypso';
 import { useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import FixedNavigationHeader from 'calypso/components/fixed-navigation-header';
-import InlineSupportLink from 'calypso/components/inline-support-link';
+import NavigationHeader from 'calypso/components/navigation-header';
 import { useLocalizedPlugins, useServerEffect } from 'calypso/my-sites/plugins/utils';
 import { recordTracksEvent, recordGoogleEvent } from 'calypso/state/analytics/actions';
 import { appendBreadcrumb, resetBreadcrumbs } from 'calypso/state/breadcrumb/actions';
@@ -19,6 +18,8 @@ import isAtomicSite from 'calypso/state/selectors/is-site-automated-transfer';
 import siteHasFeature from 'calypso/state/selectors/site-has-feature';
 import { getSiteAdminUrl, isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
+
+import './style.scss';
 
 const UploadPluginButton = ( { isMobile, siteSlug, hasUploadPlugins } ) => {
 	const dispatch = useDispatch();
@@ -109,26 +110,20 @@ const PluginsNavigationHeader = ( { navigationHeaderRef, categoryName, category,
 	const { localizePath } = useLocalizedPlugins();
 
 	const setBreadcrumbs = ( breadcrumbs = [] ) => {
+		const pluginsBreadcrumb = {
+			label: translate( 'Plugins' ),
+			href: localizePath( `/plugins/${ selectedSite?.slug || '' }` ),
+			id: 'plugins',
+		};
+
 		if ( breadcrumbs?.length === 0 || ( ! category && ! search ) ) {
 			dispatch( resetBreadcrumbs() );
-			dispatch(
-				appendBreadcrumb( {
-					label: translate( 'Plugins' ),
-					href: localizePath( `/plugins/${ selectedSite?.slug || '' }` ),
-					id: 'plugins',
-					helpBubble: translate(
-						'Add new functionality and integrations to your site with plugins. {{learnMoreLink}}Learn more{{/learnMoreLink}}.',
-						{
-							components: {
-								learnMoreLink: <InlineSupportLink supportContext="plugins" showIcon={ false } />,
-							},
-						}
-					),
-				} )
-			);
+			dispatch( appendBreadcrumb( pluginsBreadcrumb ) );
 		}
 
 		if ( category ) {
+			resetBreadcrumbs();
+			dispatch( appendBreadcrumb( pluginsBreadcrumb ) );
 			dispatch(
 				appendBreadcrumb( {
 					label: categoryName,
@@ -139,6 +134,8 @@ const PluginsNavigationHeader = ( { navigationHeaderRef, categoryName, category,
 		}
 
 		if ( search ) {
+			dispatch( resetBreadcrumbs() );
+			dispatch( appendBreadcrumb( pluginsBreadcrumb ) );
 			dispatch(
 				appendBreadcrumb( {
 					label: translate( 'Search Results' ),
@@ -169,27 +166,28 @@ const PluginsNavigationHeader = ( { navigationHeaderRef, categoryName, category,
 	}, [ selectedSite?.slug, search, category, categoryName, dispatch, localizePath ] );
 
 	return (
-		<FixedNavigationHeader
-			navigationItems={ breadcrumbs }
+		<NavigationHeader
+			className="plugins-navigation-header"
 			compactBreadcrumb={ isMobile }
 			ref={ navigationHeaderRef }
+			title={ translate( 'Plugins {{wbr}}{{/wbr}}marketplace', {
+				components: { wbr: <wbr /> },
+			} ) }
 		>
-			<div className="plugins-browser__main-buttons">
-				<ManageButton
-					shouldShowManageButton={ shouldShowManageButton }
-					siteAdminUrl={ siteAdminUrl }
-					siteSlug={ selectedSite?.slug }
-					jetpackNonAtomic={ jetpackNonAtomic }
-					hasManagePlugins={ hasManagePlugins }
-				/>
+			<ManageButton
+				shouldShowManageButton={ shouldShowManageButton }
+				siteAdminUrl={ siteAdminUrl }
+				siteSlug={ selectedSite?.slug }
+				jetpackNonAtomic={ jetpackNonAtomic }
+				hasManagePlugins={ hasManagePlugins }
+			/>
 
-				<UploadPluginButton
-					isMobile={ isMobile }
-					siteSlug={ selectedSite?.slug }
-					hasUploadPlugins={ !! selectedSite }
-				/>
-			</div>
-		</FixedNavigationHeader>
+			<UploadPluginButton
+				isMobile={ isMobile }
+				siteSlug={ selectedSite?.slug }
+				hasUploadPlugins={ !! selectedSite }
+			/>
+		</NavigationHeader>
 	);
 };
 

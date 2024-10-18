@@ -1,14 +1,15 @@
+import { FormLabel } from '@automattic/components';
 import { localizeUrl } from '@automattic/i18n-utils';
 import { useTranslate } from 'i18n-calypso';
 import { connect } from 'react-redux';
 import FormFieldset from 'calypso/components/forms/form-fieldset';
-import FormLabel from 'calypso/components/forms/form-label';
 import FormSelect from 'calypso/components/forms/form-select';
 import FormSettingExplanation from 'calypso/components/forms/form-setting-explanation';
 import useDropdownPagesQuery, {
 	DropdownPagesResponse,
 	PageNode,
 } from 'calypso/data/dropdown-pages/use-dropdown-pages';
+import { IAppState } from 'calypso/state/types';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 
 const PAGE_TITLE_DEPTH_PADDING = '—'; // em dash
@@ -166,7 +167,7 @@ const YourHomepageDisplaysSetting = ( {
 	);
 };
 
-export default connect( ( state ) => {
+export default connect( ( state: IAppState ) => {
 	const siteId = getSelectedSiteId( state );
 	return { ...( siteId && { siteId } ) };
 } )( YourHomepageDisplaysSetting );

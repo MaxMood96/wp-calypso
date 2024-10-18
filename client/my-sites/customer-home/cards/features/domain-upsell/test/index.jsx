@@ -2,11 +2,12 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import nock from 'nock';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
+import thunk from 'redux-thunk';
 import DomainUpsell from '../';
 
 const initialState = {
@@ -52,6 +53,9 @@ const initialState = {
 			primary_blog: 1,
 		},
 	},
+	productsList: {
+		isFetching: false,
+	},
 };
 
 jest.mock( '@automattic/domain-picker/src', () => {
@@ -70,7 +74,7 @@ jest.mock( '@automattic/domain-picker/src', () => {
 } );
 
 let pageLink = '';
-jest.mock( 'page', () => ( link ) => ( pageLink = link ) );
+jest.mock( '@automattic/calypso-router', () => ( link ) => ( pageLink = link ) );
 
 const domainUpsellHeadingFreePlan = 'Own a domain. Build a site.';
 const domainUpsellHeadingPaidPlan = 'That perfect domain is waiting';
@@ -79,7 +83,7 @@ const searchForDomainCta = 'Search for a domain';
 
 describe( 'index', () => {
 	test( 'Should show H3 content for the Home domain upsell and test search domain button link', async () => {
-		const mockStore = configureStore();
+		const mockStore = configureStore( [ thunk ] );
 		const store = mockStore( initialState );
 
 		render(
@@ -108,7 +112,7 @@ describe( 'index', () => {
 			.post( '/rest/v1.1/me/shopping-cart/1' )
 			.reply( 200 );
 
-		const mockStore = configureStore();
+		const mockStore = configureStore( [ thunk ] );
 		const store = mockStore( initialState );
 
 		render(
@@ -119,9 +123,11 @@ describe( 'index', () => {
 
 		const user = userEvent.setup();
 		await user.click( screen.getByRole( 'button', { name: buyThisDomainCta } ) );
-		expect( pageLink ).toBe(
-			'/plans/yearly/example.wordpress.com?domain=true&domainAndPlanPackage=true'
-		);
+		await waitFor( () => {
+			expect( pageLink ).toBe(
+				'/plans/yearly/example.wordpress.com?domain=true&domainAndPlanPackage=true'
+			);
+		} );
 	} );
 
 	test( 'Should test the purchase button link on Yearly plans', async () => {
@@ -151,7 +157,7 @@ describe( 'index', () => {
 			},
 		};
 
-		const mockStore = configureStore();
+		const mockStore = configureStore( [ thunk ] );
 		const store = mockStore( newInitialState );
 
 		render(
@@ -162,7 +168,9 @@ describe( 'index', () => {
 
 		const user = userEvent.setup();
 		await user.click( screen.getByRole( 'button', { name: buyThisDomainCta } ) );
-		expect( pageLink ).toBe( '/checkout/example.wordpress.com' );
+		await waitFor( () => {
+			expect( pageLink ).toBe( '/checkout/example.wordpress.com' );
+		} );
 	} );
 
 	test( 'Should show H3 content for the Home domain upsell if paid plan with no domains', async () => {
@@ -186,7 +194,7 @@ describe( 'index', () => {
 			},
 		};
 
-		const mockStore = configureStore();
+		const mockStore = configureStore( [ thunk ] );
 		const store = mockStore( newInitialState );
 
 		render(
@@ -241,7 +249,7 @@ describe( 'index', () => {
 			},
 		};
 
-		const mockStore = configureStore();
+		const mockStore = configureStore( [ thunk ] );
 		const store = mockStore( newInitialState );
 
 		render(
@@ -265,7 +273,7 @@ describe( 'index', () => {
 			},
 		};
 
-		const mockStore = configureStore();
+		const mockStore = configureStore( [ thunk ] );
 		const store = mockStore( newInitialState );
 
 		render(

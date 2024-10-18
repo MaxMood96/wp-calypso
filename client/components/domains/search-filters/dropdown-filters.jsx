@@ -1,32 +1,28 @@
 import config from '@automattic/calypso-config';
-import { Button, Popover } from '@automattic/components';
-import classNames from 'classnames';
+import { Button, Count, FormLabel, Popover } from '@automattic/components';
+import { isWithinBreakpoint } from '@automattic/viewport';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import { includes, isEqual, pick } from 'lodash';
 import PropTypes from 'prop-types';
 import { createRef, Component } from 'react';
-import Count from 'calypso/components/count';
 import FormInputCheckbox from 'calypso/components/forms/form-checkbox';
 import FormFieldset from 'calypso/components/forms/form-fieldset';
-import FormLabel from 'calypso/components/forms/form-label';
 import FormTextInput from 'calypso/components/forms/form-text-input';
-import MaterialIcon from 'calypso/components/material-icon';
 import TokenField from 'calypso/components/token-field';
 import ValidationFieldset from 'calypso/signup/validation-fieldset';
 
-const HANDLED_FILTER_KEYS = [ 'tlds', 'includeDashes', 'maxCharacters', 'exactSldMatchesOnly' ];
+const HANDLED_FILTER_KEYS = [ 'tlds', 'maxCharacters', 'exactSldMatchesOnly' ];
 
 export class DropdownFilters extends Component {
 	static propTypes = {
 		availableTlds: PropTypes.array,
 		filters: PropTypes.shape( {
-			includeDashes: PropTypes.bool,
 			maxCharacters: PropTypes.string,
 			exactSldMatchesOnly: PropTypes.bool,
 			tlds: PropTypes.array,
 		} ).isRequired,
 		lastFilters: PropTypes.shape( {
-			includeDashes: PropTypes.bool,
 			maxCharacters: PropTypes.string,
 			exactSldMatchesOnly: PropTypes.bool,
 			tlds: PropTypes.array,
@@ -69,7 +65,6 @@ export class DropdownFilters extends Component {
 	getFiltercounts() {
 		return (
 			( this.props.lastFilters.tlds?.length || 0 ) +
-			( this.props.lastFilters.includeDashes && 1 ) +
 			( this.props.lastFilters.exactSldMatchesOnly && 1 ) +
 			( this.props.lastFilters.maxCharacters !== '' && 1 )
 		);
@@ -114,7 +109,7 @@ export class DropdownFilters extends Component {
 	handleFiltersReset = () => {
 		this.setState( { showOverallValidationError: false }, () => {
 			this.togglePopover( { discardChanges: false } );
-			this.props.onReset( 'tlds', 'includeDashes', 'maxCharacters', 'exactSldMatchesOnly' );
+			this.props.onReset( 'tlds', 'maxCharacters', 'exactSldMatchesOnly' );
 		} );
 	};
 	handleFiltersSubmit = () => {
@@ -141,7 +136,7 @@ export class DropdownFilters extends Component {
 
 		return (
 			<div
-				className={ classNames( 'search-filters__dropdown-filters', {
+				className={ clsx( 'search-filters__dropdown-filters', {
 					'search-filters__dropdown-filters--has-filter-values': hasFilterValues,
 					'search-filters__dropdown-filters--is-open': this.state.showPopover,
 				} ) }
@@ -150,11 +145,9 @@ export class DropdownFilters extends Component {
 					aria-describedby={ this.props.popoverId }
 					aria-expanded={ this.state.showPopover }
 					aria-haspopup="true"
-					borderless
 					ref={ this.button }
 					onClick={ this.togglePopover }
 				>
-					<MaterialIcon icon="filter_list" />
 					<span className="search-filters__dropdown-filters-button-text">
 						{ this.props.translate( 'Filter' ) }
 						{ hasFilterValues && <Count primary count={ this.getFiltercounts() } /> }
@@ -173,7 +166,6 @@ export class DropdownFilters extends Component {
 
 	/**
 	 * Show the first 5 TLDs from the TLD endpoint as recommended and sort the rest alphabetically
-	 *
 	 * @param availableTlds array of TLDs
 	 */
 	addTldsLabels = ( availableTlds ) => {
@@ -188,13 +180,12 @@ export class DropdownFilters extends Component {
 
 	renderPopover() {
 		const {
-			filters: { includeDashes, maxCharacters, exactSldMatchesOnly },
+			filters: { maxCharacters, exactSldMatchesOnly },
 			popoverId,
 			translate,
 			showTldFilter,
 		} = this.props;
 
-		const isDashesFilterEnabled = config.isEnabled( 'domains/kracken-ui/dashes-filter' );
 		const isExactMatchFilterEnabled = config.isEnabled( 'domains/kracken-ui/exact-match-filter' );
 		const isLengthFilterEnabled = config.isEnabled( 'domains/kracken-ui/max-characters-filter' );
 
@@ -207,7 +198,9 @@ export class DropdownFilters extends Component {
 				id={ popoverId }
 				isVisible={ this.state.showPopover }
 				onClose={ this.handleFiltersSubmit }
-				position="bottom left"
+				position={ isWithinBreakpoint( '>660px' ) ? 'bottom' : 'bottom left' }
+				{ ...( isWithinBreakpoint( '>660px' ) && { relativePosition: { left: -238 } } ) }
+				hideArrow
 			>
 				{ isLengthFilterEnabled && (
 					<ValidationFieldset
@@ -262,22 +255,6 @@ export class DropdownFilters extends Component {
 							/>
 							<span className="search-filters__checkbox-label">
 								{ translate( 'Show exact matches only' ) }
-							</span>
-						</FormLabel>
-					) }
-
-					{ isDashesFilterEnabled && (
-						<FormLabel className="search-filters__label" htmlFor="search-filters-include-dashes">
-							<FormInputCheckbox
-								className="search-filters__checkbox"
-								checked={ includeDashes }
-								id="search-filters-include-dashes"
-								name="includeDashes"
-								onChange={ this.handleOnChange }
-								value="includeDashes"
-							/>
-							<span className="search-filters__checkbox-label">
-								{ translate( 'Enable dashes' ) }
 							</span>
 						</FormLabel>
 					) }

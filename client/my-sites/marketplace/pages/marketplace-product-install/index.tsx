@@ -1,17 +1,21 @@
-import { WPCOM_FEATURES_ATOMIC } from '@automattic/calypso-products';
-import { WordPressWordmark, Button } from '@automattic/components';
-import { ThemeProvider } from '@emotion/react';
+import {
+	PLAN_BUSINESS,
+	WPCOM_FEATURES_ATOMIC,
+	getPlan,
+	WPCOM_FEATURES_MANAGE_PLUGINS,
+} from '@automattic/calypso-products';
+import page from '@automattic/calypso-router';
+import { Button } from '@automattic/components';
+import { css, Global, ThemeProvider } from '@emotion/react';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useSelector, useDispatch, DefaultRootState } from 'react-redux';
 import QueryActiveTheme from 'calypso/components/data/query-active-theme';
 import QueryJetpackPlugins from 'calypso/components/data/query-jetpack-plugins';
 import QueryProductsList from 'calypso/components/data/query-products-list';
 import { useQueryTheme } from 'calypso/components/data/query-theme';
 import EmptyContent from 'calypso/components/empty-content';
+import WordPressLogo from 'calypso/components/wordpress-logo';
 import { useWPCOMPlugin } from 'calypso/data/marketplace/use-wpcom-plugins-query';
-import Item from 'calypso/layout/masterbar/item';
 import Masterbar from 'calypso/layout/masterbar/masterbar';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { useInterval } from 'calypso/lib/interval';
@@ -20,13 +24,18 @@ import MarketplaceProgressBar from 'calypso/my-sites/marketplace/components/prog
 import useMarketplaceAdditionalSteps from 'calypso/my-sites/marketplace/pages/marketplace-product-install/use-marketplace-additional-steps';
 import theme from 'calypso/my-sites/marketplace/theme';
 import { waitFor } from 'calypso/my-sites/marketplace/util';
+import { useSelector, useDispatch } from 'calypso/state';
 import { initiateAtomicTransfer } from 'calypso/state/atomic/transfers/actions';
 import { transferStates } from 'calypso/state/automated-transfer/constants';
 import { getAutomatedTransferStatus } from 'calypso/state/automated-transfer/selectors';
 import { getPurchaseFlowState } from 'calypso/state/marketplace/purchase-flow/selectors';
 import { MARKETPLACE_ASYNC_PROCESS_STATUS } from 'calypso/state/marketplace/types';
 import { installPlugin, activatePlugin } from 'calypso/state/plugins/installed/actions';
-import { getPluginOnSite, getStatusForPlugin } from 'calypso/state/plugins/installed/selectors';
+import {
+	getPluginOnSite,
+	getStatusForPlugin,
+	isPluginActive,
+} from 'calypso/state/plugins/installed/selectors-ts';
 import { fetchPluginData as wporgFetchPluginData } from 'calypso/state/plugins/wporg/actions';
 import { getPlugin, isFetched } from 'calypso/state/plugins/wporg/selectors';
 import {
@@ -36,11 +45,10 @@ import {
 import getPluginUploadError from 'calypso/state/selectors/get-plugin-upload-error';
 import getPluginUploadProgress from 'calypso/state/selectors/get-plugin-upload-progress';
 import getUploadedPluginId from 'calypso/state/selectors/get-uploaded-plugin-id';
-import isPluginActive from 'calypso/state/selectors/is-plugin-active';
 import isPluginUploadComplete from 'calypso/state/selectors/is-plugin-upload-complete';
 import isSiteAutomatedTransfer from 'calypso/state/selectors/is-site-automated-transfer';
 import siteHasFeature from 'calypso/state/selectors/site-has-feature';
-import { isJetpackSite } from 'calypso/state/sites/selectors';
+import { isJetpackSite, getSiteAdminUrl } from 'calypso/state/sites/selectors';
 import {
 	initiateThemeTransfer as initiateTransfer,
 	installAndActivateTheme,
@@ -55,11 +63,6 @@ import {
 import './style.scss';
 import { MarketplacePluginInstallProps } from './types';
 import type { IAppState } from 'calypso/state/types';
-
-interface InstalledPlugin {
-	slug?: string;
-	id?: number;
-}
 
 const MarketplaceProductInstall = ( {
 	pluginSlug = '',
@@ -88,7 +91,7 @@ const MarketplaceProductInstall = ( {
 		getUploadedPluginId( state, siteId )
 	) as string;
 	const pluginUploadComplete = useSelector( ( state ) => isPluginUploadComplete( state, siteId ) );
-	const installedPlugin = useSelector( ( state: DefaultRootState ): InstalledPlugin | undefined =>
+	const installedPlugin = useSelector( ( state ) =>
 		getPluginOnSite( state, siteId, isPluginUploadFlow ? uploadedPluginSlug : pluginSlug )
 	);
 	const pluginActive = useSelector( ( state ) =>
@@ -102,7 +105,7 @@ const MarketplaceProductInstall = ( {
 		getStatusForPlugin( state, siteId, pluginSlug )
 	);
 
-	const productsList = useSelector( ( state ) => getProductsList( state ) );
+	const productsList = useSelector( getProductsList );
 	const isProductListFetched = Object.values( productsList ).length > 0;
 	const isMarketplaceProduct = useSelector( ( state ) =>
 		isMarketplaceProductSelector( state, pluginSlug )
@@ -262,29 +265,41 @@ const MarketplaceProductInstall = ( {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ pluginUploadComplete, installedPlugin, setCurrentStep ] );
 
+	const pluginsUrl = useSelector( ( state ) =>
+		getSiteAdminUrl( state, siteId, 'plugins.php?activate=true&plugin_status=active' )
+	);
+	const canManagePlugins = useSelector( ( state ) => {
+		return siteHasFeature( state, selectedSite?.ID, WPCOM_FEATURES_MANAGE_PLUGINS );
+	} );
 	// Check completition of all flows and redirect to thank you page
 	useEffect( () => {
 		if (
 			// Default process
 			( installedPlugin && pluginActive ) ||
 			// Transfer to atomic using a marketplace plugin
-			( atomicFlow && transferStates.COMPLETE === automatedTransferStatus ) ||
+			( atomicFlow && transferStates.COMPLETE === automatedTransferStatus && canManagePlugins ) ||
 			// Transfer to atomic uploading a zip plugin
 			( uploadedPluginSlug &&
 				isPluginUploadFlow &&
 				! isAtomic &&
-				transferStates.COMPLETE === automatedTransferStatus )
+				transferStates.COMPLETE === automatedTransferStatus &&
+				canManagePlugins )
 		) {
-			waitFor( 1 ).then( () =>
-				page.redirect(
-					`/marketplace/thank-you/${ selectedSiteSlug }?hide-progress-bar&plugins=${
-						installedPlugin?.slug || pluginSlug || uploadedPluginSlug
-					}`
-				)
-			);
+			waitFor( 1 ).then( () => {
+				window.location.href = pluginsUrl as string;
+			} );
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [ pluginActive, automatedTransferStatus, atomicFlow, isPluginUploadFlow, isAtomic ] ); // We need to trigger this hook also when `automatedTransferStatus` changes cause the plugin install is done on the background in that case.
+	}, [
+		pluginActive,
+		automatedTransferStatus,
+		atomicFlow,
+		isPluginUploadFlow,
+		isAtomic,
+		canManagePlugins,
+		installedPlugin,
+		uploadedPluginSlug,
+		pluginsUrl,
+	] ); // We need to trigger this hook also when `automatedTransferStatus` changes cause the plugin install is done on the background in that case.
 
 	// Validate theme is already active
 	useEffect( () => {
@@ -358,9 +373,14 @@ const MarketplaceProductInstall = ( {
 					illustration="/calypso/images/illustrations/error.svg"
 					title={ null }
 					line={ translate(
-						"Your current plan doesn't allow plugin installation. Please upgrade to Business plan first."
+						"Your current plan doesn't allow plugin installation. Please upgrade to %(businessPlanName)s plan first.",
+						{
+							args: { businessPlanName: getPlan( PLAN_BUSINESS )?.getTitle() ?? '' },
+						}
 					) }
-					action={ translate( 'Upgrade to Business Plan' ) }
+					action={ translate( 'Upgrade to %(planName)s Plan', {
+						args: { planName: getPlan( PLAN_BUSINESS )?.getTitle() ?? '' },
+					} ) }
 					actionURL={ `/checkout/${ selectedSite?.slug }/business?redirect_to=/marketplace/plugin/${ pluginSlug }/install/${ selectedSite?.slug }#step2` }
 				/>
 			);
@@ -461,7 +481,7 @@ const MarketplaceProductInstall = ( {
 		// Catch the rest of the error cases.
 		if (
 			pluginUploadError ||
-			pluginInstallStatus.error ||
+			pluginInstallStatus?.error ||
 			( atomicFlow && automatedTransferStatus === transferStates.FAILURE )
 		) {
 			return (
@@ -489,8 +509,14 @@ const MarketplaceProductInstall = ( {
 			<QueryActiveTheme siteId={ siteId } />
 			{ siteId && <QueryJetpackPlugins siteIds={ [ siteId ] } /> }
 			<Masterbar className="marketplace-plugin-install__masterbar">
-				<WordPressWordmark className="marketplace-plugin-install__wpcom-wordmark" />
-				<Item>{ translate( 'Marketplace installation' ) }</Item>
+				<Global
+					styles={ css`
+						body {
+							--masterbar-height: 72px;
+						}
+					` }
+				/>
+				<WordPressLogo className="marketplace-plugin-install__logo" size={ 24 } />
 			</Masterbar>
 			<div className="marketplace-plugin-install__root">
 				{ renderError() || (

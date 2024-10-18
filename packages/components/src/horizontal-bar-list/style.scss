@@ -1,8 +1,8 @@
 // ==========================================================================
 // Horizontal bar list
 // ==========================================================================
-@import "../styles/typography.scss";
-@import "./stats-variables.scss";
+@import "../styles/typography";
+@import "./stats-variables";
 
 .horizontal-bar-list {
 	list-style: none;
@@ -134,6 +134,16 @@
 
 .horizontal-bar-list-item--static {
 	cursor: auto;
+}
+
+.horizontal-bar-list-item--no-bg {
+	.horizontal-bar-list-item-bar {
+		padding-left: 0;
+
+		&::before {
+			display: none;
+		}
+	}
 }
 
 .horizontal-bar-list-item--additional {

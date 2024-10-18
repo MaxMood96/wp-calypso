@@ -1,4 +1,4 @@
-import classnames from 'classnames';
+import clsx from 'clsx';
 import './style.scss';
 
 const CircularProgressBar = ( {
@@ -6,15 +6,18 @@ const CircularProgressBar = ( {
 	numberOfSteps,
 	size,
 	enableDesktopScaling = false,
+	strokeWidth = 4,
+	showProgressText = true,
 }: {
 	currentStep: number | null;
 	numberOfSteps: number | null;
 	size: number;
 	enableDesktopScaling?: boolean;
+	strokeWidth?: number;
+	showProgressText?: boolean;
 } ) => {
 	const SIZE = size;
-	const STROKE_WIDTH = 4;
-	const RADIUS = SIZE / 2 - STROKE_WIDTH / 2;
+	const RADIUS = SIZE / 2 - strokeWidth / 2;
 	const FULL_ARC = 2 * Math.PI * RADIUS;
 
 	if ( currentStep === null || ! numberOfSteps ) {
@@ -24,7 +27,7 @@ const CircularProgressBar = ( {
 	return (
 		<div
 			role="progressbar"
-			className={ classnames( 'circular__progress-bar', {
+			className={ clsx( 'circular__progress-bar', {
 				'desktop-scaling': enableDesktopScaling,
 			} ) }
 			style={ { width: SIZE, height: SIZE } }
@@ -41,7 +44,7 @@ const CircularProgressBar = ( {
 					cx={ SIZE / 2 }
 					cy={ SIZE / 2 }
 					r={ RADIUS }
-					strokeWidth={ STROKE_WIDTH }
+					strokeWidth={ strokeWidth }
 				/>
 				<circle
 					style={ {
@@ -53,12 +56,14 @@ const CircularProgressBar = ( {
 					cx={ SIZE / 2 }
 					cy={ SIZE / 2 }
 					r={ RADIUS }
-					strokeWidth={ STROKE_WIDTH }
+					strokeWidth={ strokeWidth }
 				/>
 			</svg>
-			<div className="circular__progress-bar-text">
-				{ currentStep }/{ numberOfSteps }
-			</div>
+			{ showProgressText && (
+				<div className="circular__progress-bar-text">
+					{ currentStep }/{ numberOfSteps }
+				</div>
+			) }
 		</div>
 	);
 };

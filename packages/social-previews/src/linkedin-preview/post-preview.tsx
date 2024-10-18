@@ -1,6 +1,7 @@
 import { __, sprintf } from '@wordpress/i18n';
-import { baseDomain, preparePreviewText } from '../helpers';
+import { baseDomain, getTitleFromDescription, preparePreviewText } from '../helpers';
 import { FEED_TEXT_MAX_LENGTH, FEED_TEXT_MAX_LINES } from './constants';
+import { DefaultAvatar } from './icons/default-avatar';
 import { LinkedInPreviewProps } from './types';
 
 import './style.scss';
@@ -23,11 +24,13 @@ export function LinkedInPostPreview( {
 			<section className={ `linkedin-preview__container ${ hasMedia ? 'has-media' : '' }` }>
 				<div className="linkedin-preview__header">
 					<div className="linkedin-preview__header--avatar">
-						<img src={ profileImage } alt="" />
+						{ profileImage ? <img src={ profileImage } alt="" /> : <DefaultAvatar /> }
 					</div>
 					<div className="linkedin-preview__header--profile">
 						<div className="linkedin-preview__header--profile-info">
-							<div className="linkedin-preview__header--profile-name">{ name }</div>
+							<div className="linkedin-preview__header--profile-name">
+								{ name || __( 'Account Name', 'social-previews' ) }
+							</div>
 							<span>•</span>
 							<div className="linkedin-preview__header--profile-actor">
 								{
@@ -87,7 +90,9 @@ export function LinkedInPostPreview( {
 							{ image ? <img className="linkedin-preview__image" src={ image } alt="" /> : null }
 							{ url ? (
 								<div className="linkedin-preview__description">
-									<h2 className="linkedin-preview__description--title">{ title }</h2>
+									<h2 className="linkedin-preview__description--title">
+										{ title || getTitleFromDescription( description ) }
+									</h2>
 									<div className="linkedin-preview__description--meta">
 										<span className="linkedin-preview__description--url">
 											{ baseDomain( url ) }

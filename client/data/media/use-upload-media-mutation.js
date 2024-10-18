@@ -23,7 +23,9 @@ export const useUploadMediaMutation = ( queryOptions = {} ) => {
 			dispatch( successMediaItemRequest( siteId, transientMedia.ID ) );
 			dispatch( receiveMedia( siteId, uploadedMediaWithTransientId, found ) );
 
-			queryClient.invalidateQueries( [ 'media-storage', siteId ] );
+			queryClient.invalidateQueries( {
+				queryKey: [ 'media-storage', siteId ],
+			} );
 		},
 		onError( error, { siteId, transientMedia } ) {
 			dispatch( failMediaItemRequest( siteId, transientMedia.ID, error ) );
@@ -43,9 +45,10 @@ export const useUploadMediaMutation = ( queryOptions = {} ) => {
 			}
 
 			const uploadedItems = [];
-
-			const uploads = dispatch( createTransientMediaItems( files, site ) );
+			const transientItems = dispatch( createTransientMediaItems( files, site ) );
 			const { ID: siteId } = site;
+
+			const uploads = files.map( ( _, i ) => [ files[ i ], transientItems[ i ] ] );
 
 			for await ( const [ file, transientMedia ] of uploads ) {
 				if ( ! transientMedia ) {

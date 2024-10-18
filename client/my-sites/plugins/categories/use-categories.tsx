@@ -1,5 +1,5 @@
 import { __, _x } from '@wordpress/i18n';
-import { useSelector } from 'react-redux';
+import { useSelector } from 'calypso/state';
 import isAtomicSite from 'calypso/state/selectors/is-site-automated-transfer';
 import { isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
@@ -94,8 +94,8 @@ export const getCategories: () => Record< string, Category > = () => ( {
 	},
 	popular: {
 		menu: __( 'Popular plugins' ),
-		title: __( 'The free essentials' ),
-		description: __( 'Add and install the very best free plugins' ),
+		title: __( 'Popular plugins' ),
+		description: __( 'Add and install the most popular free plugins' ),
 		slug: 'popular',
 		tags: [],
 		preview: [],
@@ -755,7 +755,6 @@ export const getCategories: () => Record< string, Category > = () => ( {
 
 /**
  * Get the first matching category from a collection of tags
- *
  * @param {Array<string>} pluginTags - array of tags of a plugin
  * @returns string | undefined - category name or undefined if no category is found
  */

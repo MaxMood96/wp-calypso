@@ -1,15 +1,16 @@
+import config from '@automattic/calypso-config';
 import { guessTimezone, getLanguage } from '@automattic/i18n-utils';
 import { dispatch, select } from '@wordpress/data-controls';
 import { __ } from '@wordpress/i18n';
 import { STORE_KEY as SITE_STORE } from '../site';
 import { CreateSiteParams, Visibility, NewSiteBlogDetails } from '../site/types';
 import { SiteGoal, STORE_KEY } from './constants';
-import { ProfilerData } from './types';
-import type { State } from '.';
+import { ProfilerData, ReadymadeTemplate } from './types';
+import type { DomainTransferData, State } from '.';
 import type { DomainSuggestion } from '../domain-suggestions';
 import type { FeatureId } from '../shared-types';
 // somewhat hacky, but resolves the circular dependency issue
-import type { Design, FontPair, StyleVariation } from '@automattic/design-picker/src/types';
+import type { Design, StyleVariation } from '@automattic/design-picker/src/types';
 import type { MinimalRequestCartProduct } from '@automattic/shopping-cart';
 
 // copied from design picker to avoid a circular dependency
@@ -27,6 +28,11 @@ type Language = {
 export const addFeature = ( featureId: FeatureId ) => ( {
 	type: 'ADD_FEATURE' as const,
 	featureId,
+} );
+
+export const setSiteUrl = ( siteUrl: string ) => ( {
+	type: 'SET_SITE_URL' as const,
+	siteUrl,
 } );
 
 export interface CreateSiteBaseActionParameters {
@@ -47,14 +53,19 @@ export function* createVideoPressSite( {
 	languageSlug,
 	visibility = Visibility.PublicNotIndexed,
 }: CreateSiteBaseActionParameters ) {
-	const { domain, selectedDesign, selectedFonts, siteTitle, selectedFeatures }: State =
-		yield select( STORE_KEY, 'getState' );
+	const { domain, selectedDesign, siteTitle, selectedFeatures }: State = yield select(
+		STORE_KEY,
+		'getState'
+	);
 
 	const siteUrl = domain?.domain_name || siteTitle || username;
 	const lang_id = ( getLanguage( languageSlug ) as Language )?.value;
+	const isVideomakerTrial = config.isEnabled( 'videomaker-trial' );
 	const defaultTheme = selectedDesign?.theme || 'premium/videomaker';
-	const siteVertical = 'premium/videomaker' === defaultTheme ? 'videomaker' : 'videomaker-white';
+	const legacyVertical = 'premium/videomaker' === defaultTheme ? 'videomaker' : 'videomaker-white';
+	const siteVertical = isVideomakerTrial ? 'videomaker' : legacyVertical;
 	const blogTitle = siteTitle.trim() === '' ? __( 'Site Title' ) : siteTitle;
+	const themeSlug = isVideomakerTrial ? 'pub/videomaker' : 'pub/twentytwentytwo'; // NOTE: keep this a consistent, free theme so post ids during headstart re-run after premium theme switch remain consistent
 
 	const params: CreateSiteParams = {
 		blog_name: siteUrl?.split( '.wordpress' )[ 0 ],
@@ -67,15 +78,49 @@ export function* createVideoPressSite( {
 			lang_id: lang_id,
 			site_creation_flow: 'videopress',
 			enable_fse: true,
-			theme: 'pub/twentytwentytwo', // NOTE: keep this a consistent, free theme so post ids during headstart re-run after premium theme switch remain consistent,
+			theme: themeSlug,
 			timezone_string: guessTimezone(),
-			...( selectedDesign?.template && { template: selectedDesign.template } ),
-			...( selectedFonts && {
-				font_base: selectedFonts.base,
-				font_headings: selectedFonts.headings,
-			} ),
 			use_patterns: true,
 			site_vertical_name: siteVertical,
+			selected_features: selectedFeatures,
+			wpcom_public_coming_soon: 1,
+			...( selectedDesign && { is_blank_canvas: isBlankCanvasDesign( selectedDesign ) } ),
+			is_videopress_initial_purchase: ! isVideomakerTrial,
+		},
+	};
+
+	const success: NewSiteBlogDetails | undefined = yield dispatch(
+		SITE_STORE,
+		'createSite',
+		params
+	);
+
+	return success;
+}
+
+export function* createVideoPressTvSite( {
+	languageSlug,
+	visibility = Visibility.PublicNotIndexed,
+}: CreateSiteBaseActionParameters ) {
+	const { selectedDesign, selectedFeatures }: State = yield select( STORE_KEY, 'getState' );
+
+	const lang_id = ( getLanguage( languageSlug ) as Language )?.value;
+	const blogTitle = 'VideoPress TV';
+
+	const params: CreateSiteParams = {
+		blog_name: '', // will be replaced on server with random domain
+		blog_title: blogTitle,
+		public: visibility,
+		options: {
+			site_information: {
+				title: blogTitle,
+			},
+			lang_id: lang_id,
+			site_creation_flow: 'videopress-tv',
+			enable_fse: true,
+			theme: 'pub/videopress-hq',
+			timezone_string: guessTimezone(),
+			use_patterns: true,
 			selected_features: selectedFeatures,
 			wpcom_public_coming_soon: 1,
 			...( selectedDesign && { is_blank_canvas: isBlankCanvasDesign( selectedDesign ) } ),
@@ -97,8 +142,10 @@ export function* createSenseiSite( {
 	languageSlug = '',
 	visibility = Visibility.PublicNotIndexed,
 } ) {
-	const { domain, selectedDesign, selectedFonts, siteTitle, selectedFeatures }: State =
-		yield select( STORE_KEY, 'getState' );
+	const { domain, selectedDesign, siteTitle, selectedFeatures }: State = yield select(
+		STORE_KEY,
+		'getState'
+	);
 
 	const siteUrl = domain?.domain_name || siteTitle || username;
 	const lang_id = ( getLanguage( languageSlug ) as Language )?.value;
@@ -115,80 +162,15 @@ export function* createSenseiSite( {
 			lang_id: lang_id,
 			site_creation_flow: 'sensei',
 			enable_fse: true,
-			theme: 'pub/course',
 			timezone_string: guessTimezone(),
-			...( selectedDesign?.template && { template: selectedDesign.template } ),
-			...( selectedFonts && {
-				font_base: selectedFonts.base,
-				font_headings: selectedFonts.headings,
-			} ),
 			use_patterns: true,
 			site_intent: 'sensei',
+			launchpad_screen: 'off',
 			selected_features: selectedFeatures,
 			wpcom_public_coming_soon: 1,
 			...( selectedDesign && { is_blank_canvas: isBlankCanvasDesign( selectedDesign ) } ),
 		},
 	} );
-
-	return success;
-}
-
-export function* createSite( {
-	username,
-	languageSlug,
-	bearerToken = undefined,
-	visibility = Visibility.PublicNotIndexed,
-	anchorFmPodcastId = null,
-	anchorFmEpisodeId = null,
-	anchorFmSpotifyUrl = null,
-}: CreateSiteActionParameters ) {
-	const { domain, selectedDesign, selectedFonts, siteTitle, selectedFeatures }: State =
-		yield select( STORE_KEY, 'getState' );
-
-	const siteUrl = domain?.domain_name || siteTitle || username;
-	const lang_id = ( getLanguage( languageSlug ) as Language )?.value;
-	const defaultTheme = 'zoologist';
-	const blogTitle = siteTitle.trim() === '' ? __( 'Site Title' ) : siteTitle;
-
-	const params: CreateSiteParams = {
-		blog_name: siteUrl?.split( '.wordpress' )[ 0 ],
-		blog_title: blogTitle,
-		public: visibility,
-		options: {
-			site_information: {
-				title: blogTitle,
-			},
-			lang_id: lang_id,
-			site_creation_flow: 'gutenboarding',
-			enable_fse: true,
-			theme: `pub/${ selectedDesign?.theme || defaultTheme }`,
-			timezone_string: guessTimezone(),
-			...( selectedDesign?.template && { template: selectedDesign.template } ),
-			...( selectedFonts && {
-				font_base: selectedFonts.base,
-				font_headings: selectedFonts.headings,
-			} ),
-			use_patterns: true,
-			selected_features: selectedFeatures,
-			wpcom_public_coming_soon: 1,
-			...( anchorFmPodcastId && {
-				anchor_fm_podcast_id: anchorFmPodcastId,
-			} ),
-			...( anchorFmEpisodeId && {
-				anchor_fm_episode_id: anchorFmEpisodeId,
-			} ),
-			...( anchorFmSpotifyUrl && {
-				anchor_fm_spotify_url: anchorFmSpotifyUrl,
-			} ),
-			...( selectedDesign && { is_blank_canvas: isBlankCanvasDesign( selectedDesign ) } ),
-		},
-		...( bearerToken && { authToken: bearerToken } ),
-	};
-	const success: NewSiteBlogDetails | undefined = yield dispatch(
-		SITE_STORE,
-		'createSite',
-		params
-	);
 
 	return success;
 }
@@ -226,13 +208,6 @@ export const setDomainSearch = ( domainSearch: string ) => ( {
 	type: 'SET_DOMAIN_SEARCH_TERM' as const,
 	domainSearch,
 } );
-
-export const setFonts = ( fonts: FontPair | undefined ) => {
-	return {
-		type: 'SET_FONTS' as const,
-		fonts: fonts,
-	};
-};
 
 export const setHasUsedDomainsStep = ( hasUsedDomainsStep: boolean ) => ( {
 	type: 'SET_HAS_USED_DOMAINS_STEP' as const,
@@ -286,6 +261,11 @@ export const setSelectedStyleVariation = (
 	selectedStyleVariation,
 } );
 
+export const setSelectedReadymadeTemplate = ( readymadeTemplate: ReadymadeTemplate ) => ( {
+	type: 'SET_READYMADE_TEMPLATE' as const,
+	readymadeTemplate,
+} );
+
 export const setSelectedSite = ( selectedSite: number | undefined ) => ( {
 	type: 'SET_SELECTED_SITE' as const,
 	selectedSite,
@@ -301,11 +281,6 @@ export const setSiteTitle = ( siteTitle: string ) => ( {
 	siteTitle,
 } );
 
-export const setSiteGeoAffinity = ( siteGeoAffinity: string ) => ( {
-	type: 'SET_SITE_GEO_AFFINITY' as const,
-	siteGeoAffinity,
-} );
-
 export const setSiteDescription = ( siteDescription: string ) => ( {
 	type: 'SET_SITE_DESCRIPTION' as const,
 	siteDescription,
@@ -319,21 +294,6 @@ export const setSiteLogo = ( siteLogo: string | null ) => ( {
 export const setSiteAccentColor = ( siteAccentColor: string ) => ( {
 	type: 'SET_SITE_ACCENT_COLOR' as const,
 	siteAccentColor,
-} );
-
-export const setAnchorPodcastId = ( anchorPodcastId: string | null ) => ( {
-	type: 'SET_ANCHOR_PODCAST_ID' as const,
-	anchorPodcastId,
-} );
-
-export const setAnchorEpisodeId = ( anchorEpisodeId: string | null ) => ( {
-	type: 'SET_ANCHOR_PODCAST_EPISODE_ID' as const,
-	anchorEpisodeId,
-} );
-
-export const setAnchorSpotifyUrl = ( anchorSpotifyUrl: string | null ) => ( {
-	type: 'SET_ANCHOR_PODCAST_SPOTIFY_URL' as const,
-	anchorSpotifyUrl,
 } );
 
 export function updatePlan( planProductId: number ) {
@@ -385,13 +345,6 @@ export const setProgressTitle = ( progressTitle: string | undefined ) => ( {
 	progressTitle,
 } );
 
-export const setStepProgress = (
-	stepProgress: { count: number; progress: number } | undefined
-) => ( {
-	type: 'SET_STEP_PROGRESS' as const,
-	stepProgress,
-} );
-
 export const setGoals = ( goals: SiteGoal[] ) => ( {
 	type: 'SET_GOALS' as const,
 	goals,
@@ -417,11 +370,6 @@ export const resetSelectedDesign = () => ( {
 	type: 'RESET_SELECTED_DESIGN' as const,
 } );
 
-export const setEditEmail = ( email: string ) => ( {
-	type: 'SET_EDIT_EMAIL' as const,
-	email,
-} );
-
 export const setVerticalId = ( verticalId: string ) => ( {
 	type: 'SET_VERTICAL_ID' as const,
 	verticalId,
@@ -437,6 +385,24 @@ export const setEcommerceFlowRecurType = ( ecommerceFlowRecurType: string ) => (
 	ecommerceFlowRecurType,
 } );
 
+export const setCouponCode = ( couponCode: string ) => ( {
+	type: 'SET_COUPON_CODE' as const,
+	couponCode,
+} );
+
+export const resetCouponCode = () => ( {
+	type: 'RESET_COUPON_CODE' as const,
+} );
+
+export const setStorageAddonSlug = ( storageAddonSlug: string ) => ( {
+	type: 'SET_STORAGE_ADDON_SLUG' as const,
+	storageAddonSlug,
+} );
+
+export const resetStorageAddonSlug = () => ( {
+	type: 'RESET_STORAGE_ADDON_SLUG' as const,
+} );
+
 export const setDomainForm = ( step: Record< string, string > ) => {
 	const lastUpdated = Date.now();
 
@@ -449,6 +415,30 @@ export const setDomainForm = ( step: Record< string, string > ) => {
 export const setDomainCartItem = ( domainCartItem: MinimalRequestCartProduct | undefined ) => ( {
 	type: 'SET_DOMAIN_CART_ITEM' as const,
 	domainCartItem,
+} );
+
+export const setDomainCartItems = (
+	domainCartItems: MinimalRequestCartProduct[] | undefined
+) => ( {
+	type: 'SET_DOMAIN_CART_ITEMS' as const,
+	domainCartItems,
+} );
+
+export const setDomainsTransferData = ( bulkDomainsData: DomainTransferData | undefined ) => ( {
+	type: 'SET_DOMAINS_TRANSFER_DATA' as const,
+	bulkDomainsData,
+} );
+
+export const setSignupDomainOrigin = ( signupDomainOrigin: string | undefined ) => ( {
+	type: 'SET_SIGNUP_DOMAIN_ORIGIN' as const,
+	signupDomainOrigin,
+} );
+
+export const setShouldImportDomainTransferDnsRecords = (
+	shouldImportDomainTransferDnsRecords: boolean
+) => ( {
+	type: 'SET_SHOULD_IMPORT_DOMAIN_TRANSFER_DNS_RECORDS' as const,
+	shouldImportDomainTransferDnsRecords,
 } );
 
 export const setHideFreePlan = ( hideFreePlan: boolean ) => ( {
@@ -481,17 +471,25 @@ export const setPaidSubscribers = ( paidSubscribers: boolean ) => ( {
 	paidSubscribers,
 } );
 
+export const setPartnerBundle = ( partnerBundle: string | null ) => ( {
+	type: 'SET_PARTNER_BUNDLE' as const,
+	partnerBundle,
+} );
+
 export type OnboardAction = ReturnType<
 	| typeof addFeature
 	| typeof removeFeature
 	| typeof resetFonts
 	| typeof resetOnboardStore
 	| typeof resetOnboardStoreWithSkipFlags
+	| typeof resetStorageAddonSlug
+	| typeof resetCouponCode
 	| typeof setStoreType
+	| typeof setDomainsTransferData
+	| typeof setShouldImportDomainTransferDnsRecords
 	| typeof setDomain
 	| typeof setDomainCategory
 	| typeof setDomainSearch
-	| typeof setFonts
 	| typeof setHasUsedDomainsStep
 	| typeof setHasUsedPlansStep
 	| typeof setIsRedirecting
@@ -503,12 +501,9 @@ export type OnboardAction = ReturnType<
 	| typeof setSelectedDesign
 	| typeof setSelectedStyleVariation
 	| typeof setSelectedSite
+	| typeof setSelectedReadymadeTemplate
 	| typeof setShowSignupDialog
 	| typeof setSiteTitle
-	| typeof setSiteGeoAffinity
-	| typeof setAnchorPodcastId
-	| typeof setAnchorEpisodeId
-	| typeof setAnchorSpotifyUrl
 	| typeof startOnboarding
 	| typeof setIntent
 	| typeof setStartingPoint
@@ -516,26 +511,30 @@ export type OnboardAction = ReturnType<
 	| typeof setPendingAction
 	| typeof setProgress
 	| typeof setProgressTitle
-	| typeof setStepProgress
 	| typeof setGoals
 	| typeof clearImportGoal
 	| typeof clearDIFMGoal
 	| typeof resetGoals
 	| typeof resetIntent
 	| typeof resetSelectedDesign
-	| typeof setEditEmail
 	| typeof setDomainForm
 	| typeof setDomainCartItem
+	| typeof setDomainCartItems
 	| typeof setSiteDescription
 	| typeof setSiteLogo
+	| typeof setSiteUrl
 	| typeof setSiteAccentColor
 	| typeof setVerticalId
 	| typeof setStoreLocationCountryCode
 	| typeof setEcommerceFlowRecurType
+	| typeof setCouponCode
+	| typeof setStorageAddonSlug
 	| typeof setHideFreePlan
 	| typeof setHidePlansFeatureComparison
 	| typeof setProductCartItems
 	| typeof setPlanCartItem
 	| typeof setIsMigrateFromWp
 	| typeof setPaidSubscribers
+	| typeof setPartnerBundle
+	| typeof setSignupDomainOrigin
 >;

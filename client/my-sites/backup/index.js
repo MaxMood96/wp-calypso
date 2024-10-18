@@ -1,4 +1,4 @@
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { notFound, makeLayout, render as clientRender } from 'calypso/controller';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
 import wpcomAtomicTransfer from 'calypso/lib/jetpack/wpcom-atomic-transfer';
@@ -7,6 +7,8 @@ import {
 	backupDownload,
 	backupRestore,
 	backupClone,
+	backupContents,
+	backupGranularRestore,
 	backups,
 	showJetpackIsDisconnected,
 	showNotAuthorizedForNonAdmins,
@@ -15,15 +17,17 @@ import {
 	showUnavailableForMultisites,
 } from 'calypso/my-sites/backup/controller';
 import WPCOMUpsellPage from 'calypso/my-sites/backup/wpcom-backup-upsell';
-import {
-	navigation,
-	siteSelection,
-	sites,
-	stagingSiteNotSupportedRedirect,
-} from 'calypso/my-sites/controller';
+import { navigation, siteSelection, sites } from 'calypso/my-sites/controller';
 import isJetpackSectionEnabledForSite from 'calypso/state/selectors/is-jetpack-section-enabled-for-site';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
-import { backupMainPath, backupRestorePath, backupDownloadPath, backupClonePath } from './paths';
+import {
+	backupMainPath,
+	backupRestorePath,
+	backupDownloadPath,
+	backupClonePath,
+	backupContentsPath,
+	backupGranularRestorePath,
+} from './paths';
 
 const notFoundIfNotEnabled = ( context, next ) => {
 	const state = context.store.getState();
@@ -42,7 +46,6 @@ export default function () {
 	page(
 		backupDownloadPath( ':site', ':rewindId' ),
 		siteSelection,
-		stagingSiteNotSupportedRedirect,
 		navigation,
 		backupDownload,
 		wrapInSiteOffsetProvider,
@@ -60,7 +63,6 @@ export default function () {
 	page(
 		backupRestorePath( ':site', ':rewindId' ),
 		siteSelection,
-		stagingSiteNotSupportedRedirect,
 		navigation,
 		backupRestore,
 		wrapInSiteOffsetProvider,
@@ -78,7 +80,6 @@ export default function () {
 	page(
 		backupClonePath( ':site' ),
 		siteSelection,
-		stagingSiteNotSupportedRedirect,
 		navigation,
 		backupClone,
 		wrapInSiteOffsetProvider,
@@ -96,7 +97,6 @@ export default function () {
 	page(
 		backupMainPath( ':site' ),
 		siteSelection,
-		stagingSiteNotSupportedRedirect,
 		navigation,
 		backups,
 		wrapInSiteOffsetProvider,
@@ -110,6 +110,41 @@ export default function () {
 		makeLayout,
 		clientRender
 	);
+
+	/* handles /backup/:site/contents/:rewindId, see `backupContentsPath` */
+	page(
+		backupContentsPath( ':site', ':rewindId' ),
+		siteSelection,
+		navigation,
+		backupContents,
+		wrapInSiteOffsetProvider,
+		wpcomAtomicTransfer( WPCOMUpsellPage ),
+		showUnavailableForVaultPressSites,
+		showJetpackIsDisconnected,
+		showUnavailableForMultisites,
+		showNotAuthorizedForNonAdmins,
+		notFoundIfNotEnabled,
+		makeLayout,
+		clientRender
+	);
+
+	/* handles /backup/:site/granular-restore/:rewindId, see `backupGranularRestorePath` */
+	page(
+		backupGranularRestorePath( ':site', ':rewindId' ),
+		siteSelection,
+		navigation,
+		backupGranularRestore,
+		wrapInSiteOffsetProvider,
+		wpcomAtomicTransfer( WPCOMUpsellPage ),
+		showUnavailableForVaultPressSites,
+		showJetpackIsDisconnected,
+		showUnavailableForMultisites,
+		showNotAuthorizedForNonAdmins,
+		notFoundIfNotEnabled,
+		makeLayout,
+		clientRender
+	);
+
 	/* handles /backups, see `backupMainPath` */
 	page( backupMainPath(), siteSelection, sites, makeLayout, clientRender );
 }

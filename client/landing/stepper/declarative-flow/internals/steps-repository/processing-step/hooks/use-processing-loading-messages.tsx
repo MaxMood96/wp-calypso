@@ -1,5 +1,12 @@
 import { Onboard } from '@automattic/data-stores';
-import { isWooExpressFlow } from '@automattic/onboarding';
+import {
+	isWooExpressFlow,
+	isNewHostedSiteCreationFlow,
+	isTransferringHostedSiteCreationFlow,
+	VIDEOPRESS_FLOW,
+	VIDEOPRESS_TV_FLOW,
+	VIDEOPRESS_TV_PURCHASE_FLOW,
+} from '@automattic/onboarding';
 import { useSelect } from '@wordpress/data';
 import { useI18n } from '@wordpress/react-i18n';
 import WooPurpleHeart from 'calypso/assets/images/onboarding/woo-purple-heart.png';
@@ -18,6 +25,21 @@ export function useProcessingLoadingMessages( flow?: string | null ): LoadingMes
 		[]
 	);
 
+	if ( flow && isNewHostedSiteCreationFlow( flow ) ) {
+		return [ { title: __( 'Creating your site' ), duration: Infinity } ];
+	}
+
+	if ( flow && isTransferringHostedSiteCreationFlow( flow ) ) {
+		return [
+			{ title: __( 'Laying the foundations' ), duration: 5000 },
+			{ title: __( 'Warming up CPUs' ), duration: 3000 },
+			{ title: __( 'Installing WordPress' ), duration: 3000 },
+			{ title: __( 'Securing your data' ), duration: 5000 },
+			{ title: __( 'Distributing your site worldwide' ), duration: 5000 },
+			{ title: __( 'Closing the loop' ), duration: Infinity },
+		];
+	}
+
 	if ( flow === 'copy-site' ) {
 		return [
 			{ title: __( 'Laying the foundations' ), duration: 3500 },
@@ -28,8 +50,8 @@ export function useProcessingLoadingMessages( flow?: string | null ): LoadingMes
 	}
 
 	if ( isWooExpressFlow( flow || null ) ) {
-		switch ( stepData.currentStep ) {
-			case 'siteCreationStep':
+		switch ( stepData?.currentStep ) {
+			case 'createSite':
 				return [
 					{
 						title: __( "Woo! We're creating your store" ),
@@ -134,9 +156,29 @@ export function useProcessingLoadingMessages( flow?: string | null ): LoadingMes
 					},
 				];
 		}
+	} else if ( VIDEOPRESS_FLOW === flow ) {
+		const videoPressLoadingMessages = [
+			{ title: __( 'Setting up your video site' ), duration: 5000 },
+			{ title: __( 'Scouting the locations' ), duration: 5000 },
+			{ title: __( 'Kicking off the casting' ), duration: 5000 },
+			{ title: __( "Let's head to the checkout" ), duration: 5000 },
+		];
+		return videoPressLoadingMessages;
+	} else if ( VIDEOPRESS_TV_FLOW === flow ) {
+		const videoPressLoadingMessages = [
+			{ title: __( 'Starting up your channel' ), duration: 5000 },
+		];
+		return videoPressLoadingMessages;
+	} else if ( VIDEOPRESS_TV_PURCHASE_FLOW === flow ) {
+		const videoPressLoadingMessages = [
+			{ title: __( 'Scouting the locations' ), duration: 5000 },
+			{ title: __( 'Kicking off the casting' ), duration: 5000 },
+			{ title: __( 'Let’s head to the checkout' ), duration: 5000 },
+		];
+		return videoPressLoadingMessages;
 	}
 
-	switch ( stepData.intent ) {
+	switch ( stepData?.intent ) {
 		case SiteIntent.DIFM:
 			loadingMessages = [
 				{ title: __( 'Securing your data' ), duration: 5000 },

@@ -1,13 +1,6 @@
-import { ToggleControl as OriginalToggleControl } from '@wordpress/components';
+import { ToggleControl } from '@wordpress/components';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
-
-// This is a fix to get around the fact that the original ToggleControl component doesn't support the disabled prop.
-// TODO: Remove this when the original ToggleControl component supports the disabled prop.
-const ToggleControl = OriginalToggleControl as React.ComponentType<
-	OriginalToggleControl.Props & {
-		disabled?: boolean;
-	}
->;
 
 type EmailMeNewPostsToggleProps = {
 	value: boolean;
@@ -23,9 +16,9 @@ const EmailMeNewPostsToggle = ( {
 	const translate = useTranslate();
 
 	return (
-		<div className="setting-item">
+		<div className={ clsx( 'setting-item', 'email-me-new-posts-toggle', { 'is-enabled': value } ) }>
 			<ToggleControl
-				label={ translate( 'Email me new posts' ) }
+				label={ translate( 'Receive emails' ) }
 				onChange={ () => onChange( ! value ) }
 				checked={ value }
 				disabled={ isUpdating }

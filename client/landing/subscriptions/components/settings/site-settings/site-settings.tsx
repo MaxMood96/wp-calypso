@@ -1,9 +1,11 @@
 import { Reader, SubscriptionManager } from '@automattic/data-stores';
-import { Button } from '@wordpress/components';
-import classNames from 'classnames';
+import { Button, __experimentalVStack as VStack } from '@wordpress/components';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
-import { UnsubscribeIcon } from '../icons';
-import SettingsPopover from '../settings-popover/settings-popover';
+import { useRecordViewFeedButtonClicked } from 'calypso/landing/subscriptions/tracks';
+import { getFeedUrl } from 'calypso/reader/route';
+import { SubscriptionsEllipsisMenu } from '../../subscriptions-ellipsis-menu';
+import { FeedIcon, UnsubscribeIcon } from '../icons';
 import DeliveryFrequencyInput from './delivery-frequency-input';
 import EmailMeNewCommentsToggle from './email-me-new-comments-toggle';
 import EmailMeNewPostsToggle from './email-me-new-posts-toggle';
@@ -45,18 +47,11 @@ const SiteSettings = ( {
 	return (
 		<div className="settings site-settings">
 			{ isLoggedIn && (
-				<>
-					<NotifyMeOfNewPostsToggle
-						value={ notifyMeOfNewPosts }
-						onChange={ onNotifyMeOfNewPostsChange }
-						isUpdating={ updatingNotifyMeOfNewPosts }
-					/>
-					<EmailMeNewPostsToggle
-						value={ emailMeNewPosts }
-						onChange={ onEmailMeNewPostsChange }
-						isUpdating={ updatingEmailMeNewPosts }
-					/>
-				</>
+				<EmailMeNewPostsToggle
+					value={ emailMeNewPosts }
+					onChange={ onEmailMeNewPostsChange }
+					isUpdating={ updatingEmailMeNewPosts }
+				/>
 			) }
 			{ emailMeNewPosts && (
 				<DeliveryFrequencyInput
@@ -72,6 +67,13 @@ const SiteSettings = ( {
 					isUpdating={ updatingEmailMeNewComments }
 				/>
 			) }
+			{ isLoggedIn && (
+				<NotifyMeOfNewPostsToggle
+					value={ notifyMeOfNewPosts }
+					onChange={ onNotifyMeOfNewPostsChange }
+					isUpdating={ updatingNotifyMeOfNewPosts }
+				/>
+			) }
 		</div>
 	);
 };
@@ -79,29 +81,68 @@ const SiteSettings = ( {
 type SiteSettingsPopoverProps = SiteSettingsProps & {
 	onUnsubscribe: () => void;
 	unsubscribing: boolean;
+	blogId?: number;
+	feedId: number;
+	subscriptionId: number;
 };
 
 export const SiteSettingsPopover = ( {
 	onUnsubscribe,
 	unsubscribing,
+	blogId,
+	feedId,
+	subscriptionId,
 	...props
 }: SiteSettingsPopoverProps ) => {
 	const translate = useTranslate();
+	const recordViewFeedButtonClicked = useRecordViewFeedButtonClicked();
+	const isWpComSite = Reader.isValidId( blogId );
 	return (
-		<SettingsPopover className="site-settings-popover">
-			<SiteSettings { ...props } />
+		<SubscriptionsEllipsisMenu
+			popoverClassName="site-settings-popover"
+			toggleTitle={ translate( 'More actions' ) }
+		>
+			{ ( close: () => void ) => (
+				<>
+					{ isWpComSite && <SiteSettings { ...props } /> }
 
-			<hr className="subscriptions__separator" />
+					<Button
+						className={ clsx( 'site-settings-popover__unsubscribe-button', {
+							'is-loading': unsubscribing,
+						} ) }
+						disabled={ unsubscribing }
+						icon={ <UnsubscribeIcon className="subscriptions-ellipsis-menu__item-icon" /> }
+						onClick={ () => {
+							onUnsubscribe();
+							close();
+						} }
+					>
+						{ translate( 'Unsubscribe' ) }
+					</Button>
 
-			<Button
-				className={ classNames( 'unsubscribe-button', { 'is-loading': unsubscribing } ) }
-				disabled={ unsubscribing }
-				icon={ <UnsubscribeIcon className="settings-popover__item-icon" /> }
-				onClick={ onUnsubscribe }
-			>
-				{ translate( 'Unsubscribe' ) }
-			</Button>
-		</SettingsPopover>
+					<hr className="subscriptions__separator" />
+
+					<VStack spacing={ 4 }>
+						{ Boolean( feedId ) && (
+							<Button
+								className="site-settings-popover__view-feed-button"
+								icon={ <FeedIcon className="subscriptions-ellipsis-menu__item-icon" /> }
+								href={ getFeedUrl( feedId ) }
+								onClick={ () => {
+									recordViewFeedButtonClicked( {
+										blogId: blogId ? String( blogId ) : null,
+										feedId: String( feedId ),
+										source: 'subscription-settings-dropdown',
+									} );
+								} }
+							>
+								{ translate( 'View feed' ) }
+							</Button>
+						) }
+					</VStack>
+				</>
+			) }
+		</SubscriptionsEllipsisMenu>
 	);
 };
 

@@ -1,7 +1,7 @@
+import page from '@automattic/calypso-router';
 import { isWithinBreakpoint, subscribeIsWithinBreakpoint } from '@automattic/viewport';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import debugModule from 'debug';
-import page from 'page';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { v4 as uuid } from 'uuid';
@@ -308,16 +308,18 @@ export default class WebPreviewContent extends Component {
 
 			// To prevent iframe firing the onload event before the embedded page sends the
 			// partially-loaded message, we add a waiting period here.
-			this.loadingTimeoutTimer = setTimeout( () => {
-				debug( 'preview loading timeout' );
+			if ( ! this.props.disableTimeoutRedirect ) {
+				this.loadingTimeoutTimer = setTimeout( () => {
+					debug( 'preview loading timeout' );
 
-				if ( this.props.showClose ) {
-					window.open( this.state.iframeUrl, '_blank' );
-					this.props.onClose();
-				} else {
-					window.location.replace( this.state.iframeUrl );
-				}
-			}, loadingTimeout );
+					if ( this.props.showClose ) {
+						window.open( this.state.iframeUrl, '_blank' );
+						this.props.onClose();
+					} else {
+						window.location.replace( this.state.iframeUrl );
+					}
+				}, loadingTimeout );
+			}
 		} else {
 			this.setState( { loaded: true, isLoadingSubpage: false } );
 			if ( this.loadingTimeoutTimer ) {
@@ -359,7 +361,7 @@ export default class WebPreviewContent extends Component {
 		} = this.props;
 		const isLoaded = this.state.loaded && ( ! autoHeight || this.state.viewport !== null );
 
-		const className = classNames( this.props.className, 'web-preview__inner', {
+		const className = clsx( this.props.className, 'web-preview__inner', {
 			'is-touch': hasTouch(),
 			'is-with-sidebar': this.props.hasSidebar,
 			'is-visible': this.props.showPreview,
@@ -411,7 +413,7 @@ export default class WebPreviewContent extends Component {
 					) }
 					{ 'seo' !== this.state.device && (
 						<div
-							className={ classNames( 'web-preview__frame-wrapper', {
+							className={ clsx( 'web-preview__frame-wrapper', {
 								'is-resizable': ! this.props.isModalWindow,
 							} ) }
 						>
@@ -500,8 +502,6 @@ WebPreviewContent.propTypes = {
 	isModalWindow: PropTypes.bool,
 	// The site/post description passed to the SeoPreviewPane
 	frontPageMetaDescription: PropTypes.string,
-	// Whether the inline help popup is open
-	isInlineHelpPopoverVisible: PropTypes.bool,
 	// A post object used to override the selected post in the SEO preview
 	overridePost: PropTypes.object,
 	// A customized Toolbar element
@@ -518,6 +518,8 @@ WebPreviewContent.propTypes = {
 	inlineCss: PropTypes.string,
 	// Uses the CSS selector to scroll to it
 	scrollToSelector: PropTypes.string,
+	// disable the redirection due to the timeout
+	disableTimeoutRedirect: PropTypes.bool,
 };
 
 WebPreviewContent.defaultProps = {
@@ -543,4 +545,5 @@ WebPreviewContent.defaultProps = {
 	autoHeight: false,
 	inlineCss: null,
 	scrollToSelector: null,
+	disableTimeoutRedirect: false,
 };

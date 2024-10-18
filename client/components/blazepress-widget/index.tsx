@@ -1,42 +1,49 @@
-import config from '@automattic/calypso-config';
+import page from '@automattic/calypso-router';
 import { getUrlParts } from '@automattic/calypso-url';
 import { Dialog } from '@automattic/components';
 import { useLocale, useLocalizeUrl } from '@automattic/i18n-utils';
 import { useQueryClient } from '@tanstack/react-query';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { BlankCanvas } from 'calypso/components/blank-canvas';
-import BlazeLogo from 'calypso/components/blaze-logo';
 import { LoadingEllipsis } from 'calypso/components/loading-ellipsis';
-import { showDSP, usePromoteWidget, PromoteWidgetStatus } from 'calypso/lib/promote-post';
+import {
+	showDSP,
+	usePromoteWidget,
+	PromoteWidgetStatus,
+	cleanupDSP,
+	useDspOriginProps,
+} from 'calypso/lib/promote-post';
 import './style.scss';
 import { useRouteModal } from 'calypso/lib/route-modal';
-import { getAdvertisingDashboardPath } from 'calypso/my-sites/promote-post/utils';
+import { getAdvertisingDashboardPath } from 'calypso/my-sites/promote-post-i2/utils';
+import { useSelector } from 'calypso/state';
 import getPreviousRoute from 'calypso/state/selectors/get-previous-route';
 import { getSiteSlug } from 'calypso/state/sites/selectors';
-import { getSelectedSiteId, getSelectedSiteSlug } from 'calypso/state/ui/selectors';
+import { getSelectedSite, getSelectedSiteSlug } from 'calypso/state/ui/selectors';
 
 export type BlazePressPromotionProps = {
 	isVisible: boolean;
 	siteId: string | number;
 	postId: string | number;
+	campaignId?: string;
 	keyValue: string;
 	source?: string;
 };
 
 export function goToOriginalEndpoint() {
 	const { pathname } = getUrlParts( window.location.href );
-	const index = pathname.indexOf( '/promote' );
-	page( index < 0 ? pathname : pathname.substring( 0, index ) );
+	const index = pathname.indexOf( '/promote/' );
+	page( index < 0 ? pathname : pathname.replace( /\/promote\/.*?\//, '/' ) );
 }
 
 const BlazePressWidget = ( props: BlazePressPromotionProps ) => {
 	// eslint-disable-next-line @typescript-eslint/no-empty-function
 	const { isVisible = false, keyValue, siteId } = props;
 	const [ isLoading, setIsLoading ] = useState( true );
+	const [ error, setError ] = useState( false );
 	const [ showCancelDialog, setShowCancelDialog ] = useState( false );
 	const [ showCancelButton, setShowCancelButton ] = useState( true );
 	const [ hiddenHeader, setHiddenHeader ] = useState( true );
@@ -45,11 +52,15 @@ const BlazePressWidget = ( props: BlazePressPromotionProps ) => {
 	const translate = useTranslate();
 	const localizeUrl = useLocalizeUrl();
 	const previousRoute = useSelector( getPreviousRoute );
-	const selectedSiteId = useSelector( getSelectedSiteId );
-	const siteSlug = useSelector( ( state ) => getSiteSlug( state, selectedSiteId ) );
+	const selectedSite = useSelector( getSelectedSite );
+	const jetpackVersion = selectedSite?.options?.jetpack_version;
+	const blazeAdsVersion = selectedSite?.options?.blaze_ads_version;
+	const siteSlug = useSelector( ( state ) => getSiteSlug( state, selectedSite?.ID ) );
 	const { closeModal } = useRouteModal( 'blazepress-widget', keyValue );
 	const queryClient = useQueryClient();
 	const localeSlug = useLocale();
+	const dspOriginProps = useDspOriginProps();
+	const dispatch = useDispatch();
 
 	// Scroll to top on initial load regardless of previous page position
 	useEffect( () => {
@@ -58,17 +69,29 @@ const BlazePressWidget = ( props: BlazePressPromotionProps ) => {
 		}
 	}, [ isVisible ] );
 
+	useEffect( () => {
+		return () => {
+			// Execute Widget Cleanup function
+			cleanupDSP();
+		};
+	}, [] );
+
 	const handleShowCancel = ( show: boolean ) => setShowCancelButton( show );
 	const handleShowTopBar = ( show: boolean ) => {
 		setHiddenHeader( ! show );
 	};
 
 	const onClose = ( goToCampaigns?: boolean ) => {
-		queryClient.invalidateQueries( [ 'promote-post-campaigns', siteId ] );
+		queryClient.invalidateQueries( {
+			queryKey: [ 'promote-post-campaigns', siteId ],
+		} );
 		if ( goToCampaigns ) {
-			page( getAdvertisingDashboardPath( `/${ siteSlug }/campaigns` ) );
+			page( getAdvertisingDashboardPath( `/campaigns/${ siteSlug }` ) );
 		} else {
-			queryClient && queryClient.invalidateQueries( [ 'promote-post-campaigns', siteId ] );
+			queryClient &&
+				queryClient.invalidateQueries( {
+					queryKey: [ 'promote-post-campaigns', siteId ],
+				} );
 			if ( previousRoute ) {
 				closeModal();
 			} else {
@@ -85,20 +108,29 @@ const BlazePressWidget = ( props: BlazePressPromotionProps ) => {
 				}
 				const source = props.source || 'blazepress';
 
-				await showDSP(
-					selectedSiteSlug,
-					props.siteId,
-					props.postId,
-					onClose,
-					source,
-					translate,
-					localizeUrl,
-					widgetContainer.current,
-					handleShowCancel,
-					handleShowTopBar,
-					localeSlug,
-					config.isEnabled( 'promote-post/redesign-i2' )
-				);
+				try {
+					await showDSP(
+						selectedSiteSlug,
+						props.siteId,
+						props.postId,
+						onClose,
+						source,
+						translate,
+						localizeUrl,
+						widgetContainer.current,
+						handleShowCancel,
+						handleShowTopBar,
+						localeSlug,
+						jetpackVersion,
+						blazeAdsVersion,
+						dispatch,
+						dspOriginProps,
+						props.campaignId
+					);
+				} catch ( error ) {
+					setError( true );
+					setHiddenHeader( false );
+				}
 				setIsLoading( false );
 			} )();
 	}, [ isVisible, props.postId, props.siteId, selectedSiteSlug ] );
@@ -128,40 +160,63 @@ const BlazePressWidget = ( props: BlazePressPromotionProps ) => {
 		<>
 			{ isVisible && (
 				<BlankCanvas
-					className={ classNames( 'blazepress-widget', {
+					className={ clsx( 'blazepress-widget', 'blazepress-i2', {
 						'hidden-header': hiddenHeader,
 					} ) }
 				>
-					<div className="blazepress-widget__header-bar">
-						<BlazeLogo />
-						<h2>{ translate( 'Blaze' ) }</h2>
-						{ showCancelButton && (
-							<span
-								role="button"
-								className="blazepress-widget__cancel"
-								onKeyDown={ () => setShowCancelDialog( true ) }
-								tabIndex={ 0 }
-								onClick={ () => setShowCancelDialog( true ) }
-							>
-								{ translate( 'Cancel' ) }
-							</span>
-						) }
-					</div>
-					<div
-						className={
-							isLoading ? 'blazepress-widget__content loading' : 'blazepress-widget__content'
-						}
+					<BlankCanvas.Header
+						className={ clsx( 'blazepress-widget__header-bar', {
+							'no-back-button': ! showCancelButton,
+						} ) }
+						onBackClick={ () => {
+							if ( error ) {
+								// Close without dialog if we are displaying the error page (no need to confirmation there)
+								setShowCancelDialog( false );
+								onClose();
+							} else {
+								setShowCancelDialog( true );
+							}
+						} }
 					>
+						<h2>{ translate( 'Blaze - Powered by Jetpack' ) }</h2>
+					</BlankCanvas.Header>
+
+					<div className={ clsx( 'blazepress-widget__content', { loading: isLoading } ) }>
 						<Dialog
+							showCloseIcon
 							additionalOverlayClassNames="blazepress-widget"
 							isVisible={ showCancelDialog && showCancelButton }
 							buttons={ cancelDialogButtons }
 							onClose={ () => setShowCancelDialog( false ) }
 						>
 							<h1>{ translate( 'Are you sure you want to quit?' ) }</h1>
-							<p>{ translate( 'All progress in this session will be lost.' ) }</p>
+							<p>
+								{ translate(
+									'If you quit, all of the work that has been done during this session will be lost.'
+								) }
+							</p>
 						</Dialog>
 						{ isLoading && <LoadingEllipsis /> }
+						{ error && (
+							<div className="error-notice">
+								<h3 className="error-notice__title">
+									{ translate( 'Oops, something went wrong' ) }
+								</h3>
+								<p className="error-notice__body">
+									{ translate( 'Please try again soon or {{a}}contact support{{/a}} for help.', {
+										components: {
+											a: (
+												<a
+													href="https://wordpress.com/help/contact"
+													target="_blank"
+													rel="noopener noreferrer"
+												/>
+											),
+										},
+									} ) }
+								</p>
+							</div>
+						) }
 						<div className="blazepress-widget__widget-container" ref={ widgetContainer }></div>
 					</div>
 				</BlankCanvas>

@@ -5,10 +5,11 @@ import * as actions from './actions';
 import { STORE_KEY } from './constants';
 import reducer, { State } from './reducer';
 import * as selectors from './selectors';
-import type { SelectFromMap } from '../mapped-types';
+import type { SelectFromMap, DispatchFromMap } from '../mapped-types';
 
 export type { State };
 export type OnboardSelect = SelectFromMap< typeof selectors >;
+export type OnboardActions = DispatchFromMap< typeof actions >;
 
 export { SiteGoal, SiteIntent } from './constants';
 export * as utils from './utils';
@@ -31,16 +32,14 @@ export function register(): typeof STORE_KEY {
 		reducer,
 		selectors,
 		persist: [
-			'anchorPodcastId',
-			'anchorEpisodeId',
-			'anchorSpotifyUrl',
+			'domainTransferNames',
+			'shouldImportDomainTransferDnsRecords',
 			'domain',
 			'domainSearch',
 			'domainForm',
 			'goals',
 			'hasUsedDomainsStep',
 			'hasUsedPlansStep',
-			'hideFreePlan',
 			'intent',
 			'paidSubscribers',
 			'lastLocation',
@@ -48,8 +47,8 @@ export function register(): typeof STORE_KEY {
 			'randomizedDesigns',
 			'selectedDesign',
 			'selectedFeatures',
-			'selectedFonts',
 			'selectedSite',
+			'readymadeTemplate',
 			'siteTitle',
 			'siteDescription',
 			'siteLogo',
@@ -58,6 +57,8 @@ export function register(): typeof STORE_KEY {
 			'verticalId',
 			'storeLocationCountryCode',
 			'ecommerceFlowRecurType',
+			'couponCode',
+			'storageAddonSlug',
 			'domainCartItem',
 			'planCartItem',
 			'productCartItems',
