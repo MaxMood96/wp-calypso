@@ -1,6 +1,6 @@
-import { Button, ToggleControl, BaseControl } from '@wordpress/components';
+import page from '@automattic/calypso-router';
+import { Button, ToggleControl } from '@wordpress/components';
 import { localize, LocalizeProps } from 'i18n-calypso';
-import page from 'page';
 import { Component } from 'react';
 import { connect } from 'react-redux';
 import { disableAutoRenew, enableAutoRenew } from 'calypso/lib/purchases/actions';
@@ -10,6 +10,7 @@ import { createNotice } from 'calypso/state/notices/actions';
 import { fetchUserPurchases } from 'calypso/state/purchases/actions';
 import { isFetchingUserPurchases } from 'calypso/state/purchases/selectors';
 import isSiteAtomic from 'calypso/state/selectors/is-site-automated-transfer';
+import { IAppState } from 'calypso/state/types';
 import { getSelectedSiteSlug } from 'calypso/state/ui/selectors';
 import { isExpired, isOneTimePurchase, isRechargeable } from '../../../../lib/purchases';
 import { getChangePaymentMethodPath } from '../../utils';
@@ -17,32 +18,6 @@ import AutoRenewDisablingDialog from './auto-renew-disabling-dialog';
 import AutoRenewPaymentMethodDialog from './auto-renew-payment-method-dialog';
 import type { GetChangePaymentMethodUrlFor, Purchase } from 'calypso/lib/purchases/types';
 import type { NoticeStatus, NoticeText, NoticeOptions } from 'calypso/state/notices/types';
-
-// The ToggleControl type is missing the `disabled` prop, but it is an allowed
-// prop so we override it here until the definition can be fixed.
-declare module '@wordpress/components' {
-	// eslint-disable-next-line @typescript-eslint/no-namespace
-	namespace ToggleControl {
-		interface Props extends BaseControl.ControlProps {
-			/**
-			 * If checked is `true` the toggle will be checked. If checked is
-			 * `false` the toggle will be unchecked. If no value is passed the
-			 * toggle will be unchecked.
-			 */
-			checked?: boolean | undefined;
-			/**
-			 * A function that receives the checked state as input.
-			 */
-			onChange?( isChecked: boolean ): void;
-			/**
-			 * Will disable the input if set.
-			 *
-			 * NOTE: this is missing from the actual ToggleControl props so we override it here.
-			 */
-			disabled?: boolean;
-		}
-	}
-}
 
 export interface AutoRenewToggleProps {
 	purchase: Purchase;
@@ -56,6 +31,7 @@ export interface AutoRenewToggleProps {
 	showLink?: boolean;
 	productSlug?: string;
 	siteSlug?: string | null;
+	children?: React.ReactNode;
 }
 
 export interface AutoRenewToggleConnectedProps {
@@ -264,7 +240,7 @@ class AutoRenewToggle extends Component<
 				'…'
 			) : (
 				<Button
-					isLink
+					variant="link"
 					className="is-link"
 					onClick={ this.onToggleAutoRenew }
 					disabled={ shouldDisable }
@@ -306,7 +282,7 @@ class AutoRenewToggle extends Component<
 }
 
 export default connect(
-	( state, { purchase, siteSlug }: AutoRenewToggleProps ) => ( {
+	( state: IAppState, { purchase, siteSlug }: AutoRenewToggleProps ) => ( {
 		fetchingUserPurchases: isFetchingUserPurchases( state ),
 		isEnabled: purchase.isAutoRenewEnabled,
 		currentUserId: getCurrentUserId( state ),

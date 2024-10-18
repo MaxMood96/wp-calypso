@@ -10,6 +10,7 @@ const rawReceiptEndpointReceipt: RawReceiptData = {
 	price_float: 100,
 	price_integer: 10000,
 	currency: 'USD',
+	is_gravatar_domain: false,
 	purchases: [
 		{
 			user_email: '',
@@ -26,6 +27,8 @@ const rawReceiptEndpointReceipt: RawReceiptData = {
 			is_root_domain_with_us: false,
 			is_renewal: false,
 			will_auto_renew: true,
+			blog_id: 999,
+			price_integer: 10,
 		},
 	],
 };
@@ -56,6 +59,8 @@ const rawTransactionReceipt: WPCOMTransactionEndpointResponse = {
 				is_root_domain_with_us: false,
 				is_renewal: false,
 				will_auto_renew: true,
+				blog_id: 999,
+				price_integer: 10,
 			},
 		],
 	},
@@ -68,6 +73,7 @@ const standardAssembledReceipt: ReceiptData = {
 	failedPurchases: [],
 	priceFloat: 100,
 	priceInteger: 10000,
+	isGravatarDomain: false,
 	purchases: [
 		{
 			delayedProvisioning: false,
@@ -86,6 +92,8 @@ const standardAssembledReceipt: ReceiptData = {
 			registrarSupportUrl: 'something.com',
 			willAutoRenew: true,
 			saasRedirectUrl: '',
+			blogId: 999,
+			priceInteger: 10,
 		},
 	],
 	receiptId: '12345',

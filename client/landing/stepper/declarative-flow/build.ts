@@ -1,11 +1,11 @@
-import { useFlowProgress, BUILD_FLOW } from '@automattic/onboarding';
-import { useDispatch } from '@wordpress/data';
+import { BUILD_FLOW } from '@automattic/onboarding';
 import { addQueryArgs } from '@wordpress/url';
-import { translate } from 'i18n-calypso';
-import wpcom from 'calypso/lib/wp';
+import { skipLaunchpad } from 'calypso/landing/stepper/utils/skip-launchpad';
+import { triggerGuidesForStep } from 'calypso/lib/guides/trigger-guides-for-step';
+import { useExitFlow } from '../hooks/use-exit-flow';
+import { useSiteIdParam } from '../hooks/use-site-id-param';
 import { useSiteSlug } from '../hooks/use-site-slug';
-import { ONBOARD_STORE } from '../stores';
-import { recordSubmitStep } from './internals/analytics/record-submit-step';
+import { useLaunchpadDecider } from './internals/hooks/use-launchpad-decider';
 import LaunchPad from './internals/steps-repository/launchpad';
 import Processing from './internals/steps-repository/processing-step';
 import { Flow, ProvidedDependencies } from './internals/types';
@@ -13,8 +13,9 @@ import { Flow, ProvidedDependencies } from './internals/types';
 const build: Flow = {
 	name: BUILD_FLOW,
 	get title() {
-		return translate( 'WordPress' );
+		return 'WordPress';
 	},
+	isSignupFlow: false,
 	useSteps() {
 		return [
 			{ slug: 'launchpad', component: LaunchPad },
@@ -24,38 +25,35 @@ const build: Flow = {
 
 	useStepNavigation( _currentStep, navigate ) {
 		const flowName = this.name;
-		const { setStepProgress } = useDispatch( ONBOARD_STORE );
+		const siteId = useSiteIdParam();
 		const siteSlug = useSiteSlug();
-		const flowProgress = useFlowProgress( { stepName: _currentStep, flowName } );
-		setStepProgress( flowProgress );
+		const { exitFlow } = useExitFlow( { navigate, processing: true } );
 
-		// trigger guides on step movement, we don't care about failures or response
-		wpcom.req.post(
-			'guides/trigger',
-			{
-				apiNamespace: 'wpcom/v2/',
-			},
-			{
-				flow: flowName,
-				step: _currentStep,
-			}
-		);
+		triggerGuidesForStep( flowName, _currentStep );
+
+		const { postFlowNavigator, initializeLaunchpadState } = useLaunchpadDecider( {
+			exitFlow,
+			navigate,
+		} );
 
 		const submit = ( providedDependencies: ProvidedDependencies = {} ) => {
-			recordSubmitStep( providedDependencies, '', flowName, _currentStep );
-
 			switch ( _currentStep ) {
 				case 'processing':
 					if ( providedDependencies?.goToHome && providedDependencies?.siteSlug ) {
 						return window.location.replace(
-							addQueryArgs( `/home/${ providedDependencies?.siteSlug }`, {
+							addQueryArgs( `/home/${ siteId ?? providedDependencies?.siteSlug }`, {
 								celebrateLaunch: true,
 								launchpadComplete: true,
 							} )
 						);
 					}
 
-					return navigate( `launchpad` );
+					initializeLaunchpadState( {
+						siteId,
+						siteSlug: ( providedDependencies?.siteSlug ?? siteSlug ) as string,
+					} );
+
+					return postFlowNavigator( { siteId, siteSlug } );
 				case 'launchpad': {
 					return navigate( 'processing' );
 				}
@@ -63,10 +61,15 @@ const build: Flow = {
 			return providedDependencies;
 		};
 
-		const goNext = () => {
+		const goNext = async () => {
 			switch ( _currentStep ) {
 				case 'launchpad':
-					return window.location.assign( `/view/${ siteSlug }` );
+					skipLaunchpad( {
+						checklistSlug: 'build',
+						siteId,
+						siteSlug,
+					} );
+					return;
 				default:
 					return navigate( 'freeSetup' );
 			}

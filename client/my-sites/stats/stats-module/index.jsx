@@ -1,6 +1,6 @@
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
-import { includes } from 'lodash';
+import { includes, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
@@ -11,9 +11,13 @@ import {
 	getSiteStatsNormalizedData,
 } from 'calypso/state/stats/lists/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
+import { STATS_FEATURE_DOWNLOAD_CSV } from '../constants';
 import Geochart from '../geochart';
+import { shouldGateStats } from '../hooks/use-should-gate-stats';
+import StatsCardUpsell from '../stats-card-upsell';
 import DatePicker from '../stats-date-picker';
 import DownloadCsv from '../stats-download-csv';
+import DownloadCsvUpsell from '../stats-download-csv-upsell';
 import ErrorPanel from '../stats-error';
 import StatsListCard from '../stats-list/stats-list-card';
 import StatsModulePlaceholder from './placeholder';
@@ -38,6 +42,10 @@ class StatsModule extends Component {
 		mainItemLabel: PropTypes.string,
 		additionalColumns: PropTypes.object,
 		listItemClassName: PropTypes.string,
+		gateStats: PropTypes.bool,
+		gateDownloads: PropTypes.bool,
+		hasNoBackground: PropTypes.bool,
+		skipQuery: PropTypes.bool,
 	};
 
 	static defaultProps = {
@@ -55,7 +63,7 @@ class StatsModule extends Component {
 			this.setState( { loaded: true } );
 		}
 
-		if ( this.props.query !== prevProps.query && this.state.loaded ) {
+		if ( ! isEqual( this.props.query, prevProps.query ) ) {
 			// eslint-disable-next-line react/no-did-update-set-state
 			this.setState( { loaded: false } );
 		}
@@ -68,15 +76,7 @@ class StatsModule extends Component {
 		const { period, startOf } = this.props.period;
 		const { path, query } = this.props;
 
-		return (
-			<DatePicker
-				period={ period }
-				date={ startOf }
-				path={ path }
-				query={ query }
-				summary={ true }
-			/>
-		);
+		return <DatePicker period={ period } date={ startOf } path={ path } query={ query } summary />;
 	}
 
 	getHref() {
@@ -105,7 +105,7 @@ class StatsModule extends Component {
 			'statsSearchTerms',
 			'statsClicks',
 			'statsReferrers',
-			// statsEmailsOpen and statsEmailsClick are not used. statsEmailsSummary and statsEmailsSummaryByOpens are used at the moment,
+			// statsEmailsOpen and statsEmailsClick are not used. statsEmailsSummary are used at the moment,
 			// besides this, email page uses separate summary component: <StatsEmailSummary />
 			'statsEmailsOpen',
 			'statsEmailsClick',
@@ -130,6 +130,11 @@ class StatsModule extends Component {
 			additionalColumns,
 			mainItemLabel,
 			listItemClassName,
+			gateStats,
+			gateDownloads,
+			hasNoBackground,
+			skipQuery,
+			titleNodes,
 		} = this.props;
 
 		// Only show loading indicators when nothing is in state tree, and request in-flight
@@ -140,21 +145,22 @@ class StatsModule extends Component {
 
 		const displaySummaryLink = data && ! this.props.hideSummaryLink;
 		const isAllTime = this.isAllTimeList();
-		const footerClass = classNames( 'stats-module__footer-actions', {
+		const footerClass = clsx( 'stats-module__footer-actions', {
 			'stats-module__footer-actions--summary': summary,
 		} );
 
 		return (
 			<>
-				{ siteId && statType && (
+				{ ! skipQuery && siteId && statType && (
 					<QuerySiteStats statType={ statType } siteId={ siteId } query={ query } />
 				) }
 				<StatsListCard
-					className={ className }
+					className={ clsx( className, 'stats-module__card', path ) }
 					moduleType={ path }
 					data={ data }
 					useShortLabel={ useShortLabel }
 					title={ this.props.moduleStrings?.title }
+					titleNodes={ titleNodes }
 					emptyMessage={ moduleStrings.empty }
 					metricLabel={ metricLabel }
 					showMore={
@@ -174,22 +180,41 @@ class StatsModule extends Component {
 					}
 					error={ hasError && <ErrorPanel /> }
 					loader={ isLoading && <StatsModulePlaceholder isLoading={ isLoading } /> }
-					heroElement={ path === 'countryviews' && <Geochart query={ query } /> }
+					heroElement={
+						path === 'countryviews' && <Geochart query={ query } skipQuery={ skipQuery } />
+					}
 					additionalColumns={ additionalColumns }
 					splitHeader={ !! additionalColumns }
 					mainItemLabel={ mainItemLabel }
 					showLeftIcon={ path === 'authors' }
 					listItemClassName={ listItemClassName }
+					hasNoBackground={ hasNoBackground }
+					overlay={
+						siteId &&
+						statType &&
+						gateStats && (
+							<StatsCardUpsell
+								className="stats-module__upsell"
+								statType={ statType }
+								siteId={ siteId }
+							/>
+						)
+					}
 				/>
 				{ isAllTime && (
 					<div className={ footerClass }>
-						<DownloadCsv
-							statType={ statType }
-							query={ query }
-							path={ path }
-							borderless
-							period={ period }
-						/>
+						{ gateDownloads ? (
+							<DownloadCsvUpsell siteId={ siteId } borderless />
+						) : (
+							<DownloadCsv
+								statType={ statType }
+								query={ query }
+								path={ path }
+								borderless
+								period={ period }
+								skipQuery={ skipQuery }
+							/>
+						) }
 					</div>
 				) }
 			</>
@@ -201,11 +226,15 @@ export default connect( ( state, ownProps ) => {
 	const siteId = getSelectedSiteId( state );
 	const siteSlug = getSiteSlug( state, siteId );
 	const { statType, query } = ownProps;
+	const gateStats = shouldGateStats( state, siteId, statType );
+	const gateDownloads = shouldGateStats( state, siteId, STATS_FEATURE_DOWNLOAD_CSV );
 
 	return {
 		requesting: isRequestingSiteStatsForQuery( state, siteId, statType, query ),
 		data: getSiteStatsNormalizedData( state, siteId, statType, query ),
 		siteId,
 		siteSlug,
+		gateStats,
+		gateDownloads,
 	};
 } )( localize( StatsModule ) );

@@ -2,15 +2,13 @@ import { Button } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
 import { Fragment, FunctionComponent } from 'react';
 import { connect } from 'react-redux';
-import benchLogo from 'calypso/assets/images/illustrations/bench-logo.svg';
-import billcomLogo from 'calypso/assets/images/illustrations/billcom-logo.svg';
-import evernoteLogo from 'calypso/assets/images/illustrations/evernote-logo.svg';
 import mondayLogo from 'calypso/assets/images/illustrations/monday-logo.svg';
 import quickbooksLogo from 'calypso/assets/images/illustrations/quickbooks-logo.svg';
 import streakLogo from 'calypso/assets/images/illustrations/streak-logo.png';
 import todoistLogo from 'calypso/assets/images/illustrations/todoist-logo.svg';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { recordTracksEvent as recordTracksEventAction } from 'calypso/state/analytics/actions';
+import { IAppState } from 'calypso/state/types';
 import { getSelectedSiteSlug } from 'calypso/state/ui/selectors';
 import * as T from 'calypso/types';
 import MarketingBusinessToolsFeature from './feature';
@@ -42,10 +40,6 @@ export const MarketingBusinessTools: FunctionComponent< Props > = ( { recordTrac
 		recordTracksEvent( 'calypso_marketing_business_quickbooks_button_click' );
 	};
 
-	const handleEvernoteClick = () => {
-		recordTracksEvent( 'calypso_marketing_business_evernote_button_click' );
-	};
-
 	const handleMondayClick = () => {
 		recordTracksEvent( 'calypso_marketing_business_monday_button_click' );
 	};
@@ -54,16 +48,8 @@ export const MarketingBusinessTools: FunctionComponent< Props > = ( { recordTrac
 		recordTracksEvent( 'calypso_marketing_business_todoist_button_click' );
 	};
 
-	const handleBenchClick = () => {
-		recordTracksEvent( 'calypso_marketing_business_bench_button_click' );
-	};
-
 	const handleStreakClick = () => {
 		recordTracksEvent( 'calypso_marketing_business_streak_button_click' );
-	};
-
-	const handleBillcomClick = () => {
-		recordTracksEvent( 'calypso_marketing_business_billcom_button_click' );
 	};
 
 	return (
@@ -88,24 +74,6 @@ export const MarketingBusinessTools: FunctionComponent< Props > = ( { recordTrac
 						target="_blank"
 					>
 						{ translate( 'Manage your finances' ) }
-					</Button>
-				</MarketingBusinessToolsFeature>
-
-				<MarketingBusinessToolsFeature
-					category={ translate( 'Productivity' ) }
-					title={ translate( 'Evernote' ) }
-					description={ translate(
-						'Evernote is the place to organize your work, declutter your life, and remember everything. Maintaining the important information you need to manage your work or your personal life has never been easier.'
-					) }
-					imagePath={ evernoteLogo }
-					imageAlt=""
-				>
-					<Button
-						onClick={ handleEvernoteClick }
-						href="https://evernote.grsm.io/ebcc-wordpresscom"
-						target="_blank"
-					>
-						{ translate( 'Take better notes' ) }
 					</Button>
 				</MarketingBusinessToolsFeature>
 
@@ -146,24 +114,6 @@ export const MarketingBusinessTools: FunctionComponent< Props > = ( { recordTrac
 				</MarketingBusinessToolsFeature>
 
 				<MarketingBusinessToolsFeature
-					category={ translate( 'Finance' ) }
-					title={ translate( 'Bench' ) }
-					description={ translate(
-						'Bench gives you a professional bookkeeper at a price you can afford, and powerful financial reporting software with zero learning curve.'
-					) }
-					imagePath={ benchLogo }
-					imageAlt=""
-				>
-					<Button
-						onClick={ handleBenchClick }
-						href="https://bench.grsm.io/wordpresscom"
-						target="_blank"
-					>
-						{ translate( 'Find a bookkeeper' ) }
-					</Button>
-				</MarketingBusinessToolsFeature>
-
-				<MarketingBusinessToolsFeature
 					category={ translate( 'Sales' ) }
 					title={ translate( 'Streak' ) }
 					description={ translate(
@@ -180,31 +130,13 @@ export const MarketingBusinessTools: FunctionComponent< Props > = ( { recordTrac
 						{ translate( 'Supercharge your Gmail' ) }
 					</Button>
 				</MarketingBusinessToolsFeature>
-
-				<MarketingBusinessToolsFeature
-					category={ translate( 'Finance' ) }
-					title={ translate( 'Bill.com' ) }
-					description={ translate(
-						'Bill.com is the intelligent way to create and pay bills, send invoices, and get paid.'
-					) }
-					imagePath={ billcomLogo }
-					imageAlt=""
-				>
-					<Button
-						onClick={ handleBillcomClick }
-						href="https://billcom.grsm.io/wordpresscom"
-						target="_blank"
-					>
-						{ translate( 'Manage bills and invoices' ) }
-					</Button>
-				</MarketingBusinessToolsFeature>
 			</div>
 		</Fragment>
 	);
 };
 
 export default connect(
-	( state ) => ( {
+	( state: IAppState ) => ( {
 		selectedSiteSlug: getSelectedSiteSlug( state ),
 	} ),
 	{

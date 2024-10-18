@@ -1,5 +1,7 @@
+import { addLocaleToPathLocaleInFront } from '@automattic/i18n-utils';
 import { Button } from '@wordpress/components';
 import { useTranslate } from 'i18n-calypso';
+import { debounce } from 'lodash';
 import { createRef } from 'react';
 import titlecase from 'to-title-case';
 import StickyPanel from 'calypso/components/sticky-panel';
@@ -30,16 +32,16 @@ const trackTagClick = ( slug: string ) => {
 	} );
 };
 
-const TagsColumn = ( props: TagsColProps ) => (
-	<div key={ props.slug }>
-		<a
-			href={ `/tag/${ encodeURIComponent( props.slug ) }` }
-			onClick={ trackTagClick.bind( null, props.slug ) }
-		>
-			<span className="alphabetic-tags__title">{ titlecase( props.title ) }</span>
-		</a>
-	</div>
-);
+const TagsColumn = ( props: TagsColProps ) => {
+	const path = addLocaleToPathLocaleInFront( `/tag/${ encodeURIComponent( props.slug ) }` );
+	return (
+		<div key={ props.slug }>
+			<a href={ path } onClick={ trackTagClick.bind( null, props.slug ) }>
+				<span className="alphabetic-tags__title">{ titlecase( props.title ) }</span>
+			</a>
+		</div>
+	);
+};
 
 const TagsRow = ( props: TagsRowProps ) => (
 	<div className="alphabetic-tags__row">
@@ -78,12 +80,15 @@ const scrollToLetter = ( letter: string ) => {
 	if ( element ) {
 		scrollIntoViewport( element, {
 			behavior: 'smooth',
-			scrollMode: 'if-needed',
+			block: 'center',
+			scrollMode: 'always',
 		} );
-		// setTimeout so that the focus is set after the scrollIntoViewport has completed.
-		setTimeout( () => {
+		// set focus after scrollIntoViewport has completed.
+		const focusElement = debounce( () => {
 			element.focus();
-		}, 500 );
+			window.removeEventListener( 'scroll', focusElement );
+		}, 50 );
+		window.addEventListener( 'scroll', focusElement );
 	}
 };
 
@@ -114,7 +119,7 @@ export default function AlphabeticTags( { alphabeticTags }: AlphabeticTagsProps 
 						<div className="alphabetic-tags__tag-links">
 							{ Object.keys( tagTables ).map( ( letter: string ) => (
 								<Button
-									isLink
+									variant="link"
 									key={ 'alphabetic-tags-link-' + letter }
 									onClick={ () => scrollToLetter( letter ) }
 								>

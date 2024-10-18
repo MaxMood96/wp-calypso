@@ -1,12 +1,10 @@
-import { AKISMET_PRODUCTS_LIST, isAkismetProduct } from '@automattic/calypso-products';
+import { isAkismetProduct } from '@automattic/calypso-products';
 import { Button, Card } from '@automattic/components';
-import { ExternalLink } from '@wordpress/components';
 import { createInterpolateElement } from '@wordpress/element';
 import { sprintf, __ } from '@wordpress/i18n';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
 import { useEffect, useMemo, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import QueryProducts from 'calypso/components/data/query-products-list';
 import QueryUserPurchases from 'calypso/components/data/query-user-purchases';
 import ClipboardButton from 'calypso/components/forms/clipboard-button';
@@ -15,6 +13,7 @@ import Main from 'calypso/components/main';
 import useAkismetKeyQuery from 'calypso/data/akismet/use-akismet-key-query';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { isAkismetTemporarySitePurchase } from 'calypso/me/purchases/utils';
+import { useSelector, useDispatch } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import { isProductsListFetching, getProductName } from 'calypso/state/products-list/selectors';
 import { getUserPurchases, isFetchingUserPurchases } from 'calypso/state/purchases/selectors';
@@ -48,13 +47,10 @@ const AkismetCheckoutThankYou: FunctionComponent< AkismetCheckoutThankYouProps >
 		( state ) => getUserPurchases( state )?.filter( ( purchase ) => purchase.active ) ?? []
 	);
 
-	const { overlapMessage, thanksHeadline, thanksMessage } = useMemo( () => {
-		const akismetProducts = AKISMET_PRODUCTS_LIST as ReadonlyArray< string >;
+	const { thanksHeadline, thanksMessage } = useMemo( () => {
 		const akismetPurchases = userActivePurchases.filter(
 			( purchase ) => isAkismetProduct( purchase ) && isAkismetTemporarySitePurchase( purchase )
 		);
-		const purchaseHasAPILimit =
-			akismetProducts.indexOf( productSlug ) >= akismetProducts.indexOf( 'ak_plus_monthly_1' );
 
 		let thanksHeadline = (
 			<>
@@ -65,7 +61,7 @@ const AkismetCheckoutThankYou: FunctionComponent< AkismetCheckoutThankYouProps >
 				</span>
 			</>
 		);
-		let overlapMessage = null;
+
 		let thanksMessage = createInterpolateElement(
 			sprintf(
 				// translators: %s is the product name
@@ -97,20 +93,9 @@ const AkismetCheckoutThankYou: FunctionComponent< AkismetCheckoutThankYouProps >
 				),
 				{ strong: <strong /> }
 			);
-
-			if ( purchaseHasAPILimit ) {
-				overlapMessage = createInterpolateElement(
-					__(
-						'You’ve supercharged your spam protection by increasing your API limit! Make sure to cancel any existing plans that you don’t need on your <a>account page</a>.',
-						'akismet-thank-you'
-					),
-					{ a: <ExternalLink href="https://akismet.com/account/" /> }
-				);
-			}
 		}
 
 		return {
-			overlapMessage,
 			thanksHeadline,
 			thanksMessage,
 		};
@@ -149,10 +134,6 @@ const AkismetCheckoutThankYou: FunctionComponent< AkismetCheckoutThankYouProps >
 				>
 					{ thanksMessage }
 				</p>
-
-				{ overlapMessage && (
-					<p className="akismet-checkout-thank-you__overlap-notice">{ overlapMessage }</p>
-				) }
 
 				<ThankYouAPIKeyClipboard />
 
@@ -200,7 +181,7 @@ function ThankYouAPIKeyClipboard() {
 				{ __( 'Your Akismet API Key is:', 'akismet-thank-you' ) }
 			</p>
 			<div
-				className={ classNames(
+				className={ clsx(
 					'akismet-checkout-thank-you__key-clipboard',
 					isLoading ? 'loading' : ''
 				) }

@@ -1,4 +1,4 @@
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { composeHandlers } from 'calypso/controller/shared';
 import performanceMark from 'calypso/server/lib/performance-mark';
 import {
@@ -98,7 +98,6 @@ export function validateVertical( context, next ) {
  * Supplied terms that belong to more than one taxonomy must be
  * prefixed taxonomy:term. Returned terms will
  * keep this prefix.
- *
  * @param {Object} context Routing context
  * @param {Array} terms Array of term strings
  * @returns {Array} Sorted array

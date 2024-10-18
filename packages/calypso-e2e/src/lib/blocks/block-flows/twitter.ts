@@ -5,12 +5,12 @@ interface ConfigurationData {
 	expectedTweetText: string;
 }
 
-const blockParentSelector = '[aria-label="Block: Twitter"]:has-text("Twitter URL")';
+const blockParentSelector = '[aria-label*="Block: Twitter"]:has-text("Twitter")';
 const selectors = {
 	embedUrlInput: `${ blockParentSelector } input`,
 	embedButton: `${ blockParentSelector } button:has-text("Embed")`,
-	editorTwitterIframe: `iframe[title="Embedded content from twitter"]`,
-	publishedTwitterIframe: `iframe[title="Twitter Tweet"]`,
+	editorTwitterIframe: `iframe[title="Embedded content from twitter.com"]`,
+	publishedTwitterIframe: `iframe[title="X Post"]`,
 };
 
 /**
@@ -28,7 +28,7 @@ export class TwitterBlockFlow implements BlockFlow {
 		this.configurationData = configurationData;
 	}
 
-	blockSidebarName = 'Twitter';
+	blockSidebarName = 'Twitter Embed';
 	blockEditorSelector = blockParentSelector;
 
 	/**

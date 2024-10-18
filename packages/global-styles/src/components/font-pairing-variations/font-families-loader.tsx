@@ -11,14 +11,26 @@ const FONT_API_BASE = 'https://fonts-api.wp.com/css2';
 
 const FONT_AXIS = 'ital,wght@0,400;0,700;1,400;1,700';
 
+/**
+ * Supports the following formats:
+ * - Albert Sans
+ * - 'Albert Sans'
+ * - "Albert Sans", sans-serif
+ */
+const normalizeFontFamily = ( fontFamily: string ) =>
+	fontFamily.split( ',' )[ 0 ].replaceAll( "'", '' ).replaceAll( '"', '' ).trim();
+
 const FontFamiliesLoader = ( { fontFamilies, onLoad }: Props ) => {
 	const params = useMemo(
 		() =>
 			new URLSearchParams( [
-				...fontFamilies.map( ( { fontFamily } ) => [ 'family', `${ fontFamily }:${ FONT_AXIS }` ] ),
+				...fontFamilies.map( ( { fontFamily } ) => [
+					'family',
+					`${ normalizeFontFamily( fontFamily ) }:${ FONT_AXIS }`,
+				] ),
 				[ 'display', 'swap' ],
 			] ),
-		fontFamilies
+		[ fontFamilies ]
 	);
 
 	if ( ! params.getAll( 'family' ).length ) {
@@ -31,6 +43,7 @@ const FontFamiliesLoader = ( { fontFamilies, onLoad }: Props ) => {
 			type="text/css"
 			href={ `${ FONT_API_BASE }?${ params }` }
 			onLoad={ onLoad }
+			onError={ onLoad }
 		/>
 	);
 };

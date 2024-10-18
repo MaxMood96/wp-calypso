@@ -1,19 +1,47 @@
 /* eslint-disable wpcalypso/jsx-classname-namespace */
 
-import { ScreenReaderText, Gridicon } from '@automattic/components';
-import classNames from 'classnames';
+import { ScreenReaderText, FormLabel, Gridicon } from '@automattic/components';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
 import FormInputCheckbox from 'calypso/components/forms/form-checkbox';
-import FormLabel from 'calypso/components/forms/form-label';
 import useUsersQuery from 'calypso/data/users/use-users-query';
 import { recordGoogleEvent, recordTracksEvent } from 'calypso/state/analytics/actions';
 import { getCurrentUserId } from 'calypso/state/current-user/selectors';
 import { canCurrentUser } from 'calypso/state/selectors/can-current-user';
 import getCurrentRouteParameterized from 'calypso/state/selectors/get-current-route-parameterized';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
+
+const SharingConnectionKeyringUserLabel = localize(
+	( { siteId, keyringUserId, translate, userId } ) => {
+		if ( ! keyringUserId ) {
+			return null;
+		}
+
+		const fetchOptions = {
+			search: keyringUserId,
+			search_columns: [ 'ID' ],
+		};
+
+		const { data } = useUsersQuery( siteId, fetchOptions );
+		const keyringUser = data?.users?.[ 0 ] ?? null;
+
+		if ( keyringUser && userId !== keyringUser.ID ) {
+			return (
+				<aside className="sharing-connection__keyring-user">
+					{ translate( 'Connected by %(username)s', {
+						args: { username: keyringUser.nice_name },
+						context: 'Sharing: connections',
+					} ) }
+				</aside>
+			);
+		}
+
+		return null;
+	}
+);
 
 class SharingConnection extends Component {
 	static propTypes = {
@@ -53,6 +81,11 @@ class SharingConnection extends Component {
 			tumblr: 'user',
 			google_photos: 'user',
 			facebook: 'user',
+			'instagram-business': 'user',
+			mastodon: 'user',
+			threads: 'user',
+			nextdoor: 'user',
+			bluesky: 'user',
 		},
 	};
 
@@ -75,7 +108,7 @@ class SharingConnection extends Component {
 			const isNowSitewide = event.target.checked ? 1 : 0;
 
 			this.setState( { isSavingSitewide: true } );
-			this.props.onToggleSitewideConnection( this.props.connection, isNowSitewide );
+			this.props.onToggleSitewideConnection( this.props.connection, !! isNowSitewide );
 			this.props.recordTracksEvent( 'calypso_connections_connection_sitewide_checkbox_clicked', {
 				is_now_sitewide: isNowSitewide,
 				path,
@@ -213,10 +246,10 @@ class SharingConnection extends Component {
 
 	render() {
 		const connectionSitewideElement = this.getConnectionSitewideElement();
-		const connectionClasses = classNames( 'sharing-connection', {
+		const connectionClasses = clsx( 'sharing-connection', {
 			disabled: this.props.isDisconnecting || this.props.isRefreshing,
 		} );
-		const statusClasses = classNames( 'sharing-connection__account-status', {
+		const statusClasses = clsx( 'sharing-connection__account-status', {
 			'is-shareable': undefined !== connectionSitewideElement,
 		} );
 
@@ -225,7 +258,7 @@ class SharingConnection extends Component {
 				{ this.getProfileImage() }
 				<div className={ statusClasses }>
 					<span className="sharing-connection__account-name">
-						{ this.props.connection.external_display }
+						{ this.props.connection.external_display || this.props.connection.external_name }
 					</span>
 					<SharingConnectionKeyringUserLabel
 						siteId={ this.props.siteId }
@@ -242,35 +275,6 @@ class SharingConnection extends Component {
 		);
 	}
 }
-
-const SharingConnectionKeyringUserLabel = localize(
-	( { siteId, keyringUserId, translate, userId } ) => {
-		if ( ! keyringUserId ) {
-			return null;
-		}
-
-		const fetchOptions = {
-			search: keyringUserId,
-			search_columns: [ 'ID' ],
-		};
-
-		const { data } = useUsersQuery( siteId, fetchOptions );
-		const keyringUser = data?.users?.[ 0 ] ?? null;
-
-		if ( keyringUser && userId !== keyringUser.ID ) {
-			return (
-				<aside className="sharing-connection__keyring-user">
-					{ translate( 'Connected by %(username)s', {
-						args: { username: keyringUser.nice_name },
-						context: 'Sharing: connections',
-					} ) }
-				</aside>
-			);
-		}
-
-		return null;
-	}
-);
 
 export default connect(
 	( state ) => {

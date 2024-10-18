@@ -1,8 +1,8 @@
+import page from '@automattic/calypso-router';
 import debugModule from 'debug';
-import page from 'page';
 import { useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
 import QuerySiteFeatures from 'calypso/components/data/query-site-features';
+import { useSelector } from 'calypso/state';
 import getFeaturesBySiteId from 'calypso/state/selectors/get-site-features';
 import isRequestingSiteFeatures from 'calypso/state/selectors/is-requesting-site-features';
 import { getLandingPath, isSiteEligibleForJetpackCloud } from './selectors';
@@ -13,7 +13,6 @@ const debug = debugModule( 'calypso:jetpack-cloud:landing:main' );
 /**
  * Check whether or not we've asked for and received an API response
  * describing the features of the site with the given ID.
- *
  * @param siteId The site for which features data should be requested.
  * @returns true if a request and response have taken place (success or failure);
  * false otherwise.
@@ -75,9 +74,7 @@ const Landing: React.FC< { siteId: number } > = ( { siteId } ) => {
 		// By this point, we can assume that landingPath is defined;
 		// let's redirect people to the most appropriate page,
 		// based on the features available to the selected site
-		const redirectUrl = new URL( window.location.href );
-		redirectUrl.pathname = landingPath as string;
-		page.redirect( redirectUrl.toString() );
+		page.redirect( landingPath );
 	}, [ resolvedSiteFeatures, isEligible, landingPath ] );
 
 	return <QuerySiteFeatures siteIds={ [ siteId ] } />;

@@ -1,28 +1,18 @@
-import {
-	PLAN_PREMIUM,
-	PLAN_ECOMMERCE_TRIAL_MONTHLY,
-	PLAN_ECOMMERCE_MONTHLY,
-} from '@automattic/calypso-products';
+import { PLAN_PREMIUM } from '@automattic/calypso-products';
 import deepFreeze from 'deep-freeze';
-import moment from 'moment';
 import { userState } from 'calypso/state/selectors/test/fixtures/user-state';
 import {
-	getSitePlan,
-	getSitePlanRawPrice,
+	getCurrentPlan,
 	getPlanDiscountedRawPrice,
-	getPlanRawDiscount,
 	getPlansBySite,
 	getPlansBySiteId,
-	getCurrentPlan,
+	getSitePlan,
+	getSitePlanRawPrice,
+	getSitePlanSlug,
 	hasDomainCredit,
 	isCurrentUserCurrentPlanOwner,
 	isRequestingSitePlans,
 	isSitePlanDiscounted,
-	getSitePlanSlug,
-	isSiteOnECommerceTrial,
-	isECommerceTrialExpired,
-	getECommerceTrialDaysLeft,
-	getECommerceTrialExpiration,
 } from '../selectors';
 
 describe( 'selectors', () => {
@@ -253,7 +243,7 @@ describe( 'selectors', () => {
 			expect( plan ).toBeNull();
 		} );
 	} );
-	describe( '#getPlanRawPrice()', () => {
+	describe( '#getSitePlanRawPrice()', () => {
 		const plans = {
 			data: [
 				{
@@ -406,83 +396,6 @@ describe( 'selectors', () => {
 				returnMonthly: true,
 			} );
 			expect( discountPrice ).toBeNull();
-		} );
-	} );
-
-	describe( '#getPlanRawDiscount()', () => {
-		const plans = {
-			data: [
-				{
-					currentPlan: false,
-					productSlug: 'business-bundle',
-					rawPrice: 299,
-					rawDiscount: 0,
-				},
-				{
-					currentPlan: false,
-					productSlug: 'value_bundle',
-					rawPrice: 199,
-					rawDiscount: 0,
-				},
-				{
-					currentPlan: true,
-					productSlug: 'personal-bundle',
-					rawPrice: 99,
-					rawDiscount: 100,
-				},
-				{
-					currentPlan: false,
-					productSlug: 'value_bundle-2y',
-					rawPrice: 240,
-					rawDiscount: 240,
-				},
-				{
-					currentPlan: false,
-					productSlug: 'jetpack_premium_monthly',
-					rawPrice: 30,
-					rawDiscount: 240,
-				},
-			],
-		};
-
-		const state = {
-			sites: {
-				plans: {
-					77203074: plans,
-				},
-			},
-		};
-		test( 'should return a raw discount', () => {
-			const planRawDiscount = getPlanRawDiscount( state, 77203074, 'personal-bundle' );
-			expect( planRawDiscount ).toEqual( 100 );
-		} );
-
-		test( 'should return a monthly raw discount - annual term', () => {
-			const planRawDiscount = getPlanRawDiscount( state, 77203074, 'personal-bundle', {
-				returnMonthly: true,
-			} );
-			expect( planRawDiscount ).toEqual( 8.33 );
-		} );
-
-		test( 'should return a monthly raw discount - biennial term', () => {
-			const planRawDiscount = getPlanRawDiscount( state, 77203074, 'value_bundle-2y', {
-				returnMonthly: true,
-			} );
-			expect( planRawDiscount ).toEqual( 10 );
-		} );
-
-		test( 'should return a monthly raw discount - monthly term', () => {
-			const planRawDiscount = getPlanRawDiscount( state, 77203074, 'jetpack_premium_monthly', {
-				returnMonthly: true,
-			} );
-			expect( planRawDiscount ).toEqual( 240 );
-		} );
-
-		test( 'should return null, if no raw discount is available', () => {
-			const planRawDiscount = getPlanRawDiscount( state, 77203074, 'value_bundle', {
-				returnMonthly: true,
-			} );
-			expect( planRawDiscount ).toBeNull();
 		} );
 	} );
 
@@ -704,263 +617,6 @@ describe( 'selectors', () => {
 					2916284
 				)
 			).toEqual( PLAN_PREMIUM );
-		} );
-	} );
-
-	describe( '#isSiteOnECommerceTrial()', () => {
-		const siteId = 1337;
-		test( 'Should return true when the e-commerce trial is in the purchases list', () => {
-			const plan = {
-				ID: 1,
-				productSlug: PLAN_ECOMMERCE_TRIAL_MONTHLY,
-				blogId: siteId,
-				currentPlan: true,
-			};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( isSiteOnECommerceTrial( state, siteId ) ).toBeTruthy();
-		} );
-
-		test( 'Should return false when the e-commerce trial is not in the purchases list', () => {
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( isSiteOnECommerceTrial( state, siteId ) ).toBeFalsy();
-		} );
-
-		test( 'Should return false when the site has a regular e-commerce plan', () => {
-			const plan = {
-				ID: 1,
-				productSlug: PLAN_ECOMMERCE_MONTHLY,
-				blogId: siteId,
-				currentPlan: true,
-			};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( isSiteOnECommerceTrial( state, siteId ) ).toBeFalsy();
-		} );
-	} );
-
-	describe( '#getECommerceTrialExpiration()', () => {
-		const siteId = 1337;
-		test( 'Returns the expiration date', () => {
-			const expiryDate = '2022-02-10T00:00:00+00:00';
-
-			const plan = {
-				ID: 1,
-				productSlug: PLAN_ECOMMERCE_TRIAL_MONTHLY,
-				blogId: siteId,
-				expiryDate: expiryDate,
-				currentPlan: true,
-			};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect(
-				getECommerceTrialExpiration( state, siteId ).isSame( moment( expiryDate ) )
-			).toBeTruthy();
-		} );
-
-		test( 'Returns null when the trial purchase is not present', () => {
-			const plan = {};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( getECommerceTrialExpiration( state, siteId ) ).toBeNull();
-		} );
-	} );
-
-	describe( '#getECommerceTrialDaysLeft()', () => {
-		const siteId = 1337;
-		jest.useFakeTimers().setSystemTime( new Date( '2022-01-10T00:00:00+00:00' ) );
-
-		test( 'Should return the correct number of days left before the trial expires', () => {
-			const expiryDate = '2022-02-10T00:00:00+00:00';
-
-			const plan = {
-				ID: 1,
-				productSlug: PLAN_ECOMMERCE_TRIAL_MONTHLY,
-				blogId: siteId,
-				expiryDate: expiryDate,
-				currentPlan: true,
-			};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( getECommerceTrialDaysLeft( state, siteId ) ).toBe( 31 );
-		} );
-	} );
-
-	describe( '#isECommerceTrialExpired()', () => {
-		const siteId = 1337;
-		jest.useFakeTimers().setSystemTime( new Date( '2022-01-10T00:00:00+00:00' ) );
-
-		test( 'The trial period should be expired', () => {
-			const expiryDate = '2022-01-09T00:00:00+00:00';
-
-			const plan = {
-				ID: 1,
-				productSlug: PLAN_ECOMMERCE_TRIAL_MONTHLY,
-				blogId: siteId,
-				expiryDate: expiryDate,
-				currentPlan: true,
-			};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( isECommerceTrialExpired( state, siteId ) ).toBeTruthy();
-		} );
-
-		test( 'The trial period should not be expired if is the same day', () => {
-			const expiryDate = '2022-01-10T23:59:59+00:00';
-			const plan = {
-				ID: 1,
-				productSlug: PLAN_ECOMMERCE_TRIAL_MONTHLY,
-				blogId: siteId,
-				expiryDate: expiryDate,
-				currentPlan: true,
-			};
-
-			const state = deepFreeze( {
-				...userState,
-				sites: {
-					plans: {
-						[ siteId ]: {
-							data: [ plan ],
-						},
-					},
-					items: {
-						[ siteId ]: {
-							URL: 'https://example.wordpress.com',
-						},
-					},
-				},
-				siteSettings: {
-					items: {},
-				},
-			} );
-
-			expect( isECommerceTrialExpired( state, siteId ) ).toBeFalsy();
 		} );
 	} );
 } );

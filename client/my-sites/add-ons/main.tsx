@@ -1,23 +1,19 @@
-import { useDesktopBreakpoint } from '@automattic/viewport-react';
+import page from '@automattic/calypso-router';
+import { AddOns } from '@automattic/data-stores';
 import { css, Global } from '@emotion/react';
 import styled from '@emotion/styled';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
-import { useSelector } from 'react-redux';
 import DocumentHead from 'calypso/components/data/document-head';
-import QueryProductsList from 'calypso/components/data/query-products-list';
 import QuerySitePurchases from 'calypso/components/data/query-site-purchases';
 import EmptyContent from 'calypso/components/empty-content';
-import FixedNavigationHeader from 'calypso/components/fixed-navigation-header';
-import FormattedHeader from 'calypso/components/formatted-header';
 import Main from 'calypso/components/main';
+import NavigationHeader from 'calypso/components/navigation-header';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
+import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
+import { useSelector } from 'calypso/state';
 import { canCurrentUser } from 'calypso/state/selectors/can-current-user';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 import AddOnsGrid from './components/add-ons-grid';
-import useAddOnCheckoutLink from './hooks/use-add-on-checkout-link';
-import useAddOnPurchaseStatus from './hooks/use-add-on-purchase-status';
-import useAddOns from './hooks/use-add-ons';
 import type { ReactElement } from 'react';
 
 const globalOverrides = css`
@@ -62,36 +58,16 @@ const ContainerMain = styled.div`
 
 const ContentWithHeader = ( props: { children: ReactElement } ) => {
 	const translate = useTranslate();
-	const isWide = useDesktopBreakpoint();
-	const selectedSite = useSelector( getSelectedSite );
-
-	const navigationItems = [
-		{
-			label: translate( 'Add-Ons' ) as string,
-			href: `/add-ons/${ selectedSite?.slug }`,
-			helpBubble: (
-				<span>
-					{ translate(
-						'Expand the functionality of your WordPress.com site by enabling any of the following features.'
-					) }
-				</span>
-			),
-		},
-	];
 
 	return (
 		<ContainerMain>
 			<Main className="add-ons__main" wideLayout>
-				<FixedNavigationHeader compactBreadcrumb={ ! isWide } navigationItems={ navigationItems } />
 				<DocumentHead title={ translate( 'Add-Ons' ) } />
-				<FormattedHeader
-					className="add-ons__formatted-header"
-					brandFont
-					headerText={ translate( 'Boost your plan with add-ons' ) }
-					subHeaderText={ translate(
+				<NavigationHeader
+					title={ translate( 'Boost your plan with add-ons' ) }
+					subtitle={ translate(
 						'Expand the functionality of your WordPress.com site by enabling any of the following features.'
 					) }
-					align="left"
 				/>
 				<div className="add-ons__main-content">{ props.children }</div>
 			</Main>
@@ -112,15 +88,13 @@ const NoAccess = () => {
 	);
 };
 
-interface Props {
-	context?: PageJS.Context;
-}
-
-const AddOnsMain: React.FunctionComponent< Props > = () => {
+const AddOnsMain = () => {
 	const translate = useTranslate();
-	const addOns = useAddOns();
-	const selectedSite = useSelector( getSelectedSite );
-	const checkoutLink = useAddOnCheckoutLink();
+	const selectedSite = useSelector( getSelectedSite ) ?? null;
+	const addOns = AddOns.useAddOns( { selectedSiteId: selectedSite?.ID } );
+	const filteredAddOns = addOns.filter( ( addOn ) => ! addOn?.exceedsSiteStorageLimits );
+
+	const checkoutLink = AddOns.useAddOnCheckoutLink();
 
 	const canManageSite = useSelector( ( state ) => {
 		if ( ! selectedSite ) {
@@ -135,7 +109,13 @@ const AddOnsMain: React.FunctionComponent< Props > = () => {
 	}
 
 	const handleActionPrimary = ( addOnSlug: string, quantity?: number ) => {
-		page.redirect( `${ checkoutLink( addOnSlug, quantity ) }` );
+		recordTracksEvent( 'calypso_add_ons_action_primary_click', {
+			add_on_slug_with_quantity: `${ addOnSlug }${ quantity ? `:${ quantity }` : '' }`,
+			add_on_slug: addOnSlug,
+			quantity,
+		} );
+
+		page.redirect( `${ checkoutLink( selectedSite?.ID ?? null, addOnSlug, quantity ) }` );
 	};
 
 	const handleActionSelected = () => {
@@ -145,16 +125,15 @@ const AddOnsMain: React.FunctionComponent< Props > = () => {
 	return (
 		<div>
 			<Global styles={ globalOverrides } />
-			<QueryProductsList />
 			<QuerySitePurchases siteId={ selectedSite?.ID } />
 			<PageViewTracker path="/add-ons/:site" title="Add-Ons" />
 			<ContentWithHeader>
 				<AddOnsGrid
 					actionPrimary={ { text: translate( 'Buy add-on' ), handler: handleActionPrimary } }
 					actionSecondary={ { text: translate( 'Manage add-on' ), handler: handleActionSelected } }
-					useAddOnAvailabilityStatus={ useAddOnPurchaseStatus }
-					addOns={ addOns }
-					highlightFeatured={ true }
+					useAddOnAvailabilityStatus={ AddOns.useAddOnPurchaseStatus }
+					addOns={ filteredAddOns }
+					highlightFeatured
 				/>
 			</ContentWithHeader>
 		</div>

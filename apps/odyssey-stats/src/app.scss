@@ -1,9 +1,9 @@
-@import "./styles/theme.scss";
-@import "./styles/layout.scss";
-@import "./styles/wp-admin.scss";
-@import "./styles/typography.scss";
+@import "./styles/theme";
+@import "./styles/layout";
+@import "./styles/wp-admin";
+@import "./styles/typography";
 
-.jp-stats-dashboard {
+.wp-admin {
 	.card {
 		border: 0;
 		max-width: initial;
@@ -78,9 +78,55 @@
 			border-left-color: var(--studio-black);
 		}
 	}
+
+	// Use base component styling of `@automattic/components/Button`
+	.inner-notice-container .banner__action a.button,
+	.button.jetpack-emerald-button {
+		padding: 0.5em 1.5em;
+		font-size: 1rem;
+		line-height: 1.375;
+
+		&:focus {
+			box-shadow: none;
+		}
+
+		&.is-primary {
+			color: var(--studio-white);
+			background: var(--studio-black);
+		}
+
+		// Use `transparent` styling as secondary styles
+		&.is-transparent {
+			color: var(--studio-black);
+			background: inset 0 0 0 1.5px var(--studio-white);
+
+			&:hover:not(.is-busy) {
+				color: var(--studio-black);
+				background: var(--studio-gray-0);
+			}
+
+			&.is-busy {
+				background: #dcdcde;
+				color: var(--studio-gray-20);
+				border: 1px solid transparent;
+			}
+		}
+	}
+
+	.inner-notice-container .banner__action a.button.is-compact {
+		font-size: 12px; // stylelint-disable-line declaration-property-unit-allowed-list
+		line-height: 1;
+		padding: 7px;
+	}
 }
 
-// Hide Odyssey Stats preview JITM inside odyssey.
-.jitm-card.jitm-banner.odyssey-stats-preview {
+.inner-notice-container .card.banner.is-jetpack {
+	border-left: 3px solid var(--color-jetpack);
+}
+
+// Force any JITM from Jetpack to be hidden and it is removed in https://github.com/Automattic/jetpack/pull/39714.
+// We manage our own CTAs, including JITM, across Stats pages.
+.jetpack-jitm-message,
+.jitm-card.jitm-banner {
 	display: none;
 }

@@ -1,4 +1,4 @@
-import classNames from 'classnames';
+import clsx from 'clsx';
 
 import './style.scss';
 
@@ -13,14 +13,13 @@ export interface BadgeProps {
 		| 'info-purple'
 		| 'error';
 	className?: string;
+	children?: React.ReactNode;
 }
 
 const Badge: React.FunctionComponent< BadgeProps > = ( props ) => {
 	const className = props.className;
 	const type = props.type || 'warning';
-	return (
-		<div className={ classNames( `badge badge--${ type }`, className ) }>{ props.children }</div>
-	);
+	return <div className={ clsx( `badge badge--${ type }`, className ) }>{ props.children }</div>;
 };
 
 export default Badge;

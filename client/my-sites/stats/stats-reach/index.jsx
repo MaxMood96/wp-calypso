@@ -3,7 +3,8 @@ import { localize } from 'i18n-calypso';
 import { get, reduce } from 'lodash';
 import { connect } from 'react-redux';
 import QuerySiteStats from 'calypso/components/data/query-site-stats';
-import { getSiteSlug } from 'calypso/state/sites/selectors';
+import isAtomicSite from 'calypso/state/selectors/is-site-wpcom-atomic';
+import { getSiteSlug, isJetpackSite } from 'calypso/state/sites/selectors';
 import {
 	isRequestingSiteStatsForQuery,
 	getSiteStatsNormalizedData,
@@ -21,6 +22,8 @@ export const StatsReach = ( props ) => {
 		isLoadingPublicize,
 		siteSlug,
 		isOdysseyStats,
+		isJetpack,
+		isAtomic,
 	} = props;
 
 	const isLoadingFollowData = ! followData;
@@ -34,8 +37,6 @@ export const StatsReach = ( props ) => {
 		0
 	);
 
-	let data = [];
-
 	const wpData = {
 		value: wpcomFollowCount,
 		label: translate( 'WordPress.com' ),
@@ -46,16 +47,18 @@ export const StatsReach = ( props ) => {
 		label: translate( 'Email' ),
 	};
 
-	const socialData = {
-		value: publicizeFollowCount,
-		label: translate( 'Social' ),
-	};
+	const data = [ wpData, emailData ];
 
 	if ( ! isOdysseyStats ) {
+		const subscribersUrl =
+			isAtomic || isJetpack
+				? `https://cloud.jetpack.com/subscribers/${ siteSlug }`
+				: `/people/subscribers/${ siteSlug }`;
+
 		wpData.actions = [
 			{
 				type: 'link',
-				data: `/people/subscribers/${ siteSlug }`,
+				data: subscribersUrl,
 			},
 		];
 
@@ -63,16 +66,14 @@ export const StatsReach = ( props ) => {
 			{
 				type: 'link',
 				// default to subscribers because `/people/email-followers/${ siteSlug }`, is not available at the moment
-				data: `/people/subscribers/${ siteSlug }`,
+				data: subscribersUrl,
 			},
 		];
 	}
 
 	if ( publicizeFollowCount > 0 ) {
-		socialData.children = publicizeData;
+		data.push( ...publicizeData ); // Spread the publicizeData into the data array if there are any publicize followers
 	}
-
-	data = [ wpData, emailData, socialData ];
 
 	// sort descending
 	data.sort( ( a, b ) => b.value - a.value );
@@ -119,5 +120,7 @@ export default connect( ( state ) => {
 		isLoadingPublicize,
 		siteSlug,
 		isOdysseyStats: config.isEnabled( 'is_running_in_jetpack_site' ),
+		isAtomic: isAtomicSite( state, siteId ),
+		isJetpack: isJetpackSite( state, siteId ),
 	};
 } )( localize( StatsReach ) );

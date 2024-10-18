@@ -1,6 +1,7 @@
 import { Gridicon } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
-import { useDispatch } from 'react-redux';
+import { urlToSlug } from 'calypso/lib/url/http-utils';
+import { useDispatch } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 
 export default function SiteErrorContent( { siteUrl }: { siteUrl: string } ) {
@@ -25,7 +26,7 @@ export default function SiteErrorContent( { siteUrl }: { siteUrl: string } ) {
 			<a
 				onClick={ handleClickFixNow }
 				className="sites-overview__error-message-link"
-				href={ `/settings/disconnect-site/${ siteUrl }?type=down` }
+				href={ `/settings/disconnect-site/${ urlToSlug( siteUrl ) }?type=down` }
 			>
 				{ translate( 'Fix now' ) }
 			</a>

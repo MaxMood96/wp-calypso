@@ -1,6 +1,5 @@
-import { Button } from '@automattic/components';
+import { Button, PremiumBadge } from '@automattic/components';
 import { Onboard } from '@automattic/data-stores';
-import { PremiumBadge } from '@automattic/design-picker';
 import { SelectCardCheckbox } from '@automattic/onboarding';
 import styled from '@emotion/styled';
 import { useTranslate } from 'i18n-calypso';
@@ -95,7 +94,7 @@ export const SelectGoals = ( { onChange, onSubmit, selectedGoals }: SelectGoalsP
 								checked={ selectedGoals.includes( key ) }
 							>
 								<span className="select-goals__goal-title">{ title }</span>
-								{ isPremium && <PremiumBadge shouldHideTooltip={ true } /> }
+								{ isPremium && <PremiumBadge shouldHideTooltip /> }
 							</SelectCardCheckbox>
 					  ) ) }
 			</div>

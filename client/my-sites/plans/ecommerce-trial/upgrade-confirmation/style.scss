@@ -1,9 +1,14 @@
 @import "@automattic/components/src/styles/typography";
 @import "@wordpress/base-styles/breakpoints";
 
-body.ecommerce-trial-upgraded {
+body.ecommerce-trial-upgraded,
+body.business-trial-upgraded {
 	background-color: var(--color-surface);
 	font-family: $font-sf-pro-text;
+
+	&.is-section-plans .layout__content {
+		padding-left: 0 !important;
+	}
 
 	.trial-upgrade-confirmation__header {
 		text-align: center;
@@ -63,5 +68,11 @@ body.ecommerce-trial-upgraded {
 			padding: 0 20px;
 			grid-template-columns: repeat(1, auto);
 		}
+	}
+
+	.trial-upgrade-confirmation__loading {
+		display: flex;
+		justify-content: center;
+		width: 100%;
 	}
 }

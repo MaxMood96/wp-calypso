@@ -1,7 +1,7 @@
 {
 	"name": "@automattic/global-styles",
 	"version": "1.0.0",
-	"description": "Wrap global-styles related components from Gutenberg",
+	"description": "Wrap global-styles related components from Gutenberg.",
 	"homepage": "https://github.com/Automattic/wp-calypso",
 	"license": "GPL-2.0-or-later",
 	"author": "Automattic Inc.",
@@ -29,22 +29,39 @@
 		"watch": "tsc --build ./tsconfig.json --watch"
 	},
 	"dependencies": {
-		"@tanstack/react-query": "^4.29.1",
-		"@wordpress/block-editor": "^10.5.0",
-		"@wordpress/components": "^22.1.0",
-		"@wordpress/compose": "^5.20.0",
-		"@wordpress/edit-site": "^4.19.0",
-		"@wordpress/keycodes": "^3.22.0",
-		"classnames": "^2.3.1",
+		"@automattic/calypso-config": "workspace:^",
+		"@automattic/calypso-sentry": "workspace:^",
+		"@automattic/components": "workspace:^",
+		"@automattic/data-stores": "workspace:^",
+		"@automattic/i18n-utils": "workspace:^",
+		"@automattic/typography": "workspace:^",
+		"@tanstack/react-query": "^5.15.5",
+		"@wordpress/block-editor": "^14.3.0",
+		"@wordpress/block-library": "^9.8.2",
+		"@wordpress/components": "^28.8.0",
+		"@wordpress/compose": "^7.8.0",
+		"@wordpress/keycodes": "^4.8.0",
+		"@wordpress/private-apis": "^1.8.0",
+		"clsx": "^2.1.1",
+		"deepmerge": "^4.3.0",
 		"i18n-calypso": "workspace:^",
-		"react": "^17.0.2",
-		"react-dom": "^17.0.2",
+		"is-plain-object": "^5.0.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"react-intersection-observer": "^9.4.3",
 		"tslib": "^2.3.0",
 		"wpcom-proxy-request": "workspace:^"
 	},
+	"peerDependencies": {
+		"@wordpress/data": "^10.8.0",
+		"@wordpress/element": "^6.8.0",
+		"@wordpress/i18n": "^5.8.0",
+		"debug": "^4.3.3"
+	},
 	"devDependencies": {
 		"@automattic/calypso-typescript-config": "workspace:^",
-		"typescript": "^4.7.4"
+		"@types/wordpress__block-library": "^2.6.3",
+		"typescript": "^5.3.3"
 	},
 	"private": true
 }

@@ -1,6 +1,6 @@
 import { Button } from '@automattic/components';
 import { localizeUrl } from '@automattic/i18n-utils';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
@@ -38,6 +38,10 @@ class EmptyContent extends Component {
 	};
 
 	primaryAction() {
+		if ( ! this.props.action ) {
+			return null;
+		}
+
 		if ( typeof this.props.action !== 'string' ) {
 			return this.props.action;
 		}
@@ -81,6 +85,7 @@ class EmptyContent extends Component {
 	}
 
 	render() {
+		const { line } = this.props;
 		const action = this.props.action && this.primaryAction();
 		const secondaryAction = this.props.secondaryAction && this.secondaryAction();
 		const title =
@@ -99,14 +104,22 @@ class EmptyContent extends Component {
 
 		return (
 			<div
-				className={ classNames( 'empty-content', this.props.className, {
+				className={ clsx( 'empty-content', this.props.className, {
 					'is-compact': this.props.isCompact,
 					'has-title-only': title && ! this.props.line,
 				} ) }
 			>
 				{ illustration }
-				{ title ? <h2 className="empty-content__title">{ title }</h2> : null }
-				{ this.props.line ? <h3 className="empty-content__line">{ this.props.line }</h3> : null }
+				{ typeof title === 'string' ? (
+					<h2 className="empty-content__title">{ title }</h2>
+				) : (
+					title ?? null
+				) }
+				{ typeof line === 'string' ? (
+					<h3 className="empty-content__line">{ this.props.line }</h3>
+				) : (
+					line ?? null
+				) }
 				{ action }
 				{ secondaryAction }
 				{ this.props.children }

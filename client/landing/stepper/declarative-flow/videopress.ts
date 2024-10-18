@@ -1,18 +1,24 @@
+import config from '@automattic/calypso-config';
 import { PlansSelect, SiteSelect } from '@automattic/data-stores';
-import { useLocale } from '@automattic/i18n-utils';
-import { useFlowProgress, VIDEOPRESS_FLOW } from '@automattic/onboarding';
+import { TIMELESS_PLAN_BUSINESS, TIMELESS_PLAN_PREMIUM } from '@automattic/data-stores/src/plans';
+import { StyleVariation } from '@automattic/design-picker';
+import { VIDEOPRESS_FLOW } from '@automattic/onboarding';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { translate } from 'i18n-calypso';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSupportedPlans } from 'calypso/../packages/plans-grid/src/hooks';
+import { useFlowLocale } from 'calypso/landing/stepper/hooks/use-flow-locale';
 import { useNewSiteVisibility } from 'calypso/landing/stepper/hooks/use-selected-plan';
+import { skipLaunchpad } from 'calypso/landing/stepper/utils/skip-launchpad';
 import { domainRegistration } from 'calypso/lib/cart-values/cart-items';
+import wpcom from 'calypso/lib/wp';
 import { cartManagerClient } from 'calypso/my-sites/checkout/cart-manager-client';
+import { useSiteIdParam } from '../hooks/use-site-id-param';
 import { useSiteSlug } from '../hooks/use-site-slug';
 import { PLANS_STORE, SITE_STORE, USER_STORE, ONBOARD_STORE } from '../stores';
 import './internals/videopress.scss';
+import { stepsWithRequiredLogin } from '../utils/steps-with-required-login';
 import ChooseADomain from './internals/steps-repository/choose-a-domain';
-import Intro from './internals/steps-repository/intro';
 import Launchpad from './internals/steps-repository/launchpad';
 import ProcessingStep from './internals/steps-repository/processing-step';
 import SiteOptions from './internals/steps-repository/site-options';
@@ -26,15 +32,33 @@ const videopress: Flow = {
 	get title() {
 		return translate( 'Video' );
 	},
+	isSignupFlow: true,
+	useLoginParams() {
+		return {
+			customLoginPath: '/start/videopress-account/user',
+			extraQueryParams: {
+				pageTitle: translate( 'Video Portfolio' ),
+				flow: VIDEOPRESS_FLOW,
+			},
+		};
+	},
 	useSteps() {
-		return [
-			{ slug: 'intro', component: Intro },
+		const publicSteps = [
+			{
+				slug: 'intro',
+				asyncComponent: () => import( './internals/steps-repository/intro' ),
+			},
 			{ slug: 'videomakerSetup', component: VideomakerSetup },
+		];
+
+		const privateSteps = stepsWithRequiredLogin( [
 			{ slug: 'options', component: SiteOptions },
 			{ slug: 'chooseADomain', component: ChooseADomain },
 			{ slug: 'processing', component: ProcessingStep },
 			{ slug: 'launchpad', component: Launchpad },
-		];
+		] );
+
+		return [ ...publicSteps, ...privateSteps ];
 	},
 
 	useStepNavigation( _currentStep, navigate ) {
@@ -56,21 +80,19 @@ const videopress: Flow = {
 			}
 		}
 
-		const name = this.name;
-		const { setDomain, setSelectedDesign, setSiteDescription, setSiteTitle, setStepProgress } =
-			useDispatch( ONBOARD_STORE );
-		const flowProgress = useFlowProgress( { stepName: _currentStep, flowName: name } );
-		setStepProgress( flowProgress );
-		const _siteSlug = useSiteSlug();
-		const userIsLoggedIn = useSelect(
-			( select ) => ( select( USER_STORE ) as UserSelect ).isCurrentUserLoggedIn(),
+		const { getSelectedStyleVariation } = useSelect(
+			( select ) => select( ONBOARD_STORE ) as OnboardSelect,
 			[]
 		);
+		const { setDomain, setSelectedDesign, setSiteDescription, setSiteTitle } =
+			useDispatch( ONBOARD_STORE );
+		const siteId = useSiteIdParam();
+		const _siteSlug = useSiteSlug();
 		const _siteTitle = useSelect(
 			( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getSelectedSiteTitle(),
 			[]
 		);
-		const locale = useLocale();
+		const locale = useFlowLocale();
 
 		const { createVideoPressSite, setSelectedSite, setPendingAction, setProgress } =
 			useDispatch( ONBOARD_STORE );
@@ -104,25 +126,62 @@ const videopress: Flow = {
 			setSelectedDesign( undefined );
 		};
 
-		const stepValidateUserIsLoggedIn = () => {
-			if ( ! userIsLoggedIn ) {
-				navigate( 'intro' );
-				return false;
-			}
-			return true;
-		};
+		const siteSlug = useSiteSlug();
 
 		const stepValidateSiteTitle = () => {
-			if ( ! stepValidateUserIsLoggedIn() ) {
-				return false;
-			}
-
 			if ( ! _siteTitle.length ) {
 				navigate( 'options' );
 				return false;
 			}
 
 			return true;
+		};
+
+		const updateSelectedTheme = async ( siteId: number ) => {
+			const getStyleVariations = (): Promise< StyleVariation[] > => {
+				return wpcom.req.get( {
+					path: `/sites/${ siteId }/global-styles/themes/pub/videomaker/variations`,
+					apiNamespace: 'wp/v2',
+				} );
+			};
+
+			type Theme = {
+				_links: {
+					'wp:user-global-styles': { href: string }[];
+				};
+			};
+
+			const getSiteTheme = (): Promise< Theme > => {
+				return wpcom.req.get( {
+					path: `/sites/${ siteId }/themes/pub/videomaker`,
+					apiNamespace: 'wp/v2',
+				} );
+			};
+
+			const updateGlobalStyles = ( globalStylesId: number, styleVariation: StyleVariation ) => {
+				return wpcom.req.post( {
+					path: `/sites/${ siteId }/global-styles/${ globalStylesId }`,
+					apiNamespace: 'wp/v2',
+					body: styleVariation,
+				} );
+			};
+
+			const selectedStyleVariationTitle = getSelectedStyleVariation()?.title;
+			const [ styleVariations, theme ]: [ StyleVariation[], Theme ] = await Promise.all( [
+				getStyleVariations(),
+				getSiteTheme(),
+			] );
+
+			const userGlobalStylesLink: string =
+				theme?._links?.[ 'wp:user-global-styles' ]?.[ 0 ]?.href || '';
+			const userGlobalStylesId = parseInt( userGlobalStylesLink.split( '/' ).pop() || '', 10 );
+			const styleVariation = styleVariations.find(
+				( variation ) => variation.title === selectedStyleVariationTitle
+			);
+
+			if ( styleVariation && userGlobalStylesId ) {
+				await updateGlobalStyles( userGlobalStylesId, styleVariation );
+			}
 		};
 
 		const addVideoPressPendingAction = () => {
@@ -157,14 +216,35 @@ const videopress: Flow = {
 
 				setSelectedSite( newSite.blogid );
 				setIntentOnSite( newSite.site_slug, VIDEOPRESS_FLOW );
+
+				if ( config.isEnabled( 'videomaker-trial' ) ) {
+					saveSiteSettings( newSite.blogid, {
+						launchpad_screen: 'off',
+						blogdescription: siteDescription,
+					} );
+
+					setProgress( 0.75 );
+
+					await updateSelectedTheme( newSite.blogid );
+
+					setProgress( 1.0 );
+
+					clearOnboardingSiteOptions();
+					return window.location.assign( `/site-editor/${ newSite.site_slug }` );
+				}
+
 				saveSiteSettings( newSite.blogid, {
 					launchpad_screen: 'full',
 					blogdescription: siteDescription,
 				} );
 
-				let planObject = supportedPlans.find( ( plan ) => 'premium' === plan.periodAgnosticSlug );
+				let planObject = supportedPlans.find(
+					( plan ) => TIMELESS_PLAN_PREMIUM === plan.periodAgnosticSlug
+				);
 				if ( ! planObject ) {
-					planObject = supportedPlans.find( ( plan ) => 'business' === plan.periodAgnosticSlug );
+					planObject = supportedPlans.find(
+						( plan ) => TIMELESS_PLAN_BUSINESS === plan.periodAgnosticSlug
+					);
 				}
 
 				const planProductObject = getPlanProduct( planObject?.periodAgnosticSlug, 'MONTHLY' );
@@ -216,22 +296,22 @@ const videopress: Flow = {
 			} );
 		};
 
-		switch ( _currentStep ) {
-			case 'intro':
-				clearOnboardingSiteOptions();
-				break;
-			case 'options':
-				stepValidateUserIsLoggedIn();
-				break;
-			case 'chooseADomain':
-				stepValidateSiteTitle();
-				break;
-			case 'processing':
-				if ( ! _siteSlug ) {
-					addVideoPressPendingAction();
-				}
-				break;
-		}
+		// needs to be wrapped in a useEffect because validation can call `navigate` which needs to be called in a useEffect
+		useEffect( () => {
+			switch ( _currentStep ) {
+				case 'intro':
+					clearOnboardingSiteOptions();
+					break;
+				case 'chooseADomain':
+					stepValidateSiteTitle();
+					break;
+				case 'processing':
+					if ( ! _siteSlug ) {
+						addVideoPressPendingAction();
+					}
+					break;
+			}
+		} );
 
 		async function submit( providedDependencies: ProvidedDependencies = {} ) {
 			switch ( _currentStep ) {
@@ -239,13 +319,7 @@ const videopress: Flow = {
 					return navigate( 'videomakerSetup' );
 
 				case 'videomakerSetup':
-					if ( userIsLoggedIn ) {
-						return navigate( 'options' );
-					}
-
-					return window.location.replace(
-						`/start/videopress-account/user/${ locale }?variationName=${ name }&flow=${ name }&pageTitle=Video%20Portfolio&redirect_to=/setup/videopress/options`
-					);
+					return navigate( 'options' );
 
 				case 'options': {
 					const { siteTitle, tagline } = providedDependencies;
@@ -274,10 +348,15 @@ const videopress: Flow = {
 			return;
 		};
 
-		const goNext = () => {
+		const goNext = async () => {
 			switch ( _currentStep ) {
 				case 'launchpad':
-					return window.location.replace( `/view/${ _siteSlug }` );
+					await skipLaunchpad( {
+						checklistSlug: 'videopress',
+						siteId,
+						siteSlug,
+					} );
+					return;
 
 				default:
 					return navigate( 'intro' );

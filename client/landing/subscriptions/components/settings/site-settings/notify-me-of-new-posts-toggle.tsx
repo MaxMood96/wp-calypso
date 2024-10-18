@@ -1,13 +1,6 @@
-import { ToggleControl as OriginalToggleControl } from '@wordpress/components';
+import { JetpackLogo } from '@automattic/components';
+import { ToggleControl } from '@wordpress/components';
 import { useTranslate } from 'i18n-calypso';
-
-// This is a fix to get around the fact that the original ToggleControl component doesn't support the disabled prop.
-// TODO: Remove this when the original ToggleControl component supports the disabled prop.
-const ToggleControl = OriginalToggleControl as React.ComponentType<
-	OriginalToggleControl.Props & {
-		disabled?: boolean;
-	}
->;
 
 type NotifyMeOfNewPostsToggleProps = {
 	value: boolean;
@@ -23,16 +16,34 @@ const NotifyMeOfNewPostsToggle = ( {
 	const translate = useTranslate();
 
 	return (
-		<div className="setting-item">
+		<div className="setting-item setting-item__last">
 			<ToggleControl
-				label={ translate( 'Notify me of new posts' ) }
+				label={ translate( 'Receive web and mobile notifications' ) }
 				onChange={ () => onChange( ! value ) }
 				checked={ value }
 				disabled={ isUpdating }
 			/>
-			<p className="setting-item__hint">
-				{ translate( 'Receive web and mobile notifications for new posts from this site.' ) }
-			</p>
+			{ value && (
+				<div className="setting-item__app-hint">
+					<JetpackLogo size={ 20 } />
+					<p>
+						{ translate(
+							'Take your subscriptions on the go with the {{a}}Jetpack mobile app{{/a}}.',
+							{
+								components: {
+									a: (
+										<a
+											href="https://wp.com/app/?campaign=calypso-subscription-link"
+											target="_blank"
+											rel="noopener noreferrer"
+										/>
+									),
+								},
+							}
+						) }
+					</p>
+				</div>
+			) }
 		</div>
 	);
 };

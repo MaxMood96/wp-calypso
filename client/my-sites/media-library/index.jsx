@@ -1,4 +1,4 @@
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { includes, isEqual, some } from 'lodash';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
@@ -125,7 +125,7 @@ class MediaLibrary extends Component {
 
 		switch ( filter ) {
 			case 'audio':
-				return ! ( ( site && site.options.upgraded_filetypes_enabled ) || isJetpack );
+				return ! ( site?.options?.upgraded_filetypes_enabled || isJetpack );
 
 			case 'videos':
 				return ! hasVideoUploadFeature;
@@ -150,7 +150,7 @@ class MediaLibrary extends Component {
 	}
 
 	render() {
-		const classes = classNames(
+		const classes = clsx(
 			'media-library',
 			{ 'is-single': this.props.single },
 			this.props.className

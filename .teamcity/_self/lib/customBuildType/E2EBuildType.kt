@@ -2,6 +2,7 @@ package _self.lib.customBuildType
 
 import Settings
 import _self.bashNodeScript
+import _self.lib.utils.mergeTrunk
 import jetbrains.buildServer.configs.kotlin.v2019_2.AbsoluteId
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildStep
 import jetbrains.buildServer.configs.kotlin.v2019_2.BuildSteps
@@ -58,6 +59,7 @@ open class E2EBuildType(
 	var buildTriggers: Triggers.() -> Unit = {},
 	var buildDependencies: Dependencies.() -> Unit = {},
 	var addWpcomVcsRoot: Boolean = false,
+	var buildSteps: BuildSteps.() -> Unit = {}
 
 ): BuildType() {
 	init {
@@ -70,7 +72,7 @@ open class E2EBuildType(
 		val buildTriggers = buildTriggers
 		val buildDependencies = buildDependencies
 		val params = params
-		val addWpcomVcsRoot = addWpcomVcsRoot
+		val buildSteps = buildSteps
 
 		id( buildId )
 		uuid = buildUuid
@@ -86,16 +88,12 @@ open class E2EBuildType(
 
 		vcs {
 			root(Settings.WpCalypso)
-			if (addWpcomVcsRoot) {
-				root(AbsoluteId("wpcom"), "-:.")
-			}
 			cleanCheckout = true
 		}
 
 		params {
 			param("env.NODE_CONFIG_ENV", "test")
 			param("env.PLAYWRIGHT_BROWSERS_PATH", "0")
-			param("env.TEAMCITY_VERSION", "2021")
 			param("env.HEADLESS", "true")
 			param("env.LOCALE", "en")
 			param("env.DEBUG", "")
@@ -103,6 +101,12 @@ open class E2EBuildType(
 		}
 
 		steps {
+			// IMPORTANT! This step MUST match what the docker image does. If trunk
+			// is merged when building the docker image, it must also be merged
+			// to run the tests, or they may not be compatible. See the "mergeTrunk"
+			// step in BuildDockerImage in WebApp.kt.
+			mergeTrunk( skipIfConflict = true )
+
 			bashNodeScript {
 				name = "Prepare environment"
 				scriptContent = """
@@ -143,8 +147,17 @@ open class E2EBuildType(
 					cd test/e2e
 					mkdir temp
 
+					# Disable exit on error to support retries.
+					set +o errexit
+
 					# Run suite.
-					xvfb-run yarn jest --reporters=jest-teamcity --reporters=default --maxWorkers=%JEST_E2E_WORKERS% --group=$testGroup
+					xvfb-run yarn jest --reporters=jest-teamcity --reporters=default --maxWorkers=%JEST_E2E_WORKERS% --workerIdleMemoryLimit=1GB --group=$testGroup
+
+					# Restore exit on error.
+					set -o errexit
+
+					# Retry failed tests only.
+					RETRY_COUNT=1 xvfb-run yarn jest --reporters=jest-teamcity --reporters=default --maxWorkers=%JEST_E2E_WORKERS% --workerIdleMemoryLimit=1GB --group=$testGroup --onlyFailures
 				"""
 				dockerImage = "%docker_image_e2e%"
 				dockerRunParameters = "-u %env.UID% --shm-size=4g"
@@ -167,6 +180,7 @@ open class E2EBuildType(
 				""".trimIndent()
 				dockerImage = "%docker_image_e2e%"
 			}
+			buildSteps()
 		}
 
 		features {
@@ -197,6 +211,9 @@ open class E2EBuildType(
 			executionTimeoutMin = 20
 			// Don't fail if the runner exists with a non zero code. This allows a build to pass if the failed tests have been muted previously.
 			nonZeroExitCode = false
+
+			// Support retries using the --onlyFailures flag in Jest.
+			supportTestRetry = true
 
 			// Fail if the number of passing tests is 50% or less than the last build. This will catch the case where the test runner crashes and no tests are run.
 			failOnMetricChange {

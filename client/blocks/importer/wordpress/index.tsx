@@ -1,12 +1,12 @@
 import { recordTracksEvent } from '@automattic/calypso-analytics';
 import { useSelect, useDispatch } from '@wordpress/data';
 import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
 import { convertToFriendlyWebsiteName } from 'calypso/blocks/import/util';
 import { LoadingEllipsis } from 'calypso/components/loading-ellipsis';
 import { useQuery } from 'calypso/landing/stepper/hooks/use-query';
 import { ONBOARD_STORE } from 'calypso/landing/stepper/stores';
 import { addQueryArgs } from 'calypso/lib/route';
+import { useSelector } from 'calypso/state';
 import { getUrlData } from 'calypso/state/imports/url-analyzer/selectors';
 import isSiteAutomatedTransfer from 'calypso/state/selectors/is-site-automated-transfer';
 import {
@@ -23,12 +23,9 @@ import { WPImportOption } from './types';
 import { storeMigrateSource, retrieveMigrateSource } from './utils';
 import type { OnboardSelect } from '@automattic/data-stores';
 
-import './style.scss';
-
-/* eslint-disable wpcalypso/jsx-classname-namespace */
-
 interface Props {
 	job?: ImportJob;
+	run?: boolean;
 	siteId: number;
 	siteSlug: string;
 	fromSite: string;
@@ -46,14 +43,25 @@ export const WordpressImporter: React.FunctionComponent< Props > = ( props ) => 
 	const [ option, setOption ] = useState< WPImportOption | undefined >(
 		getValidOptionParam( queryParams.get( 'option' ) )
 	);
-	const { job, fromSite, siteSlug, siteId, stepNavigator, showConfirmDialog } = props;
+	const {
+		job,
+		run: initImportRun,
+		fromSite,
+		siteSlug,
+		siteId,
+		stepNavigator,
+		showConfirmDialog,
+	} = props;
 	const siteItem = useSelector( ( state ) => getSite( state, siteId ) );
-	const fromSiteItem = useSelector( ( state ) =>
-		getSiteBySlug( state, fromSite ? convertToFriendlyWebsiteName( fromSite ) : '' )
+	const fromSiteSlug = fromSite ? convertToFriendlyWebsiteName( fromSite ) : '';
+	// Check domain without the www first, and with www as a backup
+	const fromSiteItem = useSelector(
+		( state ) =>
+			getSiteBySlug( state, fromSiteSlug ) || getSiteBySlug( state, `www.${ fromSiteSlug }` )
 	);
 	const isSiteAtomic = useSelector( ( state ) => isSiteAutomatedTransfer( state, siteId ) );
 	const isSiteJetpack = useSelector( ( state ) => isJetpackSite( state, siteId ) );
-	const hasAllSitesFetched = useSelector( ( state ) => hasAllSitesList( state ) );
+	const hasAllSitesFetched = useSelector( hasAllSitesList );
 	const fromSiteAnalyzedData = useSelector( getUrlData );
 	const { setIsMigrateFromWp } = useDispatch( ONBOARD_STORE );
 	const isMigrateFromWp = useSelect(
@@ -143,8 +151,16 @@ export const WordpressImporter: React.FunctionComponent< Props > = ( props ) => 
 	return (
 		<>
 			{ ( () => {
-				if ( isNotAtomicJetpack() || ! hasAllSitesFetched ) {
-					return <LoadingEllipsis />;
+				if (
+					isNotAtomicJetpack() ||
+					! hasAllSitesFetched ||
+					( WPImportOption.EVERYTHING === option && ! siteItem )
+				) {
+					return (
+						<div className="import-layout__center">
+							<LoadingEllipsis />;
+						</div>
+					);
 				} else if ( undefined === option && fromSite ) {
 					return (
 						<ContentChooser
@@ -167,6 +183,7 @@ export const WordpressImporter: React.FunctionComponent< Props > = ( props ) => 
 							isMigrateFromWp={ isMigrateFromWp }
 							showConfirmDialog={ showConfirmDialog }
 							onContentOnlySelection={ switchToContentUploadScreen }
+							initImportRun={ initImportRun }
 						/>
 					);
 				} else if ( WPImportOption.CONTENT_ONLY === option ) {

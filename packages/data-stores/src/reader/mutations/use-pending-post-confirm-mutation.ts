@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { callApi } from '../helpers';
 import { useCacheKey, useIsLoggedIn } from '../hooks';
+import { postSubscriptionsQueryKeyPrefix } from '../queries/use-post-subscriptions-query';
+import { subscriptionsCountQueryKeyPrefix } from '../queries/use-subscriptions-count-query';
 import { PendingPostSubscriptionsResult, SubscriptionManagerSubscriptionsCount } from '../types';
 
 type PendingPostConfirmParams = {
@@ -12,9 +14,11 @@ type PendingPostConfirmResponse = {
 };
 
 const usePendingPostConfirmMutation = () => {
-	const isLoggedIn = useIsLoggedIn();
+	const { isLoggedIn } = useIsLoggedIn();
 	const queryClient = useQueryClient();
-	const countCacheKey = useCacheKey( [ 'read', 'subscriptions-count' ] );
+	const subscriptionsCacheKey = useCacheKey( postSubscriptionsQueryKeyPrefix );
+	const countCacheKey = useCacheKey( subscriptionsCountQueryKeyPrefix );
+
 	return useMutation( {
 		mutationFn: async ( { id }: PendingPostConfirmParams ) => {
 			if ( ! id ) {
@@ -25,8 +29,10 @@ const usePendingPostConfirmMutation = () => {
 			}
 
 			const response = await callApi< PendingPostConfirmResponse >( {
+				apiNamespace: 'wpcom/v2',
 				path: `/post-comment-subscriptions/${ id }/confirm`,
 				method: 'POST',
+				isLoggedIn,
 				apiVersion: '2',
 			} );
 			if ( ! response.confirmed ) {
@@ -39,8 +45,11 @@ const usePendingPostConfirmMutation = () => {
 			return response;
 		},
 		onMutate: async ( { id } ) => {
-			await queryClient.cancelQueries( [ 'read', 'pending-post-subscriptions', isLoggedIn ] );
-			await queryClient.cancelQueries( countCacheKey );
+			await queryClient.cancelQueries( {
+				queryKey: [ 'read', 'pending-post-subscriptions', isLoggedIn ],
+			} );
+			await queryClient.cancelQueries( { queryKey: subscriptionsCacheKey } );
+			await queryClient.cancelQueries( { queryKey: countCacheKey } );
 
 			const previousPendingPostSubscriptions =
 				queryClient.getQueryData< PendingPostSubscriptionsResult >( [
@@ -95,8 +104,11 @@ const usePendingPostConfirmMutation = () => {
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries( [ 'read', 'pending-post-subscriptions', isLoggedIn ] );
-			queryClient.invalidateQueries( countCacheKey );
+			queryClient.invalidateQueries( {
+				queryKey: [ 'read', 'pending-post-subscriptions', isLoggedIn ],
+			} );
+			queryClient.invalidateQueries( { queryKey: subscriptionsCacheKey } );
+			queryClient.invalidateQueries( { queryKey: countCacheKey } );
 		},
 	} );
 };

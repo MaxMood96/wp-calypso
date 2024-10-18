@@ -1,8 +1,6 @@
-import { InitialEntry } from '@remix-run/router';
 import { combineReducers } from '@wordpress/data';
 import { SiteDetails } from '../site';
 import type { HelpCenterAction } from './actions';
-import type { HelpCenterSite } from './types';
 import type { Reducer } from 'redux';
 
 const showHelpCenter: Reducer< boolean | undefined, HelpCenterAction > = ( state, action ) => {
@@ -51,11 +49,10 @@ const isMinimized: Reducer< boolean, HelpCenterAction > = ( state = false, actio
 	return state;
 };
 
-const site: Reducer< HelpCenterSite | undefined, HelpCenterAction > = ( state, action ) => {
-	if ( action.type === 'HELP_CENTER_RESET_STORE' ) {
-		return undefined;
-	} else if ( action.type === 'HELP_CENTER_SET_SITE' ) {
-		return action.site;
+const isChatLoaded: Reducer< boolean, HelpCenterAction > = ( state = false, action ) => {
+	switch ( action.type ) {
+		case 'HELP_CENTER_SET_IS_CHAT_LOADED':
+			return action.isChatLoaded;
 	}
 	return state;
 };
@@ -87,15 +84,6 @@ const message: Reducer< string | undefined, HelpCenterAction > = ( state, action
 	return state;
 };
 
-const chatTag: Reducer< string | undefined, HelpCenterAction > = ( state, action ) => {
-	if ( action.type === 'HELP_CENTER_RESET_STORE' ) {
-		return undefined;
-	} else if ( action.type === 'HELP_CENTER_SET_CHAT_TAG' ) {
-		return action.chatTag;
-	}
-	return state;
-};
-
 const userDeclaredSiteUrl: Reducer< string | undefined, HelpCenterAction > = ( state, action ) => {
 	if ( action.type === 'HELP_CENTER_RESET_STORE' ) {
 		return undefined;
@@ -117,21 +105,26 @@ const userDeclaredSite: Reducer< SiteDetails | undefined, HelpCenterAction > = (
 	return state;
 };
 
-const iframe: Reducer< HTMLIFrameElement | undefined | null, HelpCenterAction > = (
-	state,
-	action
-) => {
-	if ( action.type === 'HELP_CENTER_SET_IFRAME' ) {
-		return action.iframe;
-	} else if ( action.type === 'HELP_CENTER_RESET_IFRAME' ) {
-		return undefined;
+const navigateToRoute: Reducer< string | undefined, HelpCenterAction > = ( state, action ) => {
+	if ( action.type === 'HELP_CENTER_SET_NAVIGATE_TO_ROUTE' ) {
+		return action.route;
 	}
 	return state;
 };
 
-const initialRoute: Reducer< InitialEntry | undefined, HelpCenterAction > = ( state, action ) => {
-	if ( action.type === 'HELP_CENTER_SET_INITIAL_ROUTE' ) {
-		return action.route;
+const odieInitialPromptText: Reducer< string | undefined, HelpCenterAction > = (
+	state,
+	action
+) => {
+	if ( action.type === 'HELP_CENTER_SET_ODIE_INITIAL_PROMPT_TEXT' ) {
+		return action.text;
+	}
+	return state;
+};
+
+const odieBotNameSlug: Reducer< string | undefined, HelpCenterAction > = ( state, action ) => {
+	if ( action.type === 'HELP_CENTER_SET_ODIE_BOT_NAME_SLUG' ) {
+		return action.odieBotNameSlug;
 	}
 	return state;
 };
@@ -140,17 +133,17 @@ const reducer = combineReducers( {
 	showHelpCenter,
 	showMessagingLauncher,
 	showMessagingWidget,
-	site,
 	subject,
 	message,
-	chatTag,
 	userDeclaredSite,
 	userDeclaredSiteUrl,
 	hasSeenWhatsNewModal,
 	isMinimized,
+	isChatLoaded,
 	unreadCount,
-	iframe,
-	initialRoute,
+	navigateToRoute,
+	odieInitialPromptText,
+	odieBotNameSlug,
 } );
 
 export type State = ReturnType< typeof reducer >;

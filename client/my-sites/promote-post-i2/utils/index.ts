@@ -1,14 +1,17 @@
 import config from '@automattic/calypso-config';
-import { __, sprintf } from '@wordpress/i18n';
+import { SiteDetails } from '@automattic/data-stores';
+import { getCurrencyObject } from '@automattic/format-currency';
+import { InfiniteData } from '@tanstack/react-query';
+import { __, _x } from '@wordpress/i18n';
 import moment from 'moment';
 import {
+	BlazablePost,
+	BlazePagedItem,
 	Campaign,
-	CampaignStats,
-} from 'calypso/data/promote-post/use-promote-post-campaigns-query';
-import {
-	PagedBlazeContentData,
-	PagedBlazeSearchResponse,
-} from 'calypso/my-sites/promote-post-i2/main';
+	CampaignQueryResult,
+	PostQueryResult,
+} from 'calypso/data/promote-post/types';
+import { PagedBlazeContentData } from 'calypso/my-sites/promote-post-i2/main';
 
 export const campaignStatus = {
 	SCHEDULED: 'scheduled',
@@ -19,6 +22,7 @@ export const campaignStatus = {
 	CANCELED: 'canceled',
 	FINISHED: 'finished',
 	PROCESSING: 'processing',
+	SUSPENDED: 'suspended',
 };
 
 export const getPostType = ( type: string ) => {
@@ -37,7 +41,18 @@ export const getPostType = ( type: string ) => {
 	}
 };
 
-export const getCampaignStatusBadgeColor = ( status: string ) => {
+export const getWidgetParams = ( keyValue: string ) => {
+	const postPartial = keyValue?.split( '_' )[ 0 ];
+	const campaignPartial = keyValue?.split( '_' )[ 1 ];
+	const selectedPostId = postPartial?.split( '-' )[ 1 ] || '';
+	const selectedCampaignId = campaignPartial?.split( '-' )[ 1 ] || '';
+	return {
+		selectedPostId,
+		selectedCampaignId,
+	};
+};
+
+export const getCampaignStatusBadgeColor = ( status?: string ) => {
 	switch ( status ) {
 		case campaignStatus.SCHEDULED: {
 			return 'info-blue';
@@ -60,18 +75,15 @@ export const getCampaignStatusBadgeColor = ( status: string ) => {
 		case campaignStatus.FINISHED: {
 			return 'info-blue';
 		}
+		case campaignStatus.SUSPENDED: {
+			return 'error';
+		}
 		default:
 			return 'warning';
 	}
 };
 
-export const isCampaignFinished = ( status: string ) => {
-	return [ campaignStatus.CANCELED, campaignStatus.ACTIVE, campaignStatus.FINISHED ].includes(
-		status
-	);
-};
-
-export const getCampaignStatus = ( status: string ) => {
+export const getCampaignStatus = ( status?: string ) => {
 	switch ( status ) {
 		case campaignStatus.SCHEDULED: {
 			return __( 'Scheduled' );
@@ -92,98 +104,105 @@ export const getCampaignStatus = ( status: string ) => {
 			return __( 'Canceled' );
 		}
 		case campaignStatus.FINISHED: {
-			return __( 'Finished' );
+			return __( 'Completed' );
 		}
 		case campaignStatus.PROCESSING: {
 			return __( 'Creating' );
+		}
+		case campaignStatus.SUSPENDED: {
+			return __( 'Suspended' );
 		}
 		default:
 			return status;
 	}
 };
 
-export const normalizeCampaignStatus = ( campaign: Campaign ): string => {
-	// This is a transactional status, so we just alter this in calypso
-	if (
-		campaign.status === campaignStatus.ACTIVE &&
-		moment().isBefore( campaign.start_date, 'day' )
-	) {
-		return campaignStatus.SCHEDULED;
-	}
-
-	return campaign.status;
+const calculateDurationDays = ( start: Date, end: Date ) => {
+	const diffTime = end.getTime() - start.getTime();
+	return diffTime < 0 ? 0 : Math.round( diffTime / ( 1000 * 60 * 60 * 24 ) );
 };
 
 export const getCampaignDurationDays = ( start_date: string, end_date: string ) => {
 	const dateStart = new Date( start_date );
 	const dateEnd = new Date( end_date );
-	const diffTime = Math.abs( dateEnd.getTime() - dateStart.getTime() );
-	return Math.round( diffTime / ( 1000 * 60 * 60 * 24 ) );
+	return calculateDurationDays( dateStart, dateEnd );
 };
 
-export const getCampaignOverallSpending = (
-	spent_budget_cents: number,
-	budget_cents: number,
-	start_date: string,
-	end_date: string
+export const getCampaignDurationFormatted = (
+	start_date?: string,
+	end_date?: string,
+	is_evergreen = false,
+	status: string = ''
 ) => {
-	if ( ! spent_budget_cents ) {
+	if ( ! start_date || ! end_date ) {
 		return '-';
 	}
-	const campaignDays = getCampaignDurationDays( start_date, end_date );
-	const spentBudgetCents =
-		spent_budget_cents > budget_cents * campaignDays
-			? budget_cents * campaignDays
-			: spent_budget_cents;
 
-	const totalBudgetUsed = ( spentBudgetCents / 100 ).toFixed( 2 );
-	let daysRun = moment().diff( moment( start_date ), 'days' );
-	daysRun = daysRun > campaignDays ? campaignDays : daysRun;
-
-	const daysText = daysRun === 1 ? 'day' : 'days';
-
-	if ( daysRun > 0 ) {
-		/* translators: %1$s: Amount, %2$s: Days. Singular or plural: Day(s) eg: $3 over 2 days */
-		return sprintf( __( '$%1$s over %2$s %3$s' ), totalBudgetUsed, daysRun, daysText );
-	}
-
-	/* translators: %1$s: Amount, eg: $3 today */
-	return sprintf( __( '$%1$s today' ), totalBudgetUsed );
-};
-
-export const getCampaignClickthroughRate = ( clicks_total: number, impressions_total: number ) => {
-	const clickthroughRate = ( clicks_total * 100 ) / impressions_total || 0;
-	return clickthroughRate.toLocaleString( undefined, {
-		useGrouping: true,
-		minimumFractionDigits: 0,
-		maximumFractionDigits: 2,
-	} );
-};
-
-export const getCampaignDurationFormatted = ( start_date: string, end_date: string ) => {
 	const campaignDays = getCampaignDurationDays( start_date, end_date );
 
-	let durationFormatted;
 	if ( campaignDays === 0 ) {
-		durationFormatted = '-';
-	} else {
-		const dateStartFormatted = moment.utc( start_date ).format( 'MMM D' );
-		const dateEndFormatted = moment.utc( end_date ).format( 'MMM D' );
-		durationFormatted = `${ dateStartFormatted } - ${ dateEndFormatted } (${ campaignDays } ${ __(
-			'days'
-		) })`;
+		return '-';
 	}
 
-	return durationFormatted;
+	// translators: Moment.js date format, `MMM` refers to short month name (e.g. `Sep`), `D`` refers to day of month (e.g. `5`). Wrap text [] to be displayed as is, for example `D [de] MMM` will be formatted as `5 de sep.`.
+	const format = _x( 'MMM D', 'shorter date format' );
+	const dateStartFormatted = moment.utc( start_date ).format( format );
+
+	// A campaign without an "end date", show start -> today (if not ended)
+	if ( is_evergreen ) {
+		const todayFormatted = moment.utc().format( format );
+		if ( status === 'active' ) {
+			return `${ dateStartFormatted } - ${ todayFormatted }`;
+		}
+
+		if ( status === 'scheduled' || status === 'created' ) {
+			return '-';
+		}
+	}
+
+	// Else show start -> end
+	const dateEndFormatted = moment.utc( end_date ).format( format );
+	return `${ dateStartFormatted } - ${ dateEndFormatted }`;
+};
+
+export const getCampaignStartDateFormatted = ( start_date?: string ) => {
+	if ( ! start_date ) {
+		return '-';
+	}
+
+	// translators: Moment.js date format. LLL: June 7, 2024 9:27 AM
+	const format = _x( 'LLL', 'datetime format' );
+	return moment.utc( start_date ).format( format );
+};
+
+export const getCampaignActiveDays = ( start_date?: string, end_date?: string ) => {
+	if ( ! start_date || ! end_date ) {
+		return 0;
+	}
+
+	const now = new Date();
+	const dateStart = new Date( start_date );
+	let dateEnd = new Date( end_date );
+	if ( dateEnd.getTime() > now.getTime() ) {
+		dateEnd = now;
+	}
+
+	return calculateDurationDays( dateStart, dateEnd );
 };
 
 export const getCampaignBudgetData = (
 	budget_cents: number,
 	start_date: string,
 	end_date: string,
-	spent_budget_cents: number
+	spent_budget_cents: number,
+	is_evergreen = 0
 ) => {
-	const campaignDays = getCampaignDurationDays( start_date, end_date );
+	let campaignDays;
+	if ( is_evergreen ) {
+		campaignDays = 7;
+	} else {
+		campaignDays = getCampaignDurationDays( start_date, end_date );
+	}
 
 	const spentBudgetCents =
 		spent_budget_cents > budget_cents * campaignDays
@@ -193,6 +212,7 @@ export const getCampaignBudgetData = (
 	const totalBudget = ( budget_cents * campaignDays ) / 100;
 	const totalBudgetUsed = spentBudgetCents / 100;
 	const totalBudgetLeft = totalBudget - totalBudgetUsed;
+
 	return {
 		totalBudget,
 		totalBudgetUsed,
@@ -201,10 +221,10 @@ export const getCampaignBudgetData = (
 	};
 };
 
-export const formatCents = ( amount: number ) => {
+export const formatCents = ( amount: number, decimals?: number ) => {
 	return amount.toLocaleString( undefined, {
 		useGrouping: true,
-		minimumFractionDigits: amount % 1 !== 0 ? 2 : 0,
+		minimumFractionDigits: decimals ?? ( amount % 1 !== 0 ? 2 : 0 ),
 		maximumFractionDigits: 2,
 	} );
 };
@@ -217,11 +237,30 @@ export const getCampaignEstimatedImpressions = ( displayDeliveryEstimate: string
 	return `${ ( +minEstimate ).toLocaleString() } - ${ ( +maxEstimate ).toLocaleString() }`;
 };
 
-export const formatNumber = ( number: number ) => {
-	if ( ! number ) {
+export const formatNumber = ( number: number, onlyPositives = false ): string => {
+	if ( ! number || ( onlyPositives && number < 0 ) ) {
 		return '-';
 	}
 	return number.toLocaleString();
+};
+
+export const formatLargeNumber = ( number: number ): string => {
+	if ( number >= 1000000 ) {
+		return (
+			( number / 1000000 )
+				.toFixed( 3 )
+				.replace( /\.?0+$/, '' )
+				.toLocaleString() + 'M'
+		);
+	} else if ( number >= 100000 ) {
+		return (
+			( number / 1000 )
+				.toFixed( 2 )
+				.replace( /\.?0+$/, '' )
+				.toLocaleString() + 'K'
+		);
+	}
+	return formatNumber( number );
 };
 
 export const canCancelCampaign = ( status: string ) => {
@@ -230,35 +269,50 @@ export const canCancelCampaign = ( status: string ) => {
 	);
 };
 
-export const unifyCampaigns = ( campaigns: Campaign[], campaignsStats: CampaignStats[] ) => {
-	return campaigns.map( ( campaign ) => {
-		const campaignStats = campaignsStats.find(
-			( cs: CampaignStats ) => cs.campaign_id === campaign.campaign_id
-		);
-		return {
-			...campaign,
-			campaign_stats_loading: ! campaignsStats.length,
-			...( campaignStats ? campaignStats : {} ),
-		};
-	} );
+type PagedDataMode = 'campaigns' | 'posts';
+
+type BlazeDataPaged = {
+	campaigns?: Campaign[];
+	posts?: BlazablePost[];
 };
 
 export const getPagedBlazeSearchData = (
-	mode: 'campaigns' | 'posts',
-	campaignsData?: PagedBlazeSearchResponse
+	mode: PagedDataMode,
+	pagedData?: InfiniteData< CampaignQueryResult | PostQueryResult >
 ): PagedBlazeContentData => {
-	const lastPage = campaignsData?.pages?.[ campaignsData?.pages?.length - 1 ];
-	if ( lastPage ) {
-		const { has_more_pages, total_items } = lastPage;
+	const lastPage = pagedData?.pages?.[ pagedData?.pages?.length - 1 ];
 
-		const foundContent = campaignsData?.pages
-			?.map( ( page: any ) => page[ mode ] )
-			?.flat() as Campaign[];
+	const campaigns_stats =
+		lastPage && 'campaigns_stats' in lastPage
+			? lastPage.campaigns_stats
+			: {
+					total_impressions: 0,
+					total_clicks: 0,
+			  };
+
+	if ( lastPage ) {
+		const { has_more_pages, total_items, warnings } = lastPage;
+
+		let foundContent: BlazePagedItem[] = pagedData?.pages
+			?.map( ( item: BlazeDataPaged ) => item[ mode ] )
+			?.flat()
+			?.filter( ( item?: BlazePagedItem ): item is BlazePagedItem => 'undefined' !== typeof item );
+
+		if ( foundContent?.length ) {
+			switch ( mode ) {
+				case 'campaigns':
+					foundContent = foundContent as Campaign[];
+				case 'posts':
+					foundContent = foundContent as BlazablePost[];
+			}
+		}
 
 		return {
 			has_more_pages,
+			campaigns_stats,
 			total_items,
 			items: foundContent,
+			warnings,
 		};
 	}
 	return {
@@ -270,7 +324,6 @@ export const getPagedBlazeSearchData = (
 
 /**
  * Update the path by adding the advertising section URL prefix
- *
  * @param {string} path partial URL
  * @returns pathname concatenated with the advertising configured path prefix
  */
@@ -278,3 +331,60 @@ export function getAdvertisingDashboardPath( path: string ) {
 	const pathPrefix = config( 'advertising_dashboard_path_prefix' ) || '/advertising';
 	return `${ pathPrefix }${ path }`;
 }
+
+export const getShortDateString = ( date: string, withTime: boolean = false ) => {
+	const timestamp = moment( Date.parse( date ) );
+	const now = moment();
+
+	const minuteDiff = Math.abs( now.diff( timestamp, 'minutes' ) );
+	if ( minuteDiff < 1 ) {
+		return __( 'Now' );
+	}
+
+	const dateDiff = Math.abs( now.diff( timestamp, 'days' ) );
+	if ( dateDiff < 7 ) {
+		return timestamp.fromNow();
+	}
+
+	if ( withTime ) {
+		const format = timestamp.isSame( now, 'year' )
+			? // translators: Moment.js date format, `MMM` refers to short month name (e.g. `Sep`), `DD`` refers to 2-digit day of month (e.g. `05`). Wrap text [] to be displayed as is, for example `DD [de] MMM` will be formatted as `05 de sep.`. HH:mm refers to 24-hour time format (e.g. `18:00`).
+			  _x( 'MMM DD, HH:mm', 'short date format' )
+			: // translators: Moment.js date format, `MMM` refers to short month name (e.g. `Sep`), `DD`` refers to 2-digit day of month (e.g. `05`), `YYYY` refers to the full year format (e.g. `2023`). Wrap text [] to be displayed as is, for example `DD [de] MMM [de] YYYY` will be formatted as `05 de sep. de 2023`. HH:mm refers to 24-hour time format (e.g. `18:00`).
+			  _x( 'MMM DD, YYYY HH:mm', 'short date with year format' );
+
+		return moment( date ).format( format );
+	}
+
+	const format = timestamp.isSame( now, 'year' )
+		? // translators: Moment.js date format, `MMM` refers to short month name (e.g. `Sep`), `DD`` refers to 2-digit day of month (e.g. `05`). Wrap text [] to be displayed as is, for example `DD [de] MMM` will be formatted as `05 de sep.`.
+		  _x( 'MMM DD', 'short date format' )
+		: // translators: Moment.js date format, `MMM` refers to short month name (e.g. `Sep`), `DD`` refers to 2-digit day of month (e.g. `05`), `YYYY` refers to the full year format (e.g. `2023`). Wrap text [] to be displayed as is, for example `DD [de] MMM [de] YYYY` will be formatted as `05 de sep. de 2023`.
+		  _x( 'MMM DD, YYYY', 'short date with year format' );
+
+	return moment( date ).format( format );
+};
+
+export const getLongDateString = ( date: string ) => {
+	const timestamp = moment( Date.parse( date ) );
+	// translators: "ll" refers to date (eg. 21 Apr) & "LT" refers to time (eg. 18:00) - "at" is translated
+	const sameElse: string = __( 'll [at] LT' ) ?? 'll [at] LT';
+	return timestamp.calendar( null, { sameElse } );
+};
+
+export const formatAmount = ( amount: number, currencyCode: string ) => {
+	if ( ! amount ) {
+		return undefined;
+	}
+	const money = getCurrencyObject( amount, currencyCode, { stripZeros: false } );
+	return `${ money.symbol }${ money.integer }${ money.fraction }`;
+};
+
+export const isRunningInWpAdmin = ( site: SiteDetails | null | undefined ): boolean => {
+	if ( ! site ) {
+		return false;
+	}
+	const isRunningInJetpack = config.isEnabled( 'is_running_in_jetpack_site' );
+	const isRunningInClassicSimple = site?.options?.is_wpcom_simple;
+	return isRunningInClassicSimple || isRunningInJetpack;
+};

@@ -38,6 +38,10 @@ Returns a formatter object that exposes the following methods:
 
 This will attempt to make an unauthenticated network request to `https://public-api.wordpress.com/geo/`. This is to determine the country code to provide better USD formatting. By default, the currency symbol for USD will be based on the locale (unlike other currency codes which use a hard-coded list of overrides; see `setCurrencySymbol`); for `en-US`/`en` it will be `$` and for all other locales it will be `US$`. However, if the geolocation determines that the country is not inside the US, the USD symbol will be `US$` regardless of locale. This is to prevent confusion for users in non-US countries using an English locale.
 
+In the US, users will expect to see USD prices rendered with the currency symbol `$`. However, there are many other currencies which use `$` as their currency symbol (eg: `CAD`). This package tries to prevent confusion between these symbols by using an international version of the symbol when the locale does not match the currency. So if your locale is `en-CA`, USD prices will be rendered with the symbol `US$`. 
+
+However, this relies on the user having set their interface language to something other than `en-US`/`en`, and many English-speaking non-US users still have that interface language (eg: there's no English locale available in our settings for Argentinian English so such users would probably still have `en`). As a result, those users will see a price with `$` and could be misled about what currency is being displayed. `geolocateCurrencySymbol()` helps prevent that from happening by showing `US$` for those users.
+
 ## formatCurrency()
 
 `formatCurrency( number: number, code: string, options: FormatCurrencyOptions = {} ): string`
@@ -64,7 +68,7 @@ Since rounding errors are common in floating point math, sometimes a price is pr
 
 ## setDefaultLocale()
 
-`setDefaultLocale( locale: string ): void`
+`setDefaultLocale( locale: string | undefined ): void`
 
 A function that can be used to set a default locale for use by `formatCurrency()` and `getCurrencyObject()`. Note that this is global and will override any browser locale that is set! Use it with care.
 
@@ -108,13 +112,17 @@ Changes function to treat number as an integer in the currency's smallest unit.
 
 Since rounding errors are common in floating point math, sometimes a price is provided as an integer in the smallest unit of a currency (eg: cents in USD or yen in JPY). If this option is false, the function will format the amount `1025` in `USD` as `$1,025.00`, but when the option is true, it will return `$10.25` instead.
 
+### `signForPositive?: boolean`
+
+If the number is greater than 0, setting this to true will include its sign (eg: `+$35.00`). Has no effect on negative numbers or 0.
+
 ## CurrencyObject
 
 An object with the following properties:
 
-### `sign: '-'|''`
+### `sign: '-' | '+' | ''`
 
-The symbol to use for negative values.
+The negative sign for the price, if it is negative, or the positive sign if `signForPositive` is set.
 
 ### `symbol: string`
 

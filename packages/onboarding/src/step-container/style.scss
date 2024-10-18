@@ -1,6 +1,6 @@
 @import "@wordpress/base-styles/breakpoints";
 @import "@wordpress/base-styles/mixins";
-@import "../../styles/mixins.scss";
+@import "../../styles/mixins";
 
 /**
  *	General
@@ -71,8 +71,8 @@
 	 *	Header
 	 */
 	.step-container__header {
+		margin-top: 32px;
 		margin-bottom: 32px;
-		margin-top: 0;
 		display: block;
 		justify-content: space-between;
 		align-items: center;
@@ -256,12 +256,13 @@
 	}
 
 	/**
-	 * Jetpack Powered and VideoPress Powered
+	 * Jetpack, Sensei and VideoPress Powered
 	 */
 	.step-container__jetpack-powered,
 	.step-container__header-jetpack-powered,
 	.step-container__woocommerce-powered,
 	.step-container__header-woocommerce-powered,
+	.step-container__sensei-powered,
 	.step-container__videopress-powered {
 		display: flex;
 		justify-content: center;
@@ -290,6 +291,14 @@
 
 		@include break-small {
 			visibility: visible;
+		}
+	}
+
+	.step-container__sensei-powered {
+		padding-bottom: 24px;
+
+		svg {
+			margin-inline-end: 8px;
 		}
 	}
 }

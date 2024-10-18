@@ -3,7 +3,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, act } from '@testing-library/react-hooks';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import nock from 'nock';
 import { useDispatch } from 'react-redux';
 import LicenseListContext from 'calypso/jetpack-cloud/sections/partner-portal/license-list-context';
@@ -26,7 +26,7 @@ import useTOSConsentMutation from 'calypso/state/partner-portal/licenses/hooks/u
 
 jest.mock( 'react-redux', () => ( {
 	useDispatch: jest.fn( () => null ),
-	useSelector: () => 1,
+	useSelector: jest.fn(),
 } ) );
 
 describe( 'useRefreshLicenseList', () => {
@@ -69,212 +69,230 @@ describe( 'useRefreshLicenseList', () => {
 } );
 
 describe( 'useProductsQuery', () => {
+	const unexpected = [
+		{
+			name: 'Jetpack Backup',
+			slug: 'jetpack-backup',
+			products: [
+				{
+					name: 'Jetpack Backup (Daily)',
+					product_id: 2100,
+					slug: 'jetpack-backup-daily',
+				},
+				{
+					name: 'Jetpack Backup (Real-time)',
+					product_id: 2102,
+					slug: 'jetpack-backup-realtime',
+				},
+				{
+					name: 'Jetpack Backup (1GB)',
+					product_id: 2120,
+					slug: 'jetpack-backup-t0',
+				},
+			],
+		},
+		{
+			name: 'Jetpack Plans',
+			slug: 'jetpack-plans',
+			products: [
+				{
+					name: 'Jetpack Personal',
+					product_id: 2005,
+					slug: 'personal',
+				},
+				{
+					name: 'Jetpack Premium',
+					product_id: 2000,
+					slug: 'premium',
+				},
+				{
+					name: 'Jetpack Professional',
+					product_id: 2001,
+					slug: 'professional',
+				},
+			],
+		},
+		{
+			name: 'Jetpack Packs',
+			slug: 'jetpack-packs',
+			products: [
+				{
+					name: 'Jetpack Security Daily',
+					product_id: 2010,
+					slug: 'jetpack-security-daily',
+				},
+				{
+					name: 'Jetpack Security Real-time',
+					product_id: 2012,
+					slug: 'jetpack-security-realtime',
+				},
+			],
+		},
+	];
+	const expected = [
+		{
+			name: 'Jetpack Scan',
+			slug: 'jetpack-scan',
+			products: [
+				{
+					family_slug: 'jetpack-scan',
+					name: 'Jetpack Scan Daily',
+					product_id: 2106,
+					slug: 'jetpack-scan',
+				},
+			],
+		},
+		{
+			name: 'Jetpack Backup',
+			slug: 'jetpack-backup',
+			products: [
+				{
+					family_slug: 'jetpack-backup',
+					name: 'Jetpack Backup (10GB)',
+					product_id: 2112,
+					slug: 'jetpack-backup-t1',
+				},
+				{
+					family_slug: 'jetpack-backup',
+					name: 'Jetpack Backup (1TB)',
+					product_id: 2114,
+					slug: 'jetpack-backup-t2',
+				},
+			],
+		},
+		{
+			name: 'Jetpack Anti Spam',
+			slug: 'jetpack-anti-spam',
+			products: [
+				{
+					family_slug: 'jetpack-anti-spam',
+					name: 'Jetpack Anti-Spam',
+					product_id: 2110,
+					slug: 'jetpack-anti-spam',
+				},
+			],
+		},
+		{
+			name: 'Jetpack Videopress',
+			slug: 'jetpack-videopress',
+			products: [
+				{
+					family_slug: 'jetpack-videopress',
+					name: 'Jetpack VideoPress',
+					product_id: 2116,
+					slug: 'jetpack-videopress',
+				},
+			],
+		},
+		{
+			name: 'Jetpack Packs',
+			slug: 'jetpack-packs',
+			products: [
+				{
+					family_slug: 'jetpack-packs',
+					name: 'Jetpack Complete',
+					product_id: 2014,
+					slug: 'jetpack-complete',
+				},
+				{
+					family_slug: 'jetpack-packs',
+					name: 'Jetpack Security (10GB)',
+					product_id: 2016,
+					slug: 'jetpack-security-t1',
+				},
+				{
+					family_slug: 'jetpack-packs',
+					name: 'Jetpack Security (1TB)',
+					product_id: 2019,
+					slug: 'jetpack-security-t2',
+				},
+			],
+		},
+	];
+
+	const expectedResults = [
+		{
+			family_slug: 'jetpack-anti-spam',
+			name: 'Jetpack Anti-Spam',
+			product_id: 2110,
+			slug: 'jetpack-anti-spam',
+		},
+		{
+			family_slug: 'jetpack-backup',
+			name: 'Jetpack Backup (10GB)',
+			product_id: 2112,
+			slug: 'jetpack-backup-t1',
+		},
+		{
+			family_slug: 'jetpack-backup',
+			name: 'Jetpack Backup (1TB)',
+			product_id: 2114,
+			slug: 'jetpack-backup-t2',
+		},
+		{
+			family_slug: 'jetpack-packs',
+			name: 'Jetpack Complete',
+			product_id: 2014,
+			slug: 'jetpack-complete',
+		},
+		{
+			family_slug: 'jetpack-scan',
+			name: 'Jetpack Scan Daily',
+			product_id: 2106,
+			slug: 'jetpack-scan',
+		},
+		{
+			family_slug: 'jetpack-packs',
+			name: 'Jetpack Security (10GB)',
+			product_id: 2016,
+			slug: 'jetpack-security-t1',
+		},
+		{
+			family_slug: 'jetpack-packs',
+			name: 'Jetpack Security (1TB)',
+			product_id: 2019,
+			slug: 'jetpack-security-t2',
+		},
+		{
+			family_slug: 'jetpack-videopress',
+			name: 'Jetpack VideoPress',
+			product_id: 2116,
+			slug: 'jetpack-videopress',
+		},
+	];
+
 	it( 'returns filtered list of products', async () => {
 		const queryClient = new QueryClient();
 		const wrapper = ( { children } ) => (
 			<QueryClientProvider client={ queryClient }>{ children }</QueryClientProvider>
 		);
-		const unexpected = [
-			{
-				name: 'Jetpack Backup',
-				slug: 'jetpack-backup',
-				products: [
-					{
-						name: 'Jetpack Backup (Daily)',
-						product_id: 2100,
-						slug: 'jetpack-backup-daily',
-					},
-					{
-						name: 'Jetpack Backup (Real-time)',
-						product_id: 2102,
-						slug: 'jetpack-backup-realtime',
-					},
-					{
-						name: 'Jetpack Backup (1GB)',
-						product_id: 2120,
-						slug: 'jetpack-backup-t0',
-					},
-				],
-			},
-			{
-				name: 'Jetpack Plans',
-				slug: 'jetpack-plans',
-				products: [
-					{
-						name: 'Jetpack Personal',
-						product_id: 2005,
-						slug: 'personal',
-					},
-					{
-						name: 'Jetpack Premium',
-						product_id: 2000,
-						slug: 'premium',
-					},
-					{
-						name: 'Jetpack Professional',
-						product_id: 2001,
-						slug: 'professional',
-					},
-				],
-			},
-			{
-				name: 'Jetpack Packs',
-				slug: 'jetpack-packs',
-				products: [
-					{
-						name: 'Jetpack Security Daily',
-						product_id: 2010,
-						slug: 'jetpack-security-daily',
-					},
-					{
-						name: 'Jetpack Security Real-time',
-						product_id: 2012,
-						slug: 'jetpack-security-realtime',
-					},
-				],
-			},
-		];
-		const expected = [
-			{
-				name: 'Jetpack Scan',
-				slug: 'jetpack-scan',
-				products: [
-					{
-						family_slug: 'jetpack-scan',
-						name: 'Jetpack Scan Daily',
-						product_id: 2106,
-						slug: 'jetpack-scan',
-					},
-				],
-			},
-			{
-				name: 'Jetpack Backup',
-				slug: 'jetpack-backup',
-				products: [
-					{
-						family_slug: 'jetpack-backup',
-						name: 'Jetpack Backup (10GB)',
-						product_id: 2112,
-						slug: 'jetpack-backup-t1',
-					},
-					{
-						family_slug: 'jetpack-backup',
-						name: 'Jetpack Backup (1TB)',
-						product_id: 2114,
-						slug: 'jetpack-backup-t2',
-					},
-				],
-			},
-			{
-				name: 'Jetpack Anti Spam',
-				slug: 'jetpack-anti-spam',
-				products: [
-					{
-						family_slug: 'jetpack-anti-spam',
-						name: 'Jetpack Anti-Spam',
-						product_id: 2110,
-						slug: 'jetpack-anti-spam',
-					},
-				],
-			},
-			{
-				name: 'Jetpack Videopress',
-				slug: 'jetpack-videopress',
-				products: [
-					{
-						family_slug: 'jetpack-videopress',
-						name: 'Jetpack VideoPress',
-						product_id: 2116,
-						slug: 'jetpack-videopress',
-					},
-				],
-			},
-			{
-				name: 'Jetpack Packs',
-				slug: 'jetpack-packs',
-				products: [
-					{
-						family_slug: 'jetpack-packs',
-						name: 'Jetpack Complete',
-						product_id: 2014,
-						slug: 'jetpack-complete',
-					},
-					{
-						family_slug: 'jetpack-packs',
-						name: 'Jetpack Security (10GB)',
-						product_id: 2016,
-						slug: 'jetpack-security-t1',
-					},
-					{
-						family_slug: 'jetpack-packs',
-						name: 'Jetpack Security (1TB)',
-						product_id: 2019,
-						slug: 'jetpack-security-t2',
-					},
-				],
-			},
-		];
-
-		const expectedResults = [
-			{
-				family_slug: 'jetpack-anti-spam',
-				name: 'Jetpack Anti-Spam',
-				product_id: 2110,
-				slug: 'jetpack-anti-spam',
-			},
-			{
-				family_slug: 'jetpack-backup',
-				name: 'Jetpack Backup (10GB)',
-				product_id: 2112,
-				slug: 'jetpack-backup-t1',
-			},
-			{
-				family_slug: 'jetpack-backup',
-				name: 'Jetpack Backup (1TB)',
-				product_id: 2114,
-				slug: 'jetpack-backup-t2',
-			},
-			{
-				family_slug: 'jetpack-packs',
-				name: 'Jetpack Complete',
-				product_id: 2014,
-				slug: 'jetpack-complete',
-			},
-			{
-				family_slug: 'jetpack-scan',
-				name: 'Jetpack Scan Daily',
-				product_id: 2106,
-				slug: 'jetpack-scan',
-			},
-			{
-				family_slug: 'jetpack-packs',
-				name: 'Jetpack Security (10GB)',
-				product_id: 2016,
-				slug: 'jetpack-security-t1',
-			},
-			{
-				family_slug: 'jetpack-packs',
-				name: 'Jetpack Security (1TB)',
-				product_id: 2019,
-				slug: 'jetpack-security-t2',
-			},
-			{
-				family_slug: 'jetpack-videopress',
-				name: 'Jetpack VideoPress',
-				product_id: 2116,
-				slug: 'jetpack-videopress',
-			},
-		];
-
 		nock( 'https://public-api.wordpress.com' )
 			.get( '/wpcom/v2/jetpack-licensing/partner/product-families' )
 			.reply( 200, [ ...unexpected, ...expected ] );
 
-		const { result, waitFor } = renderHook( () => useProductsQuery(), {
+		const { result } = renderHook( () => useProductsQuery(), {
 			wrapper,
 		} );
 
-		await waitFor( () => result.current.isSuccess );
+		await waitFor( () => expect( result.current.isSuccess ).toBe( true ) );
+
+		expect( result.current.data ).toEqual( expectedResults );
+	} );
+
+	it( 'returns filtered the public facing list of products', async () => {
+		const queryClient = new QueryClient();
+		const wrapper = ( { children } ) => (
+			<QueryClientProvider client={ queryClient }>{ children }</QueryClientProvider>
+		);
+		nock( 'https://public-api.wordpress.com' )
+			.get( '/wpcom/v2/jetpack-licensing/public/manage-pricing' )
+			.reply( 200, [ ...unexpected, ...expected ] );
+
+		const { result } = renderHook( () => useProductsQuery( true ), {
+			wrapper,
+		} );
+
+		await waitFor( () => expect( result.current.isSuccess ).toBe( true ) );
 
 		expect( result.current.data ).toEqual( expectedResults );
 	} );
@@ -301,13 +319,12 @@ describe( 'useProductsQuery', () => {
 		// Prevent console.error from being loud during testing because of the test 500 error.
 		const consoleError = global.console.error;
 		global.console.error = jest.fn();
-		const { result, waitFor } = renderHook( () => useProductsQuery(), {
+		const { result } = renderHook( () => useProductsQuery(), {
 			wrapper,
 		} );
 
 		// Wait for the response.
-		await waitFor( () => result.current.isError );
-		expect( result.current.isError ).toBe( true );
+		await waitFor( () => expect( result.current.isError ).toBe( true ) );
 		global.console.error = consoleError;
 
 		// Test that the correct notification is being triggered.
@@ -336,7 +353,7 @@ describe( 'useIssueLicenseMutation', () => {
 			.post( '/wpcom/v2/jetpack-licensing/license', '{"product":"jetpack-scan"}' )
 			.reply( 200, stub );
 
-		const { result, waitFor } = renderHook( () => useIssueLicenseMutation(), {
+		const { result } = renderHook( () => useIssueLicenseMutation(), {
 			wrapper,
 		} );
 
@@ -363,7 +380,7 @@ describe( 'useRevokeLicenseMutation', () => {
 			.delete( '/wpcom/v2/jetpack-licensing/license', '{"license_key":"jetpack-scan_foobarbaz"}' )
 			.reply( 200, stub );
 
-		const { result, waitFor } = renderHook( () => useRevokeLicenseMutation(), {
+		const { result } = renderHook( () => useRevokeLicenseMutation(), {
 			wrapper,
 		} );
 
@@ -391,7 +408,7 @@ describe( 'useTOSConsentMutation', () => {
 			.put( '/wpcom/v2/jetpack-licensing/partner', '{"tos":"consented"}' )
 			.reply( 200, stub );
 
-		const { result, waitFor } = renderHook( () => useTOSConsentMutation(), {
+		const { result } = renderHook( () => useTOSConsentMutation(), {
 			wrapper,
 		} );
 
@@ -403,10 +420,7 @@ describe( 'useTOSConsentMutation', () => {
 
 describe( 'useBillingDashboardQuery', () => {
 	function createQueryClient() {
-		const logger = {
-			error: jest.fn(),
-		};
-		return new QueryClient( { logger } );
+		return new QueryClient();
 	}
 
 	it( 'returns transformed request data', async () => {
@@ -476,11 +490,11 @@ describe( 'useBillingDashboardQuery', () => {
 			.get( '/wpcom/v2/jetpack-licensing/licenses/billing' )
 			.reply( 200, stub );
 
-		const { result, waitFor } = renderHook( () => useBillingDashboardQuery(), {
+		const { result } = renderHook( () => useBillingDashboardQuery(), {
 			wrapper,
 		} );
 
-		await waitFor( () => result.current.isSuccess );
+		await waitFor( () => expect( result.current.isSuccess ).toBe( true ) );
 
 		expect( result.current.data ).toEqual( formattedStub );
 	} );
@@ -500,13 +514,12 @@ describe( 'useBillingDashboardQuery', () => {
 		const dispatch = jest.fn();
 		useDispatch.mockReturnValue( dispatch );
 
-		const { result, waitFor } = renderHook( () => useBillingDashboardQuery( { retry: false } ), {
+		const { result } = renderHook( () => useBillingDashboardQuery( { retry: false } ), {
 			wrapper,
 		} );
 
 		// Wait for the response.
-		await waitFor( () => result.current.isError );
-		expect( result.current.isError ).toBe( true );
+		await waitFor( () => expect( result.current.isError ).toBe( true ) );
 
 		// Test that the correct notification is being triggered.
 		expect( dispatch.mock.calls[ 0 ][ 0 ].type ).toBe( 'NOTICE_CREATE' );
@@ -529,13 +542,12 @@ describe( 'useBillingDashboardQuery', () => {
 		const dispatch = jest.fn();
 		useDispatch.mockReturnValue( dispatch );
 
-		const { result, waitFor } = renderHook( () => useBillingDashboardQuery( { retry: false } ), {
+		const { result } = renderHook( () => useBillingDashboardQuery( { retry: false } ), {
 			wrapper,
 		} );
 
-		await waitFor( () => result.current.isError );
+		await waitFor( () => expect( result.current.isError ).toBe( true ) );
 
-		expect( result.current.isError ).toBe( true );
 		expect( dispatch.mock.calls[ 0 ][ 0 ].type ).toBe( 'NOTICE_CREATE' );
 		expect( dispatch.mock.calls[ 0 ][ 0 ].notice.noticeId ).toBe(
 			'partner-portal-billing-dashboard-failure'

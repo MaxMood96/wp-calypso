@@ -6,18 +6,25 @@ import {
 	PLAN_ANNUAL_PERIOD,
 	PLAN_BIENNIAL_PERIOD,
 	PLAN_TRIENNIAL_PERIOD,
+	isJetpackPlan,
+	isJetpackProduct,
 } from '@automattic/calypso-products';
+import page from '@automattic/calypso-router';
 import { CompactCard, Gridicon } from '@automattic/components';
 import formatCurrency from '@automattic/format-currency';
+import { CALYPSO_CONTACT } from '@automattic/urls';
 import { ExternalLink } from '@wordpress/components';
 import { Icon, warning as warningIcon } from '@wordpress/icons';
-import classNames from 'classnames';
-import i18n, { localize, useTranslate } from 'i18n-calypso';
-import page from 'page';
+import clsx from 'clsx';
+import { localize, useTranslate } from 'i18n-calypso';
+import { get } from 'lodash';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
+import { connect } from 'react-redux';
 import akismetIcon from 'calypso/assets/images/icons/akismet-icon.svg';
+import jetpackIcon from 'calypso/assets/images/icons/jetpack-icon.svg';
 import payPalImage from 'calypso/assets/images/upgrades/paypal-full.svg';
+import upiImage from 'calypso/assets/images/upgrades/upi.svg';
 import SiteIcon from 'calypso/blocks/site-icon';
 import InfoPopover from 'calypso/components/info-popover';
 import { withLocalizedMoment } from 'calypso/components/localized-moment';
@@ -41,12 +48,14 @@ import {
 	isIntroductoryOfferFreeTrial,
 	hasPaymentMethod,
 } from 'calypso/lib/purchases';
-import { CALYPSO_CONTACT } from 'calypso/lib/url/support';
 import { getPurchaseListUrlFor } from 'calypso/my-sites/purchases/paths';
+import getSiteIconUrl from 'calypso/state/selectors/get-site-icon-url';
+import { getSite } from 'calypso/state/sites/selectors';
 import {
 	isTemporarySitePurchase,
 	isJetpackTemporarySitePurchase,
 	isAkismetTemporarySitePurchase,
+	isMarketplaceTemporarySitePurchase,
 } from '../utils';
 import OwnerInfo from './owner-info';
 import 'calypso/me/purchases/style.scss';
@@ -64,8 +73,28 @@ class PurchaseItem extends Component {
 	}
 
 	getStatus() {
-		const { purchase, translate, locale, moment, name, isJetpack, isDisconnectedSite } = this.props;
+		const { purchase, translate, moment, name, isJetpack, isDisconnectedSite } = this.props;
 		const expiry = moment( purchase.expiryDate );
+		// @todo: There isn't currently a way to get the taxName based on the
+		// country. The country is not included in the purchase information
+		// envelope. We should add this information so we can utilize useTaxName
+		// to retrieve the correct taxName. For now, we are using a fallback tax
+		// name with context, to prevent mis-translation.
+		const taxName = translate( 'tax', {
+			context: "Shortened form of 'Sales Tax', not a country-specific tax name",
+		} );
+
+		/* translators: %s is the name of taxes in the country (eg: "VAT" or "GST"). */
+		const excludeTaxStringAbbreviation = translate( '(excludes %s)', {
+			textOnly: true,
+			args: [ taxName ],
+		} );
+
+		/* translators: %s is the name of taxes in the country (eg: "VAT" or "GST"). */
+		const excludeTaxStringTitle = translate( 'Renewal price excludes any applicable %s', {
+			textOnly: true,
+			args: [ taxName ],
+		} );
 
 		if ( purchase && isPartnerPurchase( purchase ) ) {
 			return translate( 'Managed by %(partnerName)s', {
@@ -75,7 +104,11 @@ class PurchaseItem extends Component {
 			} );
 		}
 
-		if ( isDisconnectedSite && ! isAkismetTemporarySitePurchase( purchase ) ) {
+		if (
+			isDisconnectedSite &&
+			! isAkismetTemporarySitePurchase( purchase ) &&
+			! isMarketplaceTemporarySitePurchase( purchase )
+		) {
 			if ( isJetpackTemporarySitePurchase( purchase ) ) {
 				return (
 					<>
@@ -90,7 +123,7 @@ class PurchaseItem extends Component {
 						TLDR: Don't display more than one primary button or action in a single card. (in which the card itself if a primary action/link in this case) */ }
 						<ExternalLink
 							className="purchase-item__link"
-							href="https://jetpack.com/support/install-jetpack-and-connect-your-new-plan/#how-can-i-activate-my-license-key-in-my-jetpack-installation"
+							href="https://jetpack.com/support/activate-a-jetpack-product-via-license-key/"
 						>
 							{ translate( 'Learn more' ) }
 						</ExternalLink>
@@ -145,15 +178,9 @@ class PurchaseItem extends Component {
 		}
 
 		if ( isWithinIntroductoryOfferPeriod( purchase ) && isIntroductoryOfferFreeTrial( purchase ) ) {
-			if (
-				isRenewing( purchase ) &&
-				( locale === 'en' ||
-					i18n.hasTranslation(
-						'Free trial ends on {{span}}%(date)s{{/span}}, renews automatically at %(amount)s'
-					) )
-			) {
+			if ( isRenewing( purchase ) ) {
 				return translate(
-					'Free trial ends on {{span}}%(date)s{{/span}}, renews automatically at %(amount)s',
+					'Free trial ends on {{span}}%(date)s{{/span}}, renews automatically at %(amount)s {{abbr}}%(excludeTaxStringAbbreviation)s{{/abbr}}',
 					{
 						args: {
 							date: expiry.format( 'LL' ),
@@ -161,37 +188,34 @@ class PurchaseItem extends Component {
 								isSmallestUnit: true,
 								stripZeros: true,
 							} ),
+							excludeTaxStringAbbreviation: excludeTaxStringAbbreviation,
 						},
 						components: {
 							span: <span className="purchase-item__date" />,
+							abbr: <abbr title={ excludeTaxStringTitle } />,
 						},
 					}
 				);
 			}
 
-			if (
-				locale === 'en' ||
-				i18n.hasTranslation( 'Free trial ends on {{span}}%(date)s{{/span}}' )
-			) {
-				const expiryClass =
-					expiry < moment().add( 7, 'days' )
-						? 'purchase-item__is-error'
-						: 'purchase-item__is-warning';
+			const expiryClass =
+				expiry < moment().add( 7, 'days' )
+					? 'purchase-item__is-error'
+					: 'purchase-item__is-warning';
 
-				return (
-					<span className={ expiryClass }>
-						{ translate( 'Free trial ends on {{span}}%(date)s{{/span}}', {
-							args: {
-								date: expiry.format( 'LL' ),
-							},
-							components: {
-								span: <span className="purchase-item__date" />,
-							},
-						} ) }
-						{ this.trackImpression( 'purchase-expiring' ) }
-					</span>
-				);
-			}
+			return (
+				<span className={ expiryClass }>
+					{ translate( 'Free trial ends on {{span}}%(date)s{{/span}}', {
+						args: {
+							date: expiry.format( 'LL' ),
+						},
+						components: {
+							span: <span className="purchase-item__date" />,
+						},
+					} ) }
+					{ this.trackImpression( 'purchase-expiring' ) }
+				</span>
+			);
 		}
 
 		if ( isRenewing( purchase ) && purchase.renewDate ) {
@@ -232,72 +256,55 @@ class PurchaseItem extends Component {
 							isSmallestUnit: true,
 							stripZeros: true,
 						} ),
+						excludeTaxStringAbbreviation: excludeTaxStringAbbreviation,
 						date: renewDate.format( 'LL' ),
 					},
 					components: {
+						abbr: <abbr title={ excludeTaxStringTitle } />,
 						span: <span className="purchase-item__date" />,
 					},
 				};
 				switch ( purchase.billPeriodDays ) {
 					case PLAN_MONTHLY_PERIOD:
-						if (
-							locale === 'en' ||
-							i18n.hasTranslation( 'Renews monthly at %(amount)s on {{span}}%(date)s{{/span}}' )
-						) {
-							return translate(
-								'Renews monthly at %(amount)s on {{span}}%(date)s{{/span}}',
-								translateOptions
-							);
-						}
+						return translate(
+							'Renews monthly at %(amount)s {{abbr}}%(excludeTaxStringAbbreviation)s{{/abbr}} on {{span}}%(date)s{{/span}}',
+							translateOptions
+						);
 					case PLAN_ANNUAL_PERIOD:
-						if (
-							locale === 'en' ||
-							i18n.hasTranslation( 'Renews yearly at %(amount)s on {{span}}%(date)s{{/span}}' )
-						) {
-							return translate(
-								'Renews yearly at %(amount)s on {{span}}%(date)s{{/span}}',
-								translateOptions
-							);
-						}
+						return translate(
+							'Renews yearly at %(amount)s {{abbr}}%(excludeTaxStringAbbreviation)s{{/abbr}} on {{span}}%(date)s{{/span}}',
+							translateOptions
+						);
 					case PLAN_BIENNIAL_PERIOD:
-						if (
-							locale === 'en' ||
-							i18n.hasTranslation(
-								'Renews every two years at %(amount)s on {{span}}%(date)s{{/span}}'
-							)
-						) {
-							return translate(
-								'Renews every two years at %(amount)s on {{span}}%(date)s{{/span}}',
-								translateOptions
-							);
-						}
+						return translate(
+							'Renews every two years at %(amount)s {{abbr}}%(excludeTaxStringAbbreviation)s{{/abbr}} on {{span}}%(date)s{{/span}}',
+							translateOptions
+						);
 					case PLAN_TRIENNIAL_PERIOD:
-						if (
-							locale === 'en' ||
-							i18n.hasTranslation(
-								'Renews every three years at %(amount)s on {{span}}%(date)s{{/span}}'
-							)
-						) {
-							return translate(
-								'Renews every three years at %(amount)s on {{span}}%(date)s{{/span}}',
-								translateOptions
-							);
-						}
+						return translate(
+							'Renews every three years at %(amount)s {{abbr}}%(excludeTaxStringAbbreviation)s{{/abbr}} on {{span}}%(date)s{{/span}}',
+							translateOptions
+						);
 				}
 			}
 
-			return translate( 'Renews at %(amount)s on {{span}}%(date)s{{/span}}', {
-				args: {
-					amount: formatCurrency( purchase.priceInteger, purchase.currencyCode, {
-						isSmallestUnit: true,
-						stripZeros: true,
-					} ),
-					date: renewDate.format( 'LL' ),
-				},
-				components: {
-					span: <span className="purchase-item__date" />,
-				},
-			} );
+			return translate(
+				'Renews at %(amount)s {{abbr}}%(excludeTaxStringAbbreviation)s{{/abbr}} on {{span}}%(date)s{{/span}}',
+				{
+					args: {
+						amount: formatCurrency( purchase.priceInteger, purchase.currencyCode, {
+							isSmallestUnit: true,
+							stripZeros: true,
+						} ),
+						excludeTaxStringAbbreviation: excludeTaxStringAbbreviation,
+						date: renewDate.format( 'LL' ),
+					},
+					components: {
+						abbr: <abbr title={ excludeTaxStringTitle } />,
+						span: <span className="purchase-item__date" />,
+					},
+				}
+			);
 		}
 
 		if ( isExpiring( purchase ) && ! isAkismetFreeProduct( purchase ) ) {
@@ -446,6 +453,14 @@ class PurchaseItem extends Component {
 			return translate( 'Included with Plan' );
 		}
 
+		if ( purchase.isInAppPurchase ) {
+			return (
+				<div>
+					<span>{ translate( 'In-App Purchase' ) }</span>
+				</div>
+			);
+		}
+
 		if (
 			purchase.isAutoRenewEnabled &&
 			! hasPaymentMethod( purchase ) &&
@@ -476,11 +491,15 @@ class PurchaseItem extends Component {
 
 		if ( isRenewing( purchase ) ) {
 			if ( purchase.payment.type === 'credit_card' ) {
+				const paymentMethodType = purchase.payment.creditCard.displayBrand
+					? purchase.payment.creditCard.displayBrand
+					: purchase.payment.creditCard.type || purchase.payment.paymentPartner || '';
+
 				return (
 					<>
 						<img
-							src={ getPaymentMethodImageURL( purchase.payment.creditCard.type ) }
-							alt={ purchase.payment.creditCard.type }
+							src={ getPaymentMethodImageURL( paymentMethodType ) }
+							alt={ paymentMethodType }
 							className="purchase-item__payment-method-card"
 						/>
 						{ purchase.payment.creditCard.number }
@@ -498,12 +517,16 @@ class PurchaseItem extends Component {
 				);
 			}
 
+			if ( purchase.payment.type === 'upi' ) {
+				return <img src={ upiImage } alt={ purchase.payment.type } />;
+			}
+
 			return null;
 		}
 	}
 
 	getSiteIcon = () => {
-		const { site, isDisconnectedSite, purchase } = this.props;
+		const { site, isDisconnectedSite, purchase, iconUrl } = this.props;
 
 		if ( isAkismetTemporarySitePurchase( purchase ) ) {
 			return (
@@ -513,10 +536,24 @@ class PurchaseItem extends Component {
 			);
 		}
 
+		if ( isMarketplaceTemporarySitePurchase( purchase ) ) {
+			return <SiteIcon size={ 36 } />;
+		}
+
 		if ( isDisconnectedSite ) {
 			return (
 				<div className="purchase-item__disconnected-icon">
 					<Gridicon icon="block" size={ Math.round( 36 / 1.8 ) } />
+				</div>
+			);
+		}
+
+		const isJetpackPurchase = isJetpackProduct( purchase ) || isJetpackPlan( purchase );
+
+		if ( ! iconUrl && isJetpackPurchase ) {
+			return (
+				<div className="purchase-item__static-icon">
+					<img src={ jetpackIcon } alt="Jetpack icon" />;
 				</div>
 			);
 		}
@@ -563,7 +600,7 @@ class PurchaseItem extends Component {
 			isJetpack,
 		} = this.props;
 
-		const classes = classNames( 'purchase-item', {
+		const classes = clsx( 'purchase-item', {
 			'purchase-item--disconnected': isDisconnectedSite,
 		} );
 
@@ -634,4 +671,16 @@ PurchaseItem.propTypes = {
 	isBackupMethodAvailable: PropTypes.bool,
 };
 
-export default localize( withLocalizedMoment( PurchaseItem ) );
+export default connect( ( state, { site } ) => {
+	const stateSite = getSite( state, get( site, 'ID' ) );
+
+	if ( ! stateSite ) {
+		return {
+			iconUrl: site?.icon?.img,
+		};
+	}
+
+	return {
+		iconUrl: getSiteIconUrl( state, stateSite.ID ),
+	};
+} )( localize( withLocalizedMoment( PurchaseItem ) ) );

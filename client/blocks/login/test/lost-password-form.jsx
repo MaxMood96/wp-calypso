@@ -1,9 +1,14 @@
 /**
  * @jest-environment jsdom
  */
-import { screen, render } from '@testing-library/react';
+import { screen, render, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LostPasswordForm from 'calypso/blocks/login/lost-password-form';
+
+jest.mock( 'react-redux', () => ( {
+	...jest.requireActual( 'react-redux' ),
+	useDispatch: jest.fn().mockImplementation( () => {} ),
+} ) );
 
 describe( 'LostPasswordForm', () => {
 	test( 'displays a lost password form without errors', () => {
@@ -29,7 +34,9 @@ describe( 'LostPasswordForm', () => {
 		// The error message is displayed after the user blurs the input.
 		userEvent.tab();
 
-		expect( screen.getByRole( 'alert' ) ).toBeInTheDocument();
+		await waitFor( () => {
+			expect( screen.getByRole( 'alert' ) ).toBeInTheDocument();
+		} );
 
 		const btn = screen.getByRole( 'button', { name: /Reset my password/i } );
 		expect( btn ).toBeDisabled();
@@ -66,7 +73,9 @@ describe( 'LostPasswordForm', () => {
 		// The error message is displayed after the user blurs the input.
 		userEvent.tab();
 
-		expect( screen.queryByRole( 'alert' ) ).toBeNull();
+		await waitFor( () => {
+			expect( screen.queryByRole( 'alert' ) ).toBeNull();
+		} );
 	} );
 
 	test( 'reset error message when email is empty', async () => {
@@ -83,6 +92,8 @@ describe( 'LostPasswordForm', () => {
 		// The error message is displayed after the user blurs the input.
 		userEvent.tab();
 
-		expect( screen.queryByRole( 'alert' ) ).toBeNull();
+		await waitFor( () => {
+			expect( screen.queryByRole( 'alert' ) ).toBeNull();
+		} );
 	} );
 } );

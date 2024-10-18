@@ -62,9 +62,10 @@ const WaitForPluginInstall: Step = function WaitForAtomic( { navigation, data } 
 
 			// Poll for transfer status. If there are no plugins to verify, we can skip this step.
 			let stopPollingPlugins = ! pluginsToVerify || pluginsToVerify.length <= 0;
+			let backoffTime = 1000;
 
 			while ( ! stopPollingPlugins ) {
-				await wait( 500 );
+				await wait( backoffTime );
 
 				try {
 					const response: PluginsResponse = await wpcomRequest( {
@@ -72,25 +73,30 @@ const WaitForPluginInstall: Step = function WaitForAtomic( { navigation, data } 
 						apiVersion: '1.1',
 					} );
 
-					// Check that all plugins to verify have been installed.
-					// If they _have_ been installed, we can stop polling.
+					// Check that all plugins to verify have been installed and activated.
+					// If they _have_ been installed and activated, we can stop polling.
 					if ( response?.plugins && pluginsToVerify ) {
 						stopPollingPlugins = pluginsToVerify.every( ( slug ) => {
-							return response?.plugins.find( ( plugin: { slug: string } ) => plugin.slug === slug );
+							return response?.plugins.find(
+								( plugin: { slug: string; active: boolean } ) =>
+									plugin.slug === slug && plugin.active === true
+							);
 						} );
 					}
 				} catch ( err ) {
 					// Ignore errors. It's normal to get errors the first couple of times we poll. The timeout will eventually catch it if the failures continue.
 				}
 
-				if ( maxFinishTime < new Date().getTime() ) {
+				if ( maxFinishTime <= new Date().getTime() ) {
 					handlePluginCheckFailure( {
 						type: 'plugin_check_timeout',
 						error: `plugin check took too long (${ totalTimeout / 1000 }s))`,
 						code: 'plugin_check_timeout',
 					} );
-					throw new Error( 'plugin check timeout' );
+					throw new Error( `plugin check timeout exceeded ${ totalTimeout / 1000 }s` );
 				}
+
+				backoffTime *= 2;
 			}
 
 			return { pluginsInstalled: true, siteSlug, siteId };

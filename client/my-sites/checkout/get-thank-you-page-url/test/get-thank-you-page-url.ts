@@ -1,6 +1,5 @@
 /**
  * This is required to prevent "ReferenceError: window is not defined"
- *
  * @jest-environment jsdom
  */
 
@@ -15,6 +14,7 @@ import {
 	redirectCheckoutToWpAdmin,
 	TITAN_MAIL_MONTHLY_SLUG,
 	WPCOM_DIFM_LITE,
+	PLAN_100_YEARS,
 } from '@automattic/calypso-products';
 import { LINK_IN_BIO_FLOW, NEWSLETTER_FLOW, VIDEOPRESS_FLOW } from '@automattic/onboarding';
 import {
@@ -24,6 +24,7 @@ import {
 	CartKey,
 } from '@automattic/shopping-cart';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
+import { addQueryArgs } from 'calypso/lib/url';
 import getThankYouPageUrl from 'calypso/my-sites/checkout/get-thank-you-page-url';
 
 jest.mock( 'calypso/lib/jetpack/is-jetpack-cloud', () => jest.fn() );
@@ -42,6 +43,26 @@ const defaultArgs = {
 	getUrlFromCookie: jest.fn( () => undefined ),
 	saveUrlToCookie: jest.fn(),
 };
+
+function mockWindowLocation(): void {
+	delete global.window.location;
+	global.window = Object.create( window );
+	global.window.location = {
+		ancestorOrigins: null,
+		hash: null,
+		host: 'wordpress.com',
+		port: '80',
+		protocol: 'https:',
+		hostname: 'dummy.com',
+		href: 'http://wordpress.com/checkout/jetpack/jetpack_backup_daily',
+		origin: 'http://wordpress.com/checkout/jetpack/jetpack_backup_daily',
+		pathname: null,
+		search: null,
+		assign: null,
+		reload: null,
+		replace: null,
+	};
+}
 
 describe( 'getThankYouPageUrl', () => {
 	beforeEach( () => {
@@ -765,7 +786,7 @@ describe( 'getThankYouPageUrl', () => {
 			isInModal: true,
 			saveUrlToCookie,
 		} );
-		expect( saveUrlToCookie ).toBeCalledWith( url );
+		expect( saveUrlToCookie ).toHaveBeenCalledWith( url );
 	} );
 
 	it( 'Should store the thank you URL in the redirect cookie when called from the editor with an e-commerce plan', () => {
@@ -786,7 +807,7 @@ describe( 'getThankYouPageUrl', () => {
 			isInModal: true,
 			saveUrlToCookie,
 		} );
-		expect( saveUrlToCookie ).toBeCalledWith( '/checkout/thank-you/foo.bar/:receiptId' );
+		expect( saveUrlToCookie ).toHaveBeenCalledWith( '/checkout/thank-you/foo.bar/:receiptId' );
 	} );
 
 	it( 'redirects to url from cookie followed by purchase id if there is no site', () => {
@@ -1286,9 +1307,7 @@ describe( 'getThankYouPageUrl', () => {
 				receiptId: samplePurchaseId,
 			} );
 
-			expect( url ).toBe(
-				`/checkout/offer-professional-email/foo.bar/${ samplePurchaseId }/no-site`
-			);
+			expect( url ).toBe( `/checkout/thank-you/no-site/${ samplePurchaseId }` );
 		} );
 
 		it( 'Is not displayed if cart is missing', () => {
@@ -1344,33 +1363,6 @@ describe( 'getThankYouPageUrl', () => {
 			} );
 
 			expect( url ).toBe( `/checkout/thank-you/foo.bar/${ samplePurchaseId }` );
-		} );
-
-		it( 'Is not displayed if Professional Email is in the cart and email query parameter is present', () => {
-			const cart = {
-				...getMockCart(),
-				products: [
-					{
-						...getEmptyResponseCartProduct(),
-						product_slug: TITAN_MAIL_MONTHLY_SLUG,
-						extra: { email_users: [ { email: 'purchased_mailbox@foo.bar' } ] },
-					},
-				],
-			};
-
-			const url = getThankYouPageUrl( {
-				...defaultArgs,
-				cart,
-				domains,
-				receiptId: samplePurchaseId,
-				siteSlug: 'foo.bar',
-			} );
-
-			expect( url ).toBe(
-				`/checkout/thank-you/foo.bar/${ samplePurchaseId }?email=${ encodeURIComponent(
-					'purchased_mailbox@foo.bar'
-				) }`
-			);
 		} );
 
 		it( 'Is not displayed if Premium plan is in the cart; we show the business upgrade instead', () => {
@@ -1666,6 +1658,7 @@ describe( 'getThankYouPageUrl', () => {
 		} );
 	} );
 
+	// Siteless checkout flow
 	describe( 'Jetpack Siteless Checkout Thank You', () => {
 		it( 'redirects when jetpack checkout arg is set, but siteSlug is undefined.', () => {
 			const cart = {
@@ -1756,6 +1749,107 @@ describe( 'getThankYouPageUrl', () => {
 			);
 		} );
 
+		// Jetpack siteless "Connect after checkout" flow.
+		// Triggered when `connectAfterCheckout: true`, `adminUrl` is set, `fromSiteSlug` is set,
+		// and `siteSlug` is falsy(undefined).
+		it( "redirects to the site's wp-admin `connect_url_redirect` url to initiate Jetpack connection", () => {
+			mockWindowLocation();
+			const adminUrl = 'https://my.site/wp-admin/';
+			const fromSiteSlug = 'my.site';
+			const productSlug = 'jetpack_backup_daily';
+
+			const cart = {
+				...getMockCart(),
+				products: [
+					{
+						...getEmptyResponseCartProduct(),
+						product_slug: productSlug,
+					},
+				],
+			};
+			const url = getThankYouPageUrl( {
+				...defaultArgs,
+				siteSlug: undefined,
+				cart,
+				sitelessCheckoutType: 'jetpack',
+				connectAfterCheckout: true,
+				adminUrl: adminUrl,
+				fromSiteSlug: fromSiteSlug,
+				receiptId: 'invalid receipt ID' as any,
+			} );
+
+			const redirectAfterAuth = `https://wordpress.com/checkout/jetpack/thank-you/licensing-auto-activate/${ productSlug }?fromSiteSlug=${ fromSiteSlug }&productSlug=${ productSlug }`;
+
+			expect( url ).toBe(
+				addQueryArgs(
+					{
+						redirect_after_auth: redirectAfterAuth,
+						from: 'connect-after-checkout',
+					},
+					`${ adminUrl }admin.php?page=jetpack&connect_url_redirect=true&jetpack_connect_login_redirect=true`
+				)
+			);
+		} );
+
+		it( "Connect-after-checkout flow redirects to the site's wp-admin `connect_url_redirect` url, along with a `redirect_to` query param when available", () => {
+			mockWindowLocation();
+			const adminUrl = 'https://my.site/wp-admin/';
+			const fromSiteSlug = 'my.site';
+			const productSlug = 'jetpack_backup_daily';
+
+			const cart = {
+				...getMockCart(),
+				products: [
+					{
+						...getEmptyResponseCartProduct(),
+						product_slug: productSlug,
+					},
+				],
+			};
+			const url = getThankYouPageUrl( {
+				...defaultArgs,
+				siteSlug: undefined,
+				cart,
+				receiptId: 'invalid receipt ID' as any,
+				sitelessCheckoutType: 'jetpack',
+				connectAfterCheckout: true,
+				adminUrl: adminUrl,
+				fromSiteSlug: fromSiteSlug,
+				redirectTo: 'https://foo.bar/some-path?with-args=yes',
+			} );
+
+			const redirectAfterAuth = `https://wordpress.com/checkout/jetpack/thank-you/licensing-auto-activate/${ productSlug }?fromSiteSlug=${ fromSiteSlug }&productSlug=${ productSlug }&redirect_to=https%3A%2F%2Ffoo.bar%2Fsome-path%3Fwith-args%3Dyes`;
+
+			expect( url ).toBe(
+				addQueryArgs(
+					{
+						redirect_after_auth: redirectAfterAuth,
+						from: 'connect-after-checkout',
+					},
+					`${ adminUrl }admin.php?page=jetpack&connect_url_redirect=true&jetpack_connect_login_redirect=true`
+				)
+			);
+		} );
+
+		it( 'Redirects to the 100 year plan thank-you page when the 100 year plan is available', () => {
+			const cart = {
+				...getMockCart(),
+				products: [
+					{
+						...getEmptyResponseCartProduct(),
+						product_slug: PLAN_100_YEARS,
+					},
+				],
+			};
+			const url = getThankYouPageUrl( {
+				...defaultArgs,
+				siteSlug: 'yourgroovydomain.com',
+				receiptId: 999999,
+				cart,
+			} );
+			expect( url ).toBe( '/checkout/100-year/thank-you/yourgroovydomain.com/999999' );
+		} );
+
 		it( 'redirects with jetpackTemporarySiteId query param when available', () => {
 			const cart = {
 				...getMockCart(),
@@ -1776,6 +1870,29 @@ describe( 'getThankYouPageUrl', () => {
 			} );
 			expect( url ).toBe(
 				'/checkout/jetpack/thank-you/licensing-auto-activate/jetpack_backup_daily?receiptId=80023&siteId=123456789'
+			);
+		} );
+
+		it( 'Siteless checkout redirects with `redirect_to` query param when available', () => {
+			const cart = {
+				...getMockCart(),
+				products: [
+					{
+						...getEmptyResponseCartProduct(),
+						product_slug: 'jetpack_backup_daily',
+					},
+				],
+			};
+			const url = getThankYouPageUrl( {
+				...defaultArgs,
+				siteSlug: undefined,
+				cart,
+				sitelessCheckoutType: 'jetpack',
+				receiptId: 80023,
+				redirectTo: 'https://foo.bar/some-path?with-args=yes',
+			} );
+			expect( url ).toBe(
+				'/checkout/jetpack/thank-you/licensing-auto-activate/jetpack_backup_daily?receiptId=80023&redirect_to=https%3A%2F%2Ffoo.bar%2Fsome-path%3Fwith-args%3Dyes'
 			);
 		} );
 
@@ -1861,6 +1978,60 @@ describe( 'getThankYouPageUrl', () => {
 					},
 				} )
 			).toThrow();
+		} );
+	} );
+
+	describe( 'Congrats removals', () => {
+		it( 'redirects to /email/:domain/manage/:site when purchasing only Titan Mail', () => {
+			const url = getThankYouPageUrl( {
+				...defaultArgs,
+				cart: {
+					...getMockCart(),
+					products: [
+						{
+							...getEmptyResponseCartProduct(),
+							product_slug: TITAN_MAIL_MONTHLY_SLUG,
+							meta: 'example.com', // meta holds the domain - not the same thing as siteSlug
+							extra: {
+								email_users: [ { email: 'test@example.com' } ],
+							},
+						},
+					],
+				},
+				siteSlug: 'foo.bar',
+			} );
+			expect( url ).toBe(
+				`/email/example.com/manage/foo.bar?new-email=${ encodeURIComponent( 'test@example.com' ) }`
+			);
+		} );
+
+		it( 'redirects to /checkout/thank-you when purchasing multiple products including titanmail', () => {
+			const url = getThankYouPageUrl( {
+				...defaultArgs,
+				cart: {
+					...getMockCart(),
+					products: [
+						{
+							...getEmptyResponseCartProduct(),
+							product_slug: 'personal-bundle',
+						},
+						{
+							...getEmptyResponseCartProduct(),
+							product_slug: TITAN_MAIL_MONTHLY_SLUG,
+							extra: {
+								email_users: [ { email: 'test@example.com' } ],
+							},
+						},
+					],
+				},
+				siteSlug: 'foo.bar',
+				receiptId: samplePurchaseId,
+			} );
+			expect( url ).toBe(
+				`/checkout/thank-you/foo.bar/${ samplePurchaseId }?email=${ encodeURIComponent(
+					'test@example.com'
+				) }`
+			);
 		} );
 	} );
 } );

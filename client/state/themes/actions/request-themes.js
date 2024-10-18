@@ -2,9 +2,11 @@ import { map, property } from 'lodash';
 import wpcom from 'calypso/lib/wp';
 import { fetchThemesList as fetchWporgThemesList } from 'calypso/lib/wporg';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
+import isSiteAutomatedTransfer from 'calypso/state/selectors/is-site-automated-transfer';
+import { isJetpackSite } from 'calypso/state/sites/selectors';
 import { THEMES_REQUEST, THEMES_REQUEST_FAILURE } from 'calypso/state/themes/action-types';
 import { receiveThemes } from 'calypso/state/themes/actions/receive-themes';
-import { prependThemeFilterKeys } from 'calypso/state/themes/selectors';
+import { getThemeTier, prependThemeFilterKeys } from 'calypso/state/themes/selectors';
 import {
 	normalizeJetpackTheme,
 	normalizeWpcomTheme,
@@ -15,7 +17,6 @@ import 'calypso/state/themes/init';
 
 /**
  * Triggers a network request to fetch themes for the specified site and query.
- *
  * @param  {number|string} siteId        Jetpack site ID or 'wpcom' for any WPCOM site
  * @param  {Object}        query         Theme query
  * @param  {string}        query.search  Search string
@@ -30,6 +31,9 @@ import 'calypso/state/themes/init';
 export function requestThemes( siteId, query = {}, locale ) {
 	return ( dispatch, getState ) => {
 		const startTime = new Date().getTime();
+
+		const isAtomic = isSiteAutomatedTransfer( getState(), siteId );
+		const isJetpack = isJetpackSite( getState(), siteId );
 
 		dispatch( {
 			type: THEMES_REQUEST,
@@ -53,12 +57,30 @@ export function requestThemes( siteId, query = {}, locale ) {
 							// https://github.com/Automattic/wp-calypso/issues/71911#issuecomment-1381284172
 							// User can be redirected to PatternAssembler flow using the PatternAssemblerCTA on theme-list
 							include_blankcanvas_theme: null,
+							...( query.search && !! query.search.length
+								? {
+										// Include retired themes when searching. This is useful when a theme exists in both wpcom and wporg.
+										// The theme will show up in the theme listing as wporg, but it cannot be activated
+										// since it's a retired wpcom theme (take precedence).
+										// See: https://github.com/Automattic/wp-calypso/pull/78231
+										retired: true,
+										// Include delisted themes when searching. This solves an issue where some themes
+										// are mistakenly displayed as 3rd-party themes requiring an upgrade.
+										// See: https://github.com/Automattic/wp-calypso/issues/94310#issuecomment-2370899172
+										delisted: true,
+								  }
+								: null ),
 						},
 						locale ? { locale } : null
 					)
 				);
-		} else {
+		} else if ( isAtomic || isJetpack ) {
 			request = () => wpcom.req.get( `/sites/${ siteId }/themes`, { ...query, apiVersion: '1' } );
+		} else {
+			request = () =>
+				wpcom.req.get( `/sites/${ siteId }/themes/activation-history`, {
+					apiNamespace: 'wpcom/v2',
+				} );
 		}
 
 		// WP.com returns the number of results in a `found` attr, so we can use that right away.
@@ -68,12 +90,16 @@ export function requestThemes( siteId, query = {}, locale ) {
 			.then( ( { themes: rawThemes, info: { results } = {}, found = results } ) => {
 				let themes;
 				if ( siteId === 'wporg' ) {
-					themes = map( rawThemes, normalizeWporgTheme );
+					const communityThemeTier = getThemeTier( getState(), 'community' );
+					themes = map( rawThemes, ( theme ) => normalizeWporgTheme( theme, communityThemeTier ) );
 				} else if ( siteId === 'wpcom' ) {
 					themes = map( rawThemes, normalizeWpcomTheme );
-				} else {
-					// Jetpack Site
+				} else if ( isAtomic || isJetpack ) {
+					// Jetpack or Atomic Site
 					themes = map( rawThemes, normalizeJetpackTheme );
+				} else {
+					// WPCOM Site
+					themes = map( rawThemes, normalizeWpcomTheme );
 				}
 
 				if ( ( query.search || query.filter ) && query.page === 1 ) {

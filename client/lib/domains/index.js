@@ -1,5 +1,4 @@
 export { canCurrentUserAddEmail } from './can-current-user-add-email';
-export { canCurrentUserCreateSiteFromDomainOnly } from './can-current-user-create-site-from-domain-only';
 export { isDomainAndEmailSubscriptionsOwnedByDifferentUsers } from './is-domain-and-email-subscriptions-owned-by-different-users';
 export { canRedirect } from './can-redirect';
 export { checkAuthCode } from './check-auth-code';
@@ -35,3 +34,4 @@ export { getRegisteredDomains, isFreeUrlDomain, isRegisteredDomain } from './reg
 export { resendIcannVerification } from './resend-icann-verification';
 export { resolveDomainStatus } from './resolve-domain-status';
 export { startInboundTransfer } from './start-inbound-transfer';
+export { extractDomainFromInput } from './get-domain-from-input';

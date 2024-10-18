@@ -1,8 +1,10 @@
-import { isEnabled } from '@automattic/calypso-config';
-import { FEATURE_INSTALL_THEMES } from '@automattic/calypso-products';
+import { FEATURE_INSTALL_THEMES, PLAN_BUSINESS, getPlan } from '@automattic/calypso-products';
 import { Button } from '@automattic/components';
-import { PatternAssemblerCta, BLANK_CANVAS_DESIGN } from '@automattic/design-picker';
-import { WITH_THEME_ASSEMBLER_FLOW } from '@automattic/onboarding';
+import {
+	PatternAssemblerCta,
+	usePatternAssemblerCtaData,
+	isAssemblerSupported,
+} from '@automattic/design-picker';
 import { Icon, addTemplate, brush, cloudUpload } from '@wordpress/icons';
 import { localize } from 'i18n-calypso';
 import { isEmpty, times } from 'lodash';
@@ -11,15 +13,32 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { connect, useSelector } from 'react-redux';
 import InfiniteScroll from 'calypso/components/infinite-scroll';
 import Theme from 'calypso/components/theme';
+import { useIsSiteAssemblerEnabled } from 'calypso/data/site-assembler';
 import withIsFSEActive from 'calypso/data/themes/with-is-fse-active';
+import { getWooMyCustomThemeOptions } from 'calypso/my-sites/themes/theme-options';
 import { isUserLoggedIn } from 'calypso/state/current-user/selectors';
 import getSiteEditorUrl from 'calypso/state/selectors/get-site-editor-url';
 import isAtomicSite from 'calypso/state/selectors/is-site-automated-transfer';
 import siteHasFeature from 'calypso/state/selectors/site-has-feature';
+import { isSiteOnECommerceTrial, isSiteOnWooExpress } from 'calypso/state/sites/plans/selectors';
+import {
+	getSiteThemeInstallUrl,
+	getSiteAdminUrl,
+	getSiteSlug,
+	isWooCYSEligibleSite,
+} from 'calypso/state/sites/selectors';
 import { upsellCardDisplayed as upsellCardDisplayedAction } from 'calypso/state/themes/actions';
 import { DEFAULT_THEME_QUERY } from 'calypso/state/themes/constants';
+import { isDefaultWooExpressThemeActive } from 'calypso/state/themes/selectors/is-wooexpress-default-theme-active';
 import { getThemesBookmark } from 'calypso/state/themes/themes-ui/selectors';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
+import WooDesignWithAIBanner from '../woo-design-with-ai-banner';
+import {
+	StartNewDesignWarningModal,
+	StartOverWarningModal,
+} from '../woo-design-with-ai-warning-modals';
+import getSiteAssemblerUrl from './get-site-assembler-url';
+import useWooActiveThemeQuery from './use-woo-active-theme-query';
 
 import './style.scss';
 
@@ -40,9 +59,29 @@ const getGridColumns = ( gridContainerRef, minColumnWidth, margin ) => {
 	return columnsPerRow;
 };
 
-export const ThemesList = ( props ) => {
+const getWarningModalComponent = ( isDefaultWooExpressTheme, isCurrentThemeAIGenerated ) => {
+	switch ( true ) {
+		case isCurrentThemeAIGenerated:
+			return StartOverWarningModal;
+		case ! isDefaultWooExpressTheme:
+			return StartNewDesignWarningModal;
+		default:
+			return null;
+	}
+};
+
+export const ThemesList = ( { tabFilter, ...props } ) => {
+	const {
+		themes,
+		translate,
+		isSiteWooExpressOrEcomFreeTrial,
+		siteSlug,
+		siteAdminUrl,
+		getButtonOptions,
+	} = props;
 	const themesListRef = useRef( null );
 	const [ showSecondUpsellNudge, setShowSecondUpsellNudge ] = useState( false );
+	const isSiteAssemblerEnabled = useIsSiteAssemblerEnabled();
 	const updateShowSecondUpsellNudge = useCallback( () => {
 		const minColumnWidth = 320; // $theme-item-min-width: 320px;
 		const margin = 32; // $theme-item-horizontal-margin: 32px;
@@ -60,11 +99,13 @@ export const ThemesList = ( props ) => {
 	}, [ updateShowSecondUpsellNudge ] );
 
 	const selectedSite = useSelector( getSelectedSite );
-
 	const isLoggedIn = useSelector( isUserLoggedIn );
-
-	const isPatternAssemblerCTAEnabled =
-		! isLoggedIn || isEnabled( 'pattern-assembler/logged-in-showcase' );
+	const siteEditorUrl = useSelector( ( state ) =>
+		getSiteEditorUrl( state, selectedSite?.ID, {
+			canvas: 'edit',
+			assembler: '1',
+		} )
+	);
 
 	const fetchNextPage = useCallback(
 		( options ) => {
@@ -73,43 +114,72 @@ export const ThemesList = ( props ) => {
 		[ props.fetchNextPage ]
 	);
 
-	const goToSiteAssemblerFlow = ( shouldGoToAssemblerStep ) => {
+	const goToSiteAssemblerFlow = () => {
+		const shouldGoToAssemblerStep = isAssemblerSupported();
 		props.recordTracksEvent( 'calypso_themeshowcase_pattern_assembler_cta_click', {
 			goes_to_assembler_step: shouldGoToAssemblerStep,
+			is_logged_in: isLoggedIn,
 		} );
 
-		const basePathname = isLoggedIn ? '/setup' : '/start';
-		const params = new URLSearchParams( {
-			ref: 'calypshowcase',
-			theme: BLANK_CANVAS_DESIGN.slug,
-		} );
-
-		if ( selectedSite?.slug ) {
-			params.set( 'siteSlug', selectedSite.slug );
+		if ( props.onDesignYourOwnClick ) {
+			props.onDesignYourOwnClick();
+		} else {
+			const destinationUrl = getSiteAssemblerUrl( {
+				isLoggedIn,
+				selectedSite,
+				shouldGoToAssemblerStep,
+				siteEditorUrl,
+			} );
+			window.location.assign( destinationUrl );
 		}
-
-		window.location.assign( `${ basePathname }/${ WITH_THEME_ASSEMBLER_FLOW }?${ params }` );
 	};
 
-	const matchingWpOrgThemes = useMemo( () => {
-		const themeSlugs = props.themes.map( ( theme ) => theme.id );
-
-		return (
-			props.wpOrgThemes?.filter(
-				( wpOrgTheme ) =>
-					! themeSlugs.includes( wpOrgTheme?.id?.toLowerCase() ) && // Avoid duplicate themes. Some free themes are available in both wpcom and wporg.
-					( wpOrgTheme?.name?.toLowerCase() === props.searchTerm.toLowerCase() ||
-						wpOrgTheme?.id?.toLowerCase() === props.searchTerm.toLowerCase() )
-			) || []
-		);
-	}, [ props.wpOrgThemes, props.searchTerm, props.themes ] );
-
-	const themes = useMemo(
-		() => [ ...props.themes, ...matchingWpOrgThemes ],
-		[ props.themes, matchingWpOrgThemes ]
+	const [ openWarningModal, setOpenWarningModal ] = useState( false );
+	const { data: activeTheme } = useWooActiveThemeQuery(
+		selectedSite?.ID,
+		isSiteWooExpressOrEcomFreeTrial
 	);
 
-	if ( ! props.loading && themes.length === 0 ) {
+	const goToWooDesignWithAI = () => {
+		props.recordTracksEvent( 'calypso_themeshowcase_woo_design_with_ai_cta_click', {
+			is_ai_generated: activeTheme?.is_ai_generated,
+		} );
+
+		window.location.assign(
+			`${ siteAdminUrl }admin.php?page=wc-admin&path=/customize-store/design-with-ai`
+		);
+	};
+
+	const _themes = useMemo( () => {
+		if ( ! activeTheme?.is_ai_generated ) {
+			return themes;
+		}
+
+		const activeThemeIndex = themes.findIndex( ( theme ) => theme.id === activeTheme?.slug );
+		if ( activeThemeIndex < 0 ) {
+			return themes;
+		}
+
+		const theme = themes[ activeThemeIndex ];
+
+		return [
+			...themes.slice( 0, activeThemeIndex ),
+			{
+				...theme,
+				isCustomGeneratedTheme: true,
+				name: translate( 'My custom theme' ),
+				buttonOptions: getWooMyCustomThemeOptions( {
+					options: getButtonOptions( theme.id ),
+					translate,
+					siteAdminUrl,
+					siteSlug,
+				} ),
+			},
+			...themes.slice( activeThemeIndex + 1 ),
+		];
+	}, [ themes, translate, activeTheme, getButtonOptions, siteAdminUrl, siteSlug ] );
+
+	if ( ! props.loading && props.themes.length === 0 ) {
 		return (
 			<Empty
 				isFSEActive={ props.isFSEActive }
@@ -117,6 +187,7 @@ export const ThemesList = ( props ) => {
 				searchTerm={ props.searchTerm }
 				translate={ props.translate }
 				upsellCardDisplayed={ props.upsellCardDisplayed }
+				isSiteAssemblerEnabled={ isSiteAssemblerEnabled }
 			/>
 		);
 	}
@@ -129,18 +200,54 @@ export const ThemesList = ( props ) => {
 		</div>
 	);
 
+	const DesignWithAIWarningModal = getWarningModalComponent(
+		props.isDefaultWooExpressThemeActive,
+		activeTheme?.is_ai_generated
+	);
+
+	const onClickWooBannerCTA = () => {
+		if ( props.isDefaultWooExpressThemeActive ) {
+			goToWooDesignWithAI();
+		} else {
+			setOpenWarningModal( true );
+		}
+	};
+
 	return (
 		<div className="themes-list" ref={ themesListRef }>
-			{ themes.map( ( theme, index ) => (
-				<ThemeBlock key={ 'theme-block' + index } theme={ theme } index={ index } { ...props } />
+			{ _themes.map( ( theme, index ) => (
+				<ThemeBlock
+					key={ 'theme-block' + index }
+					theme={ theme }
+					index={ index }
+					tabFilter={ tabFilter }
+					{ ...props }
+				/>
 			) ) }
 			{ /* Don't show second upsell nudge when less than 6 rows are present.
 				 Second plan upsell at 7th row is implemented through CSS. */ }
 			{ showSecondUpsellNudge && SecondUpsellNudge }
 			{ /* The Pattern Assembler CTA will display on the 9th row and the behavior is controlled by CSS */ }
-			{ isPatternAssemblerCTAEnabled && themes.length > 0 && (
-				<PatternAssemblerCta onButtonClick={ goToSiteAssemblerFlow } />
+			{ ! props.isWooCYSEligibleSite &&
+				! ( props.isSiteWooExpressOrEcomFreeTrial && props.tier === 'free' ) &&
+				tabFilter !== 'my-themes' &&
+				_themes.length > 0 &&
+				isSiteAssemblerEnabled && <PatternAssemblerCta onButtonClick={ goToSiteAssemblerFlow } /> }
+			{ /* The Woo Design with AI banner will be displayed on the 2nd or last row.The behavior is controlled by CSS */ }
+			{ props.isWooCYSEligibleSite && _themes.length > 0 && (
+				<WooDesignWithAIBanner
+					className={ activeTheme?.is_ai_generated ? 'last-row' : 'second-row' }
+					onClick={ onClickWooBannerCTA }
+				/>
 			) }
+			{ DesignWithAIWarningModal && openWarningModal && (
+				<DesignWithAIWarningModal
+					setOpenModal={ setOpenWarningModal }
+					onContinue={ goToWooDesignWithAI }
+					adminUrl={ siteAdminUrl }
+				/>
+			) }
+			{ props.children }
 			{ props.loading && <LoadingPlaceholders placeholderCount={ props.placeholderCount } /> }
 			<InfiniteScroll nextPageMethod={ fetchNextPage } />
 		</div>
@@ -149,7 +256,6 @@ export const ThemesList = ( props ) => {
 
 ThemesList.propTypes = {
 	themes: PropTypes.array.isRequired,
-	wpOrgThemes: PropTypes.array,
 	loading: PropTypes.bool.isRequired,
 	recordTracksEvent: PropTypes.func.isRequired,
 	fetchNextPage: PropTypes.func.isRequired,
@@ -163,6 +269,7 @@ ThemesList.propTypes = {
 	isActive: PropTypes.func,
 	getPrice: PropTypes.func,
 	isInstalling: PropTypes.func,
+	isLivePreviewStarted: PropTypes.func,
 	// i18n function provided by localize()
 	translate: PropTypes.func,
 	placeholderCount: PropTypes.number,
@@ -172,14 +279,15 @@ ThemesList.propTypes = {
 	] ),
 	siteId: PropTypes.number,
 	searchTerm: PropTypes.string,
+	tier: PropTypes.string,
 	upsellCardDisplayed: PropTypes.func,
+	children: PropTypes.node,
 };
 
 ThemesList.defaultProps = {
 	loading: false,
 	searchTerm: '',
 	themes: [],
-	wpOrgThemes: [],
 	recordTracksEvent: noop,
 	fetchNextPage: noop,
 	placeholderCount: DEFAULT_THEME_QUERY.number,
@@ -188,10 +296,11 @@ ThemesList.defaultProps = {
 	isActive: () => false,
 	getPrice: () => '',
 	isInstalling: () => false,
+	isLivePreviewStarted: () => false,
 };
 
-function ThemeBlock( props ) {
-	const { theme, index } = props;
+export function ThemeBlock( props ) {
+	const { theme, index, tabFilter, tier } = props;
 	const [ selectedStyleVariation, setSelectedStyleVariation ] = useState( null );
 
 	if ( isEmpty( theme ) ) {
@@ -204,9 +313,18 @@ function ThemeBlock( props ) {
 
 	return (
 		<Theme
-			key={ 'theme-' + theme.id }
-			buttonContents={ props.getButtonOptions( theme.id, selectedStyleVariation ) }
-			screenshotClickUrl={ props.getScreenshotUrl?.( theme.id, selectedStyleVariation ) }
+			key={ `theme-${ theme.id }` }
+			buttonContents={
+				// Allow theme to override button options.
+				theme.buttonOptions
+					? theme.buttonOptions
+					: props.getButtonOptions( theme.id, selectedStyleVariation )
+			}
+			screenshotClickUrl={ props.getScreenshotUrl?.( theme.id, {
+				tabFilter,
+				tierFilter: tier,
+				styleVariationSlug: selectedStyleVariation?.slug,
+			} ) }
 			onScreenshotClick={ props.onScreenshotClick }
 			onStyleVariationClick={ ( themeId, themeIndex, variation ) => {
 				setSelectedStyleVariation( variation );
@@ -218,8 +336,8 @@ function ThemeBlock( props ) {
 			index={ index }
 			theme={ theme }
 			active={ props.isActive( theme.id ) }
+			loading={ props.isInstalling( theme.id ) || props.isLivePreviewStarted( theme.id ) }
 			price={ props.getPrice( theme.id ) }
-			installing={ props.isInstalling( theme.id ) }
 			upsellUrl={ props.upsellUrl }
 			bookmarkRef={ bookmarkRef }
 			siteId={ siteId }
@@ -229,16 +347,31 @@ function ThemeBlock( props ) {
 	);
 }
 
-function Options( { isFSEActive, recordTracksEvent, searchTerm, translate, upsellCardDisplayed } ) {
-	const isLoggedInShowcase = useSelector( isUserLoggedIn );
+function Options( {
+	isFSEActive,
+	recordTracksEvent,
+	searchTerm,
+	translate,
+	upsellCardDisplayed,
+	isSiteAssemblerEnabled,
+} ) {
+	const isLoggedIn = useSelector( isUserLoggedIn );
 	const selectedSite = useSelector( getSelectedSite );
 	const canInstallTheme = useSelector( ( state ) =>
 		siteHasFeature( state, selectedSite?.ID, FEATURE_INSTALL_THEMES )
 	);
 	const isAtomic = useSelector( ( state ) => isAtomicSite( state, selectedSite?.ID ) );
 	const sitePlan = selectedSite?.plan?.product_slug;
-	const siteEditorUrl = useSelector( ( state ) => getSiteEditorUrl( state, selectedSite?.ID ) );
-
+	const siteEditorUrl = useSelector( ( state ) =>
+		getSiteEditorUrl( state, selectedSite?.ID, {
+			canvas: 'edit',
+			assembler: '1',
+		} )
+	);
+	const siteThemeInstallUrl = useSelector( ( state ) =>
+		getSiteThemeInstallUrl( state, selectedSite?.ID )
+	);
+	const assemblerCtaData = usePatternAssemblerCtaData();
 	const options = [];
 
 	useEffect( () => {
@@ -249,27 +382,28 @@ function Options( { isFSEActive, recordTracksEvent, searchTerm, translate, upsel
 	}, [ upsellCardDisplayed ] );
 
 	// Design your own theme / homepage.
-	if ( isLoggedInShowcase ) {
-		// This should start the Pattern Assembler ideally, but it's not ready yet for the
-		// logged-in showcase, so we use the site editor as a fallback.
-		if ( isFSEActive ) {
-			options.push( {
-				title: translate( 'Design your own' ),
-				icon: addTemplate,
-				description: translate( 'Jump right into the editor to design your homepage.' ),
-				onClick: () =>
-					recordTracksEvent( 'calypso_themeshowcase_more_options_design_homepage_click', {
-						site_plan: sitePlan,
-						search_term: searchTerm,
-						destination: 'site-editor',
-					} ),
-				url: siteEditorUrl,
-				buttonText: translate( 'Open the editor' ),
-			} );
-		}
+	if ( ( isFSEActive || assemblerCtaData.shouldGoToAssemblerStep ) && isSiteAssemblerEnabled ) {
+		options.push( {
+			title: assemblerCtaData.title,
+			icon: addTemplate,
+			description: assemblerCtaData.subtitle,
+			onClick: () =>
+				recordTracksEvent( 'calypso_themeshowcase_more_options_design_homepage_click', {
+					site_plan: sitePlan,
+					search_term: searchTerm,
+					destination: assemblerCtaData.shouldGoToAssemblerStep ? 'assembler' : 'site-editor',
+				} ),
+			url: getSiteAssemblerUrl( {
+				isLoggedIn,
+				selectedSite,
+				shouldGoToAssemblerStep: assemblerCtaData.shouldGoToAssemblerStep,
+				siteEditorUrl,
+			} ),
+			buttonText: assemblerCtaData.buttonText,
+		} );
 	} else {
 		// This should also start the Pattern Assembler, which is currently in development for
-		// the logged-out showcase. Since there isn't any proper fallback for the meantime, we
+		// the logged-out showcase on mobile viewport. Since there isn't any proper fallback for the meantime, we
 		// just don't include this option.
 	}
 
@@ -288,19 +422,20 @@ function Options( { isFSEActive, recordTracksEvent, searchTerm, translate, upsel
 				site_plan: sitePlan,
 				search_term: searchTerm,
 			} );
-			window.location.replace( 'https://wordpress.com/built-by/?ref=no-themes' );
+			window.location.replace( 'https://wordpress.com/website-design-service/?ref=no-themes' );
 		},
-		url: 'https://wordpress.com/built-by/?ref=no-themes',
+		url: 'https://wordpress.com/website-design-service/?ref=no-themes',
 		buttonText: translate( 'Hire an expert' ),
 	} );
 
 	// Upload a theme.
-	if ( ! isLoggedInShowcase ) {
+	if ( ! isLoggedIn || ! selectedSite ) {
 		options.push( {
 			title: translate( 'Upload a theme' ),
 			icon: cloudUpload,
 			description: translate(
-				'With a Business plan, you can upload and install third-party themes, including your own themes.'
+				'With a %(businessPlanName)s plan, you can upload and install third-party themes, including your own themes.',
+				{ args: { businessPlanName: getPlan( PLAN_BUSINESS )?.getTitle() } }
 			),
 			onClick: () =>
 				recordTracksEvent( 'calypso_themeshowcase_more_options_upload_theme_click', {
@@ -324,9 +459,7 @@ function Options( { isFSEActive, recordTracksEvent, searchTerm, translate, upsel
 					search_term: searchTerm,
 					destination: 'upload-theme',
 				} ),
-			url: isAtomic
-				? `https://${ selectedSite.slug }/wp-admin/theme-install.php`
-				: `/themes/upload/${ selectedSite.slug }`,
+			url: isAtomic ? siteThemeInstallUrl : `/themes/upload/${ selectedSite.slug }`,
 			buttonText: translate( 'Upload theme' ),
 		} );
 	} else {
@@ -334,7 +467,8 @@ function Options( { isFSEActive, recordTracksEvent, searchTerm, translate, upsel
 			title: translate( 'Upload a theme' ),
 			icon: cloudUpload,
 			description: translate(
-				'With a Business plan, you can upload and install third-party themes, including your own themes.'
+				'With a %(businessPlanName)s plan, you can upload and install third-party themes, including your own themes.',
+				{ args: { businessPlanName: getPlan( PLAN_BUSINESS )?.getTitle() } }
 			),
 			onClick: () =>
 				recordTracksEvent( 'calypso_themeshowcase_more_options_upload_theme_click', {
@@ -390,6 +524,7 @@ function Empty( props ) {
 				searchTerm={ props.searchTerm }
 				translate={ props.translate }
 				upsellCardDisplayed={ props.upsellCardDisplayed }
+				isSiteAssemblerEnabled={ props.isSiteAssemblerEnabled }
 			/>
 		</>
 	);
@@ -401,15 +536,23 @@ function LoadingPlaceholders( { placeholderCount } ) {
 			<Theme
 				key={ 'placeholder-' + i }
 				theme={ { id: 'placeholder-' + i, name: 'Loading…' } }
-				isPlaceholder={ true }
+				isPlaceholder
 			/>
 		);
 	} );
 }
 
-const mapStateToProps = ( state ) => ( {
-	themesBookmark: getThemesBookmark( state ),
-} );
+const mapStateToProps = ( state, { siteId } ) => {
+	return {
+		themesBookmark: getThemesBookmark( state ),
+		siteSlug: getSiteSlug( state, siteId ),
+		isSiteWooExpressOrEcomFreeTrial:
+			isSiteOnECommerceTrial( state, siteId ) || isSiteOnWooExpress( state, siteId ),
+		isWooCYSEligibleSite: isWooCYSEligibleSite( state, siteId ),
+		isDefaultWooExpressThemeActive: isDefaultWooExpressThemeActive( state, siteId ),
+		siteAdminUrl: getSiteAdminUrl( state, siteId ),
+	};
+};
 
 const mapDispatchToProps = {
 	upsellCardDisplayed: upsellCardDisplayedAction,

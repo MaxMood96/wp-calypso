@@ -31,7 +31,6 @@ class ReaderCombinedCardComponent extends Component {
 		site: PropTypes.object,
 		feed: PropTypes.object,
 		onClick: PropTypes.func,
-		isDiscover: PropTypes.bool,
 		postKey: PropTypes.object.isRequired,
 		selectedPostKey: PropTypes.object,
 		showFollowButton: PropTypes.bool,
@@ -42,7 +41,6 @@ class ReaderCombinedCardComponent extends Component {
 	};
 
 	static defaultProps = {
-		isDiscover: false,
 		showFollowButton: false,
 		blockedSites: [],
 	};
@@ -81,7 +79,6 @@ class ReaderCombinedCardComponent extends Component {
 			postKey,
 			selectedPostKey,
 			onClick,
-			isDiscover,
 			blockedSites,
 			translate,
 			hasOrganization,
@@ -112,9 +109,9 @@ class ReaderCombinedCardComponent extends Component {
 						siteIcon={ siteIcon }
 						feedIcon={ feedIcon }
 						author={ null }
-						preferGravatar={ true }
+						preferGravatar
 						siteUrl={ streamUrl }
-						isCompact={ true }
+						isCompact
 					/>
 					<div className="reader-combined-card__header-details">
 						<ReaderSiteStreamLink
@@ -145,7 +142,6 @@ class ReaderCombinedCardComponent extends Component {
 							postKey={ postKeys[ i ] }
 							streamUrl={ streamUrl }
 							onClick={ onClick }
-							isDiscover={ isDiscover }
 							isSelected={ isSelectedPost( post ) }
 							showFeaturedAsset={ mediaCount > 0 }
 							hasOrganization={ hasOrganization }
@@ -156,11 +152,11 @@ class ReaderCombinedCardComponent extends Component {
 				<div className="reader-combined-card__footer">
 					<ReaderPostOptionsMenu
 						className="reader-combined-card__options-menu ignore-click"
-						showFollow={ true }
+						showFollow
 						showConversationFollow={ false }
 						showVisitPost={ false }
 						showEditPost={ false }
-						showReportSite={ true }
+						showReportSite
 						showReportPost={ false }
 						post={ posts[ 0 ] }
 						posts={ posts }

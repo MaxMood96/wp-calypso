@@ -1,21 +1,51 @@
+import { Badge, Button } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
 import { useSelector } from 'react-redux';
-import Badge from 'calypso/components/badge';
 import { useLocalizedMoment } from 'calypso/components/localized-moment';
+import {
+	useMarketplaceReviewsQuery,
+	useMarketplaceReviewsStatsQuery,
+} from 'calypso/data/marketplace/use-marketplace-reviews';
 import { formatNumberMetric } from 'calypso/lib/format-number-compact';
 import { preventWidows } from 'calypso/lib/formatting';
 import PluginIcon from 'calypso/my-sites/plugins/plugin-icon/plugin-icon';
 import PluginRatings from 'calypso/my-sites/plugins/plugin-ratings/';
 import { useLocalizedPlugins } from 'calypso/my-sites/plugins/utils';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
+import usePluginVersionInfo from '../plugin-management-v2/hooks/use-plugin-version-info';
+
 import './style.scss';
 
-const PluginDetailsHeader = ( { plugin, isPlaceholder, isJetpackCloud } ) => {
+const PluginDetailsHeader = ( {
+	plugin,
+	isPlaceholder,
+	isJetpackCloud,
+	onReviewsClick = () => {},
+	isMarketplaceProduct,
+} ) => {
 	const moment = useLocalizedMoment();
 	const translate = useTranslate();
 	const { localizePath } = useLocalizedPlugins();
 
 	const selectedSite = useSelector( getSelectedSite );
+
+	const { currentVersionsRange } = usePluginVersionInfo( plugin, selectedSite?.ID );
+
+	const { data: reviewsStats } = useMarketplaceReviewsStatsQuery( {
+		productType: 'plugin',
+		slug: plugin.slug,
+	} );
+
+	const { data: marketplaceReviews } = useMarketplaceReviewsQuery( {
+		productType: 'plugin',
+		slug: plugin.slug,
+	} );
+	const numberOfReviews = marketplaceReviews?.length || 0;
+
+	// Rating can be a valid number, 0 or null, discard undefined for easier comparison
+	const rating = isMarketplaceProduct
+		? ( reviewsStats?.ratings_average * 100 ) / 5 ?? 0
+		: plugin.rating ?? null;
 
 	if ( isPlaceholder ) {
 		return <PluginDetailsHeaderPlaceholder />;
@@ -58,11 +88,28 @@ const PluginDetailsHeader = ( { plugin, isPlaceholder, isJetpackCloud } ) => {
 				{ preventWidows( plugin.short_description || plugin.description ) }
 			</div>
 			<div className="plugin-details-header__additional-info">
-				{ !! plugin.rating && (
+				{ /* We want to accept rating 0, which means no rating for Marketplace products */ }
+				{ rating !== null && (
 					<div className="plugin-details-header__info">
 						<div className="plugin-details-header__info-title">{ translate( 'Ratings' ) }</div>
 						<div className="plugin-details-header__info-value">
-							<PluginRatings rating={ plugin.rating } />
+							<PluginRatings rating={ rating } />
+							{ ( numberOfReviews > 0 || isMarketplaceProduct ) && (
+								<Button
+									borderless
+									className="plugin-details-header__number-reviews-link is-link"
+									onClick={ onReviewsClick }
+								>
+									{ numberOfReviews > 0 &&
+										translate( '%(numberOfReviews)d review', '%(numberOfReviews)d reviews', {
+											count: numberOfReviews,
+											args: {
+												numberOfReviews,
+											},
+										} ) }
+									{ isMarketplaceProduct && numberOfReviews === 0 && translate( 'Write a review' ) }
+								</Button>
+							) }
 						</div>
 					</div>
 				) }
@@ -74,7 +121,11 @@ const PluginDetailsHeader = ( { plugin, isPlaceholder, isJetpackCloud } ) => {
 				</div>
 				<div className="plugin-details-header__info">
 					<div className="plugin-details-header__info-title">{ translate( 'Version' ) }</div>
-					<div className="plugin-details-header__info-value">{ plugin.version }</div>
+					<div className="plugin-details-header__info-value">
+						{ /* Show the default version if plugin is not installed */ }
+						{ currentVersionsRange?.min || plugin.version }
+						{ currentVersionsRange?.max && ` - ${ currentVersionsRange.max }` }
+					</div>
 				</div>
 				{ Boolean( plugin.active_installs ) && (
 					<div className="plugin-details-header__info">

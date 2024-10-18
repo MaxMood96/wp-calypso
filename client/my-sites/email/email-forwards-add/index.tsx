@@ -1,8 +1,7 @@
+import page from '@automattic/calypso-router';
 import { Button, Card } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import { useCallback } from 'react';
-import { useSelector } from 'react-redux';
 import DocumentHead from 'calypso/components/data/document-head';
 import QueryProductsList from 'calypso/components/data/query-products-list';
 import QuerySiteDomains from 'calypso/components/data/query-site-domains';
@@ -12,9 +11,10 @@ import SectionHeader from 'calypso/components/section-header';
 import EmailForwardingAddNewCompactList from 'calypso/my-sites/email/email-forwarding/email-forwarding-add-new-compact-list';
 import EmailHeader from 'calypso/my-sites/email/email-header';
 import {
-	emailManagement,
-	emailManagementPurchaseNewEmailAccount,
+	getEmailManagementPath,
+	getPurchaseNewEmailAccountPath,
 } from 'calypso/my-sites/email/paths';
+import { useSelector } from 'calypso/state';
 import getCurrentRoute from 'calypso/state/selectors/get-current-route';
 import {
 	hasLoadedSiteDomains,
@@ -52,17 +52,11 @@ const EmailForwardsAdd = ( { selectedDomainName, source }: EmailForwardsAddProps
 		}
 
 		if ( source === 'purchase' ) {
-			page(
-				emailManagementPurchaseNewEmailAccount(
-					selectedSite.slug,
-					selectedDomainName,
-					currentRoute
-				)
-			);
+			page( getPurchaseNewEmailAccountPath( selectedSite.slug, selectedDomainName, currentRoute ) );
 			return;
 		}
 
-		page( emailManagement( selectedSite.slug, selectedDomainName, currentRoute ) );
+		page( getEmailManagementPath( selectedSite.slug, selectedDomainName, currentRoute ) );
 	}, [ currentRoute, selectedDomainName, selectedSite, source ] );
 
 	const onAddedEmailForwards = useCallback( () => {
@@ -70,7 +64,7 @@ const EmailForwardsAdd = ( { selectedDomainName, source }: EmailForwardsAddProps
 			return;
 		}
 
-		page( emailManagement( selectedSite.slug, selectedDomainName, currentRoute ) );
+		page( getEmailManagementPath( selectedSite.slug, selectedDomainName, currentRoute ) );
 	}, [ currentRoute, selectedDomainName, selectedSite ] );
 
 	return (
@@ -79,7 +73,7 @@ const EmailForwardsAdd = ( { selectedDomainName, source }: EmailForwardsAddProps
 
 			{ selectedSite && <QuerySiteDomains siteId={ selectedSite.ID } /> }
 
-			<Main wideLayout={ true }>
+			<Main wideLayout>
 				<DocumentHead title={ translate( 'Add New Email Forwards' ) } />
 
 				<EmailHeader />

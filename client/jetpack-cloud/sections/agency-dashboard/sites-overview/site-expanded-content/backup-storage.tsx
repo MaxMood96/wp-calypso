@@ -1,6 +1,5 @@
 import { Button, Gridicon } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
 import useGetDisplayDate from 'calypso/components/jetpack/daily-backup-status/use-get-display-date';
 import { useLocalizedMoment } from 'calypso/components/localized-moment';
 import useRewindableActivityLogQuery from 'calypso/data/activity-log/use-rewindable-activity-log-query';
@@ -8,10 +7,12 @@ import TextPlaceholder from 'calypso/jetpack-cloud/sections/partner-portal/text-
 import { isSuccessfulRealtimeBackup } from 'calypso/lib/jetpack/backup-utils';
 import useDateOffsetForSite from 'calypso/lib/jetpack/hooks/use-date-offset-for-site';
 import { urlToSlug } from 'calypso/lib/url';
+import { useSelector } from 'calypso/state';
+import { getCurrentPartner } from 'calypso/state/partner-portal/partner/selectors';
 import { isJetpackSiteMultiSite } from 'calypso/state/sites/selectors';
-import { useDashboardAddRemoveLicense } from '../../hooks';
-import { DASHBOARD_LICENSE_TYPES, getExtractedBackupTitle } from '../utils';
 import ExpandedCard from './expanded-card';
+import useDashboardAddRemoveLicense from './hooks/use-dashboard-add-remove-license';
+import useExtractedBackupTitle from './hooks/use-extracted-backup-title';
 import type { Site, Backup } from '../types';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { Moment } from 'moment';
@@ -27,11 +28,13 @@ const BACKUP_ERROR_STATUSES = [ 'rewind_backup_error', 'backup_only_error' ];
 const BackupStorageContent = ( {
 	siteId,
 	siteUrl,
+	isAtomicSite,
 	trackEvent,
 }: {
 	siteId: number;
 	siteUrl: string;
 	trackEvent: ( eventName: string ) => void;
+	isAtomicSite?: boolean;
 } ) => {
 	const translate = useTranslate();
 
@@ -65,9 +68,11 @@ const BackupStorageContent = ( {
 
 	// Show plugin name only if it is a activity from a plugin
 	const pluginName =
-		backup?.activityName.startsWith( 'plugin__' ) && backup.activityDescription[ 0 ]?.children[ 0 ];
+		backup?.activityName.startsWith( 'plugin__' ) &&
+		backup.activityDescription?.[ 0 ]?.children?.[ 0 ];
 
 	const showLoader = isLoading || ! backup;
+	const extractedBackupTitle = useExtractedBackupTitle( backup );
 
 	return (
 		<div className="site-expanded-content__card-content-container">
@@ -81,7 +86,7 @@ const BackupStorageContent = ( {
 							<TextPlaceholder />
 						) : (
 							<>
-								{ getExtractedBackupTitle( backup ) }
+								{ extractedBackupTitle }
 								{ pluginName ? ` - ${ pluginName }` : '' }
 							</>
 						) }
@@ -91,11 +96,16 @@ const BackupStorageContent = ( {
 			<div className="site-expanded-content__card-footer">
 				<Button
 					onClick={ () => trackEvent( 'expandable_block_activity_log_click' ) }
-					href={ `/activity-log/${ siteUrl }` }
+					href={
+						isAtomicSite
+							? `https://wordpress.com/activity-log/${ urlToSlug( siteUrl ) }`
+							: `/activity-log/${ urlToSlug( siteUrl ) }`
+					}
+					target={ isAtomicSite ? '_blank' : undefined }
 					className="site-expanded-content__card-button"
 					compact
 				>
-					{ translate( 'Activity log' ) }
+					{ translate( 'Activity log' ) } { isAtomicSite && <Gridicon icon="external" /> }
 				</Button>
 			</div>
 		</div>
@@ -112,6 +122,9 @@ export default function BackupStorage( { site, trackEvent, hasError }: Props ) {
 
 	const translate = useTranslate();
 
+	const partner = useSelector( getCurrentPartner );
+	const partnerCanIssueLicense = Boolean( partner?.can_issue_licenses );
+
 	const hasBackupError = BACKUP_ERROR_STATUSES.includes( backupStatus );
 
 	const components = {
@@ -126,7 +139,7 @@ export default function BackupStorage( { site, trackEvent, hasError }: Props ) {
 
 	const { isLicenseSelected, handleAddLicenseAction } = useDashboardAddRemoveLicense(
 		siteId,
-		DASHBOARD_LICENSE_TYPES.BACKUP
+		'backup'
 	);
 
 	const addBackupText = isLicenseSelected ? (
@@ -173,6 +186,11 @@ export default function BackupStorage( { site, trackEvent, hasError }: Props ) {
 		);
 	}
 
+	// If the user cannot issue licenses, and doesn't already have one, we have nothing to show
+	if ( ! isLicenseSelected && ! partnerCanIssueLicense ) {
+		return null;
+	}
+
 	return (
 		<ExpandedCard
 			header={ translate( 'Latest backup' ) }
@@ -193,6 +211,7 @@ export default function BackupStorage( { site, trackEvent, hasError }: Props ) {
 				<BackupStorageContent
 					siteId={ site.blog_id }
 					siteUrl={ site.url }
+					isAtomicSite={ site.is_atomic }
 					trackEvent={ trackEvent }
 				/>
 			) }

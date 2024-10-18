@@ -1,152 +1,173 @@
-import { Button } from '@automattic/components';
+import { NavigatorHeader, NavigatorItem, NavigatorItemGroup } from '@automattic/onboarding';
 import {
-	__experimentalHStack as HStack,
+	Button,
+	__experimentalVStack as VStack,
 	__experimentalUseNavigator as useNavigator,
 } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
-import { focus } from '@wordpress/dom';
-import { header, footer, layout, color, typography } from '@wordpress/icons';
+import { header, footer } from '@wordpress/icons';
 import { useTranslate } from 'i18n-calypso';
-import { useState, useEffect, useRef } from 'react';
-import { ONBOARD_STORE } from 'calypso/landing/stepper/stores';
+import { useEffect } from 'react';
+import { INITIAL_CATEGORY, NAVIGATOR_PATHS } from './constants';
 import { PATTERN_ASSEMBLER_EVENTS } from './events';
-import { NavigationButtonAsItem } from './navigator-buttons';
-import NavigatorHeader from './navigator-header';
-import { NavigatorItemGroup } from './navigator-item-group';
-import type { OnboardSelect } from '@automattic/data-stores';
-import type { MouseEvent } from 'react';
+import { useScreen, usePatternCountMapByCategory } from './hooks';
+import NavigatorTitle from './navigator-title';
+import PatternCategoryList from './pattern-category-list';
+import PatternCount from './pattern-count';
+import { Category, Pattern, PatternType } from './types';
 
 interface Props {
-	onSelect: ( name: string ) => void;
-	onContinueClick: ( callback?: () => void ) => void;
+	onMainItemSelect: ( name: string ) => void;
+	onPreselectPattern: ( type: PatternType, selectedPattern: Pattern ) => void;
+	hasHeader: boolean;
+	hasFooter: boolean;
+	sections: Pattern[];
+	categories: Category[];
+	patternsMapByCategory: Record< string, Pattern[] >;
+	onContinueClick: () => void;
 	recordTracksEvent: ( name: string, eventProperties?: any ) => void;
 }
 
-const ScreenMain = ( { onSelect, onContinueClick, recordTracksEvent }: Props ) => {
+const ScreenMain = ( {
+	onMainItemSelect,
+	onPreselectPattern,
+	hasHeader,
+	hasFooter,
+	sections,
+	categories,
+	patternsMapByCategory,
+	onContinueClick,
+	recordTracksEvent,
+}: Props ) => {
 	const translate = useTranslate();
-	const [ disabled, setDisabled ] = useState( true );
-	const wrapperRef = useRef< HTMLDivElement | null >( null );
-	const { location } = useNavigator();
-	const isInitialLocation = location.isInitial && ! location.isBack;
-	const selectedDesign = useSelect(
-		( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getSelectedDesign(),
-		[]
-	);
+	const { title, description, continueLabel } = useScreen( 'main' );
+	const { location, params, goTo } = useNavigator();
+	const patternCountMapByCategory = usePatternCountMapByCategory( sections );
+	const selectedCategory = params.categorySlug as string;
+	const totalPatternCount = Number( hasHeader ) + sections.length + Number( hasFooter );
+	const isButtonDisabled = totalPatternCount === 0;
 
-	const headerDescription = selectedDesign?.is_virtual
-		? translate( 'Customize your homepage with our library of styles and patterns.' )
-		: translate( 'Use our library of styles and patterns to build a homepage.' );
+	const handlePreselectCategory = ( category: string ) => {
+		goTo( `${ NAVIGATOR_PATHS.MAIN }/${ category }`, { replace: true } );
+	};
 
-	// Use the mousedown event to prevent either the button focusing or text selection
-	const handleMouseDown = ( event: MouseEvent< HTMLButtonElement > ) => {
-		if ( disabled ) {
-			event.preventDefault();
-			recordTracksEvent( PATTERN_ASSEMBLER_EVENTS.CONTINUE_MISCLICK );
+	const handleSelectCategory = ( category: string, type: PatternType = 'section' ) => {
+		const basePath = NAVIGATOR_PATHS.MAIN;
+		const isBack = category === selectedCategory;
+		const nextPath = ! isBack ? `${ basePath }/${ category }` : basePath;
+		goTo( nextPath, { replace: true } );
+
+		if ( ! isBack ) {
+			recordTracksEvent( PATTERN_ASSEMBLER_EVENTS.CATEGORY_LIST_CATEGORY_CLICK, {
+				pattern_category: category,
+			} );
+
+			if ( type !== 'section' ) {
+				onMainItemSelect( type );
+			}
 		}
 	};
 
-	const handleClick = () => {
-		if ( ! disabled ) {
-			onContinueClick();
-		}
-	};
-
-	// Set a delay to enable the Continue button since the user might mis-click easily when they go back from another screen
+	// On the first Assembler flow load, instead of starting with a blank page,
+	// we insert a default header pattern and footer pattern, and then pre-select the first pattern category.
+	//
+	// This is done by doing all the above in a React effect when there is no selected pattern category,
+	// which happens on the first load of the Assembler flow.
 	useEffect( () => {
-		const timeoutId = window.setTimeout( () => setDisabled( false ), 300 );
-		return () => {
-			window.clearTimeout( timeoutId );
-		};
-	}, [] );
-
-	useEffect( () => {
-		if ( ! isInitialLocation || ! wrapperRef.current ) {
-			return;
+		if ( ! selectedCategory ) {
+			if ( ! hasHeader && patternsMapByCategory.header?.length > 0 ) {
+				onPreselectPattern( 'header', patternsMapByCategory.header[ 0 ] );
+			}
+			if ( ! hasFooter && patternsMapByCategory.footer?.length > 0 ) {
+				onPreselectPattern( 'footer', patternsMapByCategory.footer[ 0 ] );
+			}
+			if ( hasHeader && hasFooter ) {
+				handlePreselectCategory( INITIAL_CATEGORY );
+			}
 		}
-
-		const activeElement = wrapperRef.current.ownerDocument.activeElement;
-		if ( wrapperRef.current.contains( activeElement ) ) {
-			return;
-		}
-
-		const firstTabbable = ( focus.tabbable.find( wrapperRef.current ) as HTMLElement[] )[ 0 ];
-		const elementToFocus = firstTabbable ?? wrapperRef.current;
-		elementToFocus.focus();
-	}, [ isInitialLocation ] );
+	}, [
+		hasHeader,
+		hasFooter,
+		patternsMapByCategory.header?.length,
+		patternsMapByCategory.footer?.length,
+	] );
 
 	return (
 		<>
 			<NavigatorHeader
-				title={ translate( 'Design your own' ) }
-				description={ headerDescription }
+				title={ <NavigatorTitle title={ title } /> }
+				description={ description }
 				hideBack
 			/>
-			<div
-				className="screen-container__body screen-container__body--align-sides"
-				ref={ wrapperRef }
-			>
-				<HStack direction="column" alignment="top" spacing="4">
-					<NavigatorItemGroup title={ translate( 'Layout' ) }>
-						<NavigationButtonAsItem
-							path="/header"
+			<div className="screen-container__body">
+				<VStack spacing="4">
+					<NavigatorItemGroup title={ translate( 'Patterns' ) }>
+						<NavigatorItem
 							icon={ header }
 							aria-label={ translate( 'Header' ) }
-							onClick={ () => onSelect( 'header' ) }
+							onClick={ () => handleSelectCategory( 'header', 'header' ) }
+							active={ location.path === NAVIGATOR_PATHS.MAIN_HEADER }
 						>
-							<span className="pattern-layout__list-item-text">{ translate( 'Header' ) }</span>
-						</NavigationButtonAsItem>
-						<NavigationButtonAsItem
-							path="/section"
-							icon={ layout }
-							aria-label={ translate( 'Homepage' ) }
-							onClick={ () => onSelect( 'section' ) }
-						>
-							<span className="pattern-layout__list-item-text">{ translate( 'Homepage' ) }</span>
-						</NavigationButtonAsItem>
-						<NavigationButtonAsItem
-							path="/footer"
+							<>
+								{ translate( 'Header' ) }
+								<PatternCount count={ Number( hasHeader ) } />
+							</>
+						</NavigatorItem>
+
+						<VStack spacing="4">
+							<PatternCategoryList
+								categories={ categories }
+								patternsMapByCategory={ patternsMapByCategory }
+								patternCountMapByCategory={ patternCountMapByCategory }
+								selectedCategory={ selectedCategory }
+								onSelectCategory={ handleSelectCategory }
+							/>
+						</VStack>
+
+						<NavigatorItem
 							icon={ footer }
 							aria-label={ translate( 'Footer' ) }
-							onClick={ () => onSelect( 'footer' ) }
+							onClick={ () => handleSelectCategory( 'footer', 'footer' ) }
+							active={ location.path === NAVIGATOR_PATHS.MAIN_FOOTER }
 						>
-							<span className="pattern-layout__list-item-text">{ translate( 'Footer' ) }</span>
-						</NavigationButtonAsItem>
+							<>
+								{ translate( 'Footer' ) }
+								<PatternCount count={ Number( hasFooter ) } />
+							</>
+						</NavigatorItem>
 					</NavigatorItemGroup>
-					<NavigatorItemGroup title={ translate( 'Style' ) }>
-						<>
-							<NavigationButtonAsItem
-								path="/color-palettes"
-								icon={ color }
-								aria-label={ translate( 'Colors' ) }
-								onClick={ () => onSelect( 'color-palettes' ) }
-							>
-								<span className="pattern-layout__list-item-text">{ translate( 'Colors' ) }</span>
-							</NavigationButtonAsItem>
-							<NavigationButtonAsItem
-								path="/font-pairings"
-								icon={ typography }
-								aria-label={ translate( 'Fonts' ) }
-								onClick={ () => onSelect( 'font-pairings' ) }
-							>
-								<span className="pattern-layout__list-item-text">{ translate( 'Fonts' ) }</span>
-							</NavigationButtonAsItem>
-						</>
-					</NavigatorItemGroup>
-				</HStack>
+				</VStack>
 			</div>
 			<div className="screen-container__footer">
-				<span className="screen-container__description">
-					{ translate( 'Ready? Go to the Site Editor to continue editing.' ) }
+				<span className="screen-container__footer-description">
+					{ totalPatternCount > 0 &&
+						translate(
+							'You’ve selected {{strong}}%(count)s{{/strong}} pattern.',
+							'You’ve selected {{strong}}%(count)s{{/strong}} patterns.',
+							{
+								count: totalPatternCount,
+								args: {
+									count: totalPatternCount,
+								},
+								components: {
+									strong: <strong />,
+								},
+							}
+						) }
 				</span>
 				<Button
 					className="pattern-assembler__button"
-					primary
-					aria-disabled={ disabled }
-					onMouseDown={ handleMouseDown }
-					onClick={ handleClick }
-				>
-					{ translate( 'Continue' ) }
-				</Button>
+					disabled={ isButtonDisabled }
+					showTooltip={ isButtonDisabled }
+					onClick={ onContinueClick }
+					label={
+						isButtonDisabled
+							? translate( 'Select your first pattern to get started.' )
+							: continueLabel
+					}
+					variant="primary"
+					text={ continueLabel }
+					__experimentalIsFocusable
+				/>
 			</div>
 		</>
 	);

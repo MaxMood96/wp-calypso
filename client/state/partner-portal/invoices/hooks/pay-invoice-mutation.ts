@@ -5,8 +5,8 @@ import {
 	useQueryClient,
 } from '@tanstack/react-query';
 import { sprintf, __ } from '@wordpress/i18n';
-import { useDispatch, useSelector } from 'react-redux';
 import { wpcomJetpackLicensing as wpcomJpl } from 'calypso/lib/wp';
+import { useDispatch, useSelector } from 'calypso/state';
 import { errorNotice, successNotice } from 'calypso/state/notices/actions';
 import { getActivePartnerKeyId } from 'calypso/state/partner-portal/partner/selectors';
 import type { APIInvoice, APIInvoices } from 'calypso/state/partner-portal/types';
@@ -32,11 +32,9 @@ export default function usePayInvoiceMutation< TContext = unknown >(
 	return useMutation< APIInvoice, Error, PayInvoiceMutationVariables, TContext >( {
 		mutationFn: payInvoiceMutation,
 		onSuccess: ( invoice: APIInvoice ) => {
-			const invoicePages = queryClient.getQueriesData( [
-				'partner-portal',
-				'invoices',
-				activeKeyId,
-			] );
+			const invoicePages = queryClient.getQueriesData( {
+				queryKey: [ 'partner-portal', 'invoices', activeKeyId ],
+			} );
 
 			invoicePages.forEach( ( query ) => {
 				const data = query[ 1 ] as APIInvoices;

@@ -1,25 +1,34 @@
 @import "@automattic/onboarding/styles/mixins";
 
 $theme-sheet-content-max-width: 1462px;
+$button-border: 4px;
 
 .is-section-theme {
+	// overwrite notices z-index so they are visible on top of the theme preview
+	.global-notices {
+		// This should be - z-index: z-index("root", ".is-section-theme .global-notices")
+		// but the @automattic/onboarding/styles/mixins import overwrites the z-index function on client/assets/stylesheets/shared/functions/_z-index.scss
+		z-index: 100201;
+	}
+
 	&.theme-default.color-scheme {
 		--color-surface-backdrop: var(--studio-white);
 	}
 
-	.layout:not(.has-no-sidebar) .layout__content {
+	.layout.is-logged-in .layout__content {
 		overflow: clip;
-		padding-top: var(--masterbar-height);
+		padding-top: 47px;
 
-		@include breakpoint-deprecated( "<960px" ) {
-			padding-left: 0;
-			padding-right: 0;
-		}
-
+		.theme__sheet-screenshot,
 		.theme__sheet-web-preview {
 			@include breakpoint-deprecated( ">960px" ) {
-				height: calc(100vh - 96px);
 				top: calc(var(--masterbar-height) + 16px);
+			}
+		}
+
+		.theme__sheet-web-preview .theme-preview__frame-wrapper {
+			@include breakpoint-deprecated( ">960px" ) {
+				max-height: calc(100vh - 32px - var(--masterbar-height));
 			}
 		}
 	}
@@ -32,6 +41,37 @@ $theme-sheet-content-max-width: 1462px;
 
 	.empty-content {
 		margin-bottom: 20px;
+	}
+
+	&.is-global-sidebar-visible {
+		background: var(--studio-gray-0);
+
+		.layout__content {
+			min-height: 100vh;
+			@media screen and (min-width: 782px) {
+				padding: calc(var(--masterbar-height) + var(--content-padding-top)) 16px var(--content-padding-bottom) var(--sidebar-width-max);
+			}
+		}
+
+		.layout__primary > * {
+			background-color: var(--color-surface);
+			border-radius: 8px; /* stylelint-disable-line scales/radii */
+			box-shadow: 0 0 17.4px 0 rgba(0, 0, 0, 0.05);
+			height: calc(100vh - var(--masterbar-height) - var(--content-padding-top) - var(--content-padding-bottom));
+			max-width: none;
+			overflow-y: auto;
+		}
+	}
+
+	.theme__sheet .navigation-header {
+		margin: 0 auto;
+		max-width: $theme-sheet-content-max-width;
+		padding: 24px 44px;
+
+		@media screen and (min-width: 960px) {
+			padding: 24px 20px;
+			box-sizing: initial;
+		}
 	}
 }
 
@@ -126,7 +166,8 @@ $theme-sheet-content-max-width: 1462px;
 		display: flex;
 		gap: 16px;
 		flex-direction: column;
-		padding: 0;
+		padding-top: 0;
+		padding-bottom: 0;
 
 		.theme__sheet-column-left {
 			padding: 0 24px;
@@ -135,6 +176,15 @@ $theme-sheet-content-max-width: 1462px;
 
 		.theme__sheet-column-right {
 			order: 1;
+		}
+	}
+
+	.theme__sheet-demo-button,
+	.theme__sheet-preview-demo-site {
+		svg {
+			vertical-align: text-bottom;
+			margin-left: 4px;
+			fill: currentColor;
 		}
 	}
 }
@@ -191,8 +241,8 @@ $theme-sheet-content-max-width: 1462px;
 			width: 100%;
 		}
 
-		button {
-			border-radius: 4px;
+		.button {
+			border-radius: $button-border;
 
 			@include breakpoint-deprecated( "<960px" ) {
 				width: 100%;
@@ -213,6 +263,12 @@ $theme-sheet-content-max-width: 1462px;
 		display: flex;
 		font-size: $font-title-large;
 		line-height: 1;
+	}
+
+	.theme__sheet-main-info-type {
+		flex-basis: unset;
+		font-family: $sans;
+		margin-left: 8px;
 	}
 
 	.theme__sheet-main-info-tag {
@@ -243,29 +299,6 @@ $theme-sheet-content-max-width: 1462px;
 
 .theme__sheet-column-right {
 	grid-area: preview;
-}
-
-.theme__sheet-action-bar-container {
-	box-shadow: 0 1px var(--color-border-subtle);
-}
-
-.theme__sheet-action-bar.card {
-	box-shadow: none;
-	box-sizing: content-box;
-	margin: 0 auto;
-	max-width: $theme-sheet-content-max-width;
-	min-height: 70px;
-	padding: 0 20px;
-	position: relative;
-
-	@include breakpoint-deprecated( "<960px" ) {
-		margin: 0 0 32px 0;
-		min-height: 60px;
-	}
-}
-
-.is-mobile-app-view .theme__sheet-action-bar.card {
-	display: none;
 }
 
 .theme__sheet-primary-button {
@@ -332,6 +365,57 @@ $theme-sheet-content-max-width: 1462px;
 	font-size: 90%; /* stylelint-disable-line declaration-property-unit-allowed-list */
 }
 
+.theme__sheet-web-preview {
+	$iframe-viewport-height: 1040px;
+	$iframe-viewport-height-scaled: calc($iframe-viewport-height / 2);
+	min-height: $iframe-viewport-height-scaled;
+
+	.theme-preview__frame-wrapper {
+		pointer-events: none;
+		@include breakpoint-deprecated( ">960px" ) {
+			max-height: calc(100vh - var(--masterbar-height));
+
+			.theme-preview__frame {
+				height: 200%;
+				max-height: 200vh;
+				max-width: 200%;
+				min-height: $iframe-viewport-height-scaled;
+				transform: scale(0.5) !important;
+				width: 200%;
+			}
+		}
+	}
+	&:hover,
+	&:focus {
+		.theme-preview__frame-wrapper {
+			opacity: 0.8;
+		}
+	}
+
+	.theme-preview__container {
+		position: relative;
+	}
+
+	.theme-preview__frame {
+		transform: none !important;
+	}
+}
+
+.theme__sheet-screenshot {
+	&:hover,
+	&:focus {
+		.theme__sheet-img {
+			opacity: 0.8;
+		}
+	}
+}
+
+@keyframes theme__sheet-preview-demo-site {
+	0% {
+		transform: translate(-50%, 10px);
+	}
+}
+
 .theme__sheet-web-preview,
 .theme__sheet-screenshot {
 	background-color: transparentize(rgb(255, 255, 255), 0.5);
@@ -347,15 +431,19 @@ $theme-sheet-content-max-width: 1462px;
 	width: 98%;
 	z-index: 1;
 
-	// with width: 98%, gives 4:3 ratio before the image loads
-	// also x-browser issues, so it's smaller than 4:3 proper
-	min-height: 36.15vw; // 36.75vw would be correct, but Safari is slightly off
+	&:hover,
+	&:focus {
+		.theme__sheet-preview-demo-site {
+			opacity: 1;
+			animation: theme__sheet-preview-demo-site 150ms ease-in-out;
+		}
+	}
 
 	@include breakpoint-deprecated( "<960px" ) {
 		border-radius: 0;
 		box-shadow: none;
 		position: relative;
-		height: 100vw; // force proportions
+		max-height: 100vw;
 		overflow: hidden;
 		margin-top: 0;
 		top: 0;
@@ -373,6 +461,10 @@ $theme-sheet-content-max-width: 1462px;
 	}
 
 	@include breakpoint-deprecated( ">960px" ) {
+		pointer-events: all;
+		position: sticky;
+		top: 16px;
+
 		&.is-active:hover {
 			cursor: pointer;
 			box-shadow:
@@ -382,21 +474,15 @@ $theme-sheet-content-max-width: 1462px;
 	}
 }
 
-.theme__sheet-web-preview {
-	pointer-events: none;
-
-	@include breakpoint-deprecated( ">960px" ) {
-		height: calc(100vh - 64px);
-		pointer-events: all;
-		position: sticky;
-		top: 16px;
-
-		.theme-preview__frame-wrapper .theme-preview__frame {
-			height: 200%;
-			max-width: 200%;
-			transform: scale(0.5) !important;
-			width: 200%;
-		}
+.theme__sheet-preview-demo-site {
+	opacity: 0;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	z-index: 1;
+	transform: translate(-50%, 0);
+	&.button {
+		border-radius: $button-border;
 	}
 }
 
@@ -444,10 +530,12 @@ $theme-sheet-content-max-width: 1462px;
 }
 
 .theme__sheet-content {
-	box-shadow: none;
-	font-size: 1rem;
-	min-height: auto;
-	padding: 0;
+	&.card {
+		box-shadow: none;
+		font-size: 1rem;
+		min-height: auto;
+		padding: 0;
+	}
 
 	div {
 		width: auto !important; // override inline style in content markup
@@ -629,7 +717,7 @@ $theme-sheet-content-max-width: 1462px;
 		display: inline-block;
 		position: relative;
 		background-color: var(--color-neutral-5);
-		border-radius: 4px;
+		border-radius: $button-border;
 		color: var(--color-neutral-80);
 		margin: 0;
 		padding: 2px 10px;
@@ -753,7 +841,7 @@ $theme-sheet-content-max-width: 1462px;
 	&.theme__page-upsell-banner {
 		background-color: #f0f7fc;
 		border: 0;
-		border-radius: 4px;
+		border-radius: $button-border;
 		box-shadow: none;
 		margin-bottom: 24px;
 		padding: 24px 30px;
@@ -774,5 +862,11 @@ $theme-sheet-content-max-width: 1462px;
 		width: 100%;
 		margin: 0;
 		text-decoration: none;
+	}
+}
+.theme__sheet-reviews-summary {
+
+	@include breakpoint-deprecated( "<960px" ) {
+		padding-left: 1.5rem;
 	}
 }

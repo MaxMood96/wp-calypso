@@ -1,6 +1,9 @@
+import { isEnabled } from '@automattic/calypso-config';
 import { Plans } from '@automattic/data-stores';
 import languages from '@automattic/languages';
+import { addQueryArgs } from '@wordpress/url';
 import { useMatch } from 'react-router-dom';
+import { useFlowLocale } from '../hooks/use-flow-locale';
 
 const plansPaths = Plans.plansSlugs;
 
@@ -41,3 +44,66 @@ export function useLangRouteParam() {
 	const match = useMatch( path );
 	return match?.params.lang;
 }
+
+export const getLoginUrl = ( {
+	variationName,
+	redirectTo,
+	pageTitle,
+	locale,
+	customLoginPath,
+	extra = {},
+}: {
+	/**
+	 * Variation name is used to track the relevant login flow in the signup framework as explained in https://github.com/Automattic/wp-calypso/issues/67173
+	 */
+	variationName?: string | null;
+	redirectTo?: string | null;
+	pageTitle?: string | null;
+	locale: string;
+	customLoginPath?: string | null;
+	extra?: Record< string, string | number >;
+} ): string => {
+	const defaultLoginPath = `/start/account/${
+		isEnabled( 'signup/social-first' ) ? 'user-social' : 'user'
+	}`;
+	const loginPath = customLoginPath || defaultLoginPath;
+	const localizedLoginPath = locale && locale !== 'en' ? `${ loginPath }/${ locale }` : loginPath;
+
+	// Empty values are ignored down the call stack, so we don't need to check for them here.
+	return addQueryArgs( localizedLoginPath, {
+		variationName,
+		redirect_to: redirectTo,
+		pageTitle,
+		toStepper: true,
+		...extra,
+	} );
+};
+
+export const useLoginUrl = ( {
+	variationName,
+	redirectTo,
+	pageTitle,
+	locale,
+	customLoginPath,
+	extra = {},
+}: {
+	/**
+	 * Variation name is used to track the relevant login flow in the signup framework as explained in https://github.com/Automattic/wp-calypso/issues/67173
+	 */
+	variationName?: string | null;
+	redirectTo?: string | null;
+	pageTitle?: string | null;
+	locale?: string;
+	customLoginPath?: string | null;
+	extra?: Record< string, string | number >;
+} ): string => {
+	const currentLocale = useFlowLocale();
+	return getLoginUrl( {
+		variationName,
+		redirectTo,
+		pageTitle,
+		locale: locale ?? currentLocale,
+		customLoginPath,
+		extra,
+	} );
+};

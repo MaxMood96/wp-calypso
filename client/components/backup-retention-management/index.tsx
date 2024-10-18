@@ -3,13 +3,14 @@ import { useEffect, useState, useCallback } from '@wordpress/element';
 import { removeQueryArgs } from '@wordpress/url';
 import { useTranslate } from 'i18n-calypso';
 import { FunctionComponent } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { useStorageText } from 'calypso/components/backup-storage-space/hooks';
 import { UpsellPrice } from 'calypso/components/backup-storage-space/usage-warning/upsell';
+import useUpsellInfo from 'calypso/components/backup-storage-space/usage-warning/use-upsell-slug';
 import QuerySiteProducts from 'calypso/components/data/query-site-products';
 import ExternalLink from 'calypso/components/external-link';
 import { addQueryArgs } from 'calypso/lib/route';
 import { buildCheckoutURL } from 'calypso/my-sites/plans/jetpack-plans/get-purchase-url-callback';
+import { useDispatch, useSelector } from 'calypso/state';
 import { JETPACK_BACKUP_RETENTION_UPDATE_RESET } from 'calypso/state/action-types';
 import { recordTracksEvent } from 'calypso/state/analytics/actions/record';
 import { updateBackupRetention } from 'calypso/state/rewind/retention/actions';
@@ -28,7 +29,6 @@ import InfoTooltip from './info-tooltip';
 import LoadingPlaceholder from './loading';
 import RetentionConfirmationDialog from './retention-confirmation-dialog';
 import RetentionOptionsControl from './retention-options/retention-options-control';
-import useUpsellInfo from './use-upsell-info';
 import type { RetentionOptionInput } from './types';
 import type { RetentionPeriod } from 'calypso/state/rewind/retention/types';
 import './style.scss';
@@ -110,9 +110,7 @@ const BackupRetentionManagement: FunctionComponent< OwnProps > = ( {
 	const siteSlug = useSelector( ( state ) => getSiteSlug( state, siteId ) ) as string;
 	const { upsellSlug, originalPrice, isPriceFetching, currencyCode } = useUpsellInfo(
 		siteId,
-		estimatedCurrentSiteSize,
-		retentionSelected,
-		storageLimitBytes
+		retentionSelected
 	);
 
 	const upgradePrice = (
@@ -183,7 +181,11 @@ const BackupRetentionManagement: FunctionComponent< OwnProps > = ( {
 	const [ confirmationDialogVisible, setConfirmationDialogVisible ] = useState( false );
 	const onClose = useCallback( () => {
 		setConfirmationDialogVisible( false );
-	}, [] );
+
+		dispatch(
+			recordTracksEvent( 'calypso_jetpack_backup_storage_retention_confirmation_cancel_click' )
+		);
+	}, [ dispatch ] );
 
 	const updateRetentionPeriod = useCallback( () => {
 		dispatch( updateBackupRetention( siteId, retentionSelected as RetentionPeriod ) );
@@ -275,6 +277,10 @@ const BackupRetentionManagement: FunctionComponent< OwnProps > = ( {
 		updateRetentionRequestStatus,
 	] );
 
+	useEffect( () => {
+		dispatch( recordTracksEvent( 'calypso_jetpack_backup_storage_retention_view' ) );
+	}, [ dispatch ] );
+
 	const updateSettingsButton = (
 		<Button primary onClick={ handleUpdateRetention } disabled={ disableFormSubmission }>
 			{ updateRetentionRequestStatus !== BACKUP_RETENTION_UPDATE_REQUEST.PENDING ? (
@@ -299,7 +305,7 @@ const BackupRetentionManagement: FunctionComponent< OwnProps > = ( {
 		( isFetching && <LoadingPlaceholder /> ) || (
 			<div className="backup-retention-management">
 				{ siteId && <QuerySiteProducts siteId={ siteId } /> }
-				<Card compact={ true } className="setting-title">
+				<Card compact className="setting-title">
 					<h3>{ translate( 'Days of backups saved' ) } </h3>
 					<InfoTooltip />
 				</Card>

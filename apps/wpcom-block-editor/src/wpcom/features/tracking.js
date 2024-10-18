@@ -1,3 +1,4 @@
+import { debounce } from '@wordpress/compose';
 import { use, select } from '@wordpress/data';
 import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
@@ -56,6 +57,13 @@ const SELECTORS = {
 	 * Legacy block inserter
 	 */
 	LEGACY_BLOCK_INSERTER: '.block-editor-inserter__block-list',
+
+	/**
+	 * Command Palette
+	 */
+	COMMAND_PALETTE_ROOT: '.commands-command-menu__container div[cmdk-root]',
+	COMMAND_PALETTE_INPUT: '.commands-command-menu__container input[cmdk-input]',
+	COMMAND_PALETTE_LIST: '.commands-command-menu__container div[cmdk-list]',
 };
 
 // Debugger.
@@ -69,7 +77,6 @@ let ignoreNextReplaceBlocksAction = false;
  * Global handler.
  * Use this function when you need to inspect the block
  * to get specific data and populate the record.
- *
  * @param {Object} block - Block object data.
  * @returns {Object} Record properties object.
  */
@@ -102,7 +109,6 @@ function globalEventPropsHandler( block ) {
 }
 /**
  * Looks up the block name based on its id.
- *
  * @param {string} blockId Block identifier.
  * @returns {string|null} Block name if it exists. Otherwise, `null`.
  */
@@ -113,7 +119,6 @@ const getTypeForBlockId = ( blockId ) => {
 
 /**
  * Guess which inserter was used to insert/replace blocks.
- *
  * @param {string[]|string} originalBlockIds ids or blocks that are being replaced
  * @returns {'header-inserter'|'slash-inserter'|'quick-inserter'|'block-switcher'|'payments-intro-block'|'patterns-explorer'|'pattern-selection-modal'|undefined} ID representing the insertion method that was used
  */
@@ -189,7 +194,6 @@ const getBlockInserterUsed = ( originalBlockIds = [] ) => {
 
 /**
  * Get the search term from the inserter.
- *
  * @param {string} inserter
  * @returns {string} The search term
  */
@@ -217,7 +221,6 @@ const getBlockInserterSearchTerm = ( inserter ) => {
 /**
  * Ensure you are working with block object. This either returns the object
  * or tries to lookup the block by id.
- *
  * @param {string | Object} block Block object or string identifier.
  * @returns {Object} block object or an empty object if not found.
  */
@@ -240,7 +243,6 @@ const ensureBlockObject = ( block ) => {
  *
  * Also, it adds default `inner_block`,
  * and `parent_block_client_id` (if parent exists) properties.
- *
  * @param {Array}    blocks            Block instances object or an array of such objects
  * @param {string}   eventName         Event name used to track.
  * @param {Function} propertiesHandler Callback function to populate event properties
@@ -283,7 +285,6 @@ function trackBlocksHandler( blocks, eventName, propertiesHandler = noop, parent
  *
  * This method tracks only blocks explicitly listed as a target of the action.
  * If you also want to track an event for all child blocks, use `trackBlocksHandler`.
- *
  * @see {@link trackBlocksHandler} for a recursive version.
  * @param {string} eventName event name
  * @returns {Function} track handler
@@ -326,7 +327,6 @@ const getBlocksTracker = ( eventName ) => ( blockIds, fromRootClientId, toRootCl
  * Determines whether a block pattern has been inserted and if so, records
  * a track event for it. The recorded event will also reflect whether the
  * inserted pattern replaced blocks.
- *
  * @param {Array} actionData Data supplied to block insertion or replacement tracking functions.
  * @param {Object} additionalData Additional information.
  * @returns {Object|null} The inserted pattern with its name and category if available.
@@ -334,10 +334,9 @@ const getBlocksTracker = ( eventName ) => ( blockIds, fromRootClientId, toRootCl
 const maybeTrackPatternInsertion = ( actionData, additionalData ) => {
 	const { rootClientId, blocks_replaced, insert_method, search_term } = additionalData;
 	const context = getBlockEventContextProperties( rootClientId );
-	const {
-		__experimentalBlockPatterns: patterns,
-		__experimentalBlockPatternCategories: patternCategories,
-	} = select( 'core/block-editor' ).getSettings();
+	const { __experimentalBlockPatternCategories: patternCategories } =
+		select( 'core/block-editor' ).getSettings();
+	const patterns = select( 'core/block-editor' ).__experimentalGetAllowedPatterns();
 
 	const meta = find( actionData, ( item ) => item?.patternName );
 	let patternName = meta?.patternName;
@@ -368,6 +367,7 @@ const maybeTrackPatternInsertion = ( actionData, additionalData ) => {
 			blocks_replaced,
 			insert_method,
 			search_term,
+			is_user_created: patternName?.startsWith( 'core/block/' ),
 			...context,
 		} );
 
@@ -382,7 +382,6 @@ const maybeTrackPatternInsertion = ( actionData, additionalData ) => {
 
 /**
  * Track block insertion.
- *
  * @param {Object | Array} blocks block instance object or an array of such objects
  * @param {Array} args additional insertBlocks data e.g. metadata containing pattern name.
  * @returns {void}
@@ -412,7 +411,6 @@ const trackBlockInsertion = ( blocks, ...args ) => {
 
 /**
  * Track block removal.
- *
  * @param {Object | Array} blocks block instance object or an array of such objects
  * @returns {void}
  */
@@ -429,7 +427,6 @@ const trackBlockRemoval = ( blocks ) => {
 
 /**
  * Track block replacement.
- *
  * @param {Array} originalBlockIds ids or blocks that are being replaced
  * @param {Object | Array} blocks block instance object or an array of such objects
  * @param {Array} args Additional data supplied to replaceBlocks action
@@ -468,7 +465,6 @@ const trackBlockReplacement = ( originalBlockIds, blocks, ...args ) => {
 /**
  * Track inner blocks replacement.
  * Page Templates insert their content into the page replacing everything that was already there.
- *
  * @param {Array} rootClientId id of parent block
  * @param {Object | Array} blocks block instance object or an array of such objects
  * @returns {void}
@@ -521,7 +517,6 @@ const trackInnerBlocksReplacement = ( rootClientId, blocks ) => {
 
 /**
  * Track update and publish action for Global Styles plugin.
- *
  * @param {string} eventName Name of the track event.
  * @returns {Function} tracker
  */
@@ -534,7 +529,6 @@ const trackGlobalStyles = ( eventName ) => ( options ) => {
 /**
  * Logs any error notice which is shown to the user so we can determine how often
  * folks see different errors and what types of sites they occur on.
- *
  * @param {string} content The error message. Like "Update failed."
  * @param {Object} options Optional. Extra data logged with the error in Gutenberg.
  */
@@ -598,7 +592,6 @@ const trackSaveEntityRecord = ( kind, name, record ) => {
 
 /**
  * Track list view open and close events.
- *
  * @param {boolean} isOpen new state of the list view
  */
 const trackListViewToggle = ( isOpen ) => {
@@ -694,7 +687,6 @@ const trackSiteEditorChangeContent = ( { type, slug } ) => {
 
 /**
  * Tracks editEntityRecord for global styles updates.
- *
  * @param {string} kind    Kind of the edited entity record.
  * @param {string} type    Name of the edited entity record.
  * @param {number} id      Record ID of the edited entity record.
@@ -739,7 +731,6 @@ const trackEditEntityRecord = ( kind, type, id, updates ) => {
 
 /**
  * Tracks saveEditedEntityRecord for saving various entities.
- *
  * @param {string} kind Kind of the edited entity record.
  * @param {string} type Name of the edited entity record.
  * @param {number} id   Record ID of the edited entity record.
@@ -786,7 +777,6 @@ const trackSaveEditedEntityRecord = ( kind, type, id ) => {
 /**
  * Tracks __experimentalSaveEditedEntityRecord for saving various entities. Currently this is only
  * expected to be triggered for site entity items like logo, description, and title.
- *
  * @param {string} kind Kind of the edited entity record.
  * @param {string} type Name of the edited entity record.
  * @param {number} id   Record ID of the edited entity record.
@@ -807,7 +797,6 @@ const trackSaveSpecifiedEntityEdits = ( kind, type, id, itemsToSave ) => {
 
 /**
  * Track block install.
- *
  * @param {Object} block block instance object
  * @returns {void}
  */
@@ -818,10 +807,75 @@ const trackInstallBlockType = ( block ) => {
 };
 
 /**
+ * Command Palette
+ */
+const trackCommandPaletteSearch = debounce( ( event ) => {
+	tracksRecordEvent( 'wpcom_editor_command_palette_search', {
+		keyword: event.target.value,
+	} );
+}, 500 );
+
+const trackCommandPaletteSelected = ( event ) => {
+	let selectedCommandElement;
+	if ( event.type === 'keydown' && event.code === 'Enter' ) {
+		selectedCommandElement = event.currentTarget.querySelector(
+			'div[cmdk-item][aria-selected="true"]'
+		);
+	} else if ( event.type === 'click' ) {
+		selectedCommandElement = event.target.closest( 'div[cmdk-item][aria-selected="true"]' );
+	}
+
+	if ( selectedCommandElement ) {
+		tracksRecordEvent( 'wpcom_editor_command_palette_selected', {
+			value: selectedCommandElement.dataset.value,
+		} );
+	}
+};
+
+const trackCommandPaletteOpen = () => {
+	tracksRecordEvent( 'wpcom_editor_command_palette_open' );
+
+	window.setTimeout( () => {
+		const commandPaletteInputElement = document.querySelector( SELECTORS.COMMAND_PALETTE_INPUT );
+		if ( commandPaletteInputElement ) {
+			commandPaletteInputElement.addEventListener( 'input', trackCommandPaletteSearch );
+		}
+
+		const commandPaletteListElement = document.querySelector( SELECTORS.COMMAND_PALETTE_LIST );
+		if ( commandPaletteListElement ) {
+			commandPaletteListElement.addEventListener( 'click', trackCommandPaletteSelected );
+		}
+
+		const commandPaletteRootElement = document.querySelector( SELECTORS.COMMAND_PALETTE_ROOT );
+		if ( commandPaletteRootElement ) {
+			commandPaletteRootElement.addEventListener( 'keydown', trackCommandPaletteSelected );
+		}
+	} );
+};
+
+const trackCommandPaletteClose = () => {
+	tracksRecordEvent( 'wpcom_editor_command_palette_close' );
+
+	const commandPaletteInputElement = document.querySelector( SELECTORS.COMMAND_PALETTE_INPUT );
+	if ( commandPaletteInputElement ) {
+		commandPaletteInputElement.removeEventListener( 'input', trackCommandPaletteSearch );
+	}
+
+	const commandPaletteListElement = document.querySelector( SELECTORS.COMMAND_PALETTE_LIST );
+	if ( commandPaletteListElement ) {
+		commandPaletteListElement.removeEventListener( 'click', trackCommandPaletteSelected );
+	}
+
+	const commandPaletteRootElement = document.querySelector( SELECTORS.COMMAND_PALETTE_ROOT );
+	if ( commandPaletteRootElement ) {
+		commandPaletteRootElement.removeEventListener( 'keydown', trackCommandPaletteSelected );
+	}
+};
+
+/**
  * Tracker can be
  * - string - which means it is an event name and should be tracked as such automatically
  * - function - in case you need to load additional properties from the action.
- *
  * @type {Object}
  */
 const REDUX_TRACKING = {
@@ -877,16 +931,23 @@ const REDUX_TRACKING = {
 		enableComplementaryArea: trackEnableComplementaryArea,
 		disableComplementaryArea: trackDisableComplementaryArea,
 	},
+	'core/commands': {
+		open: trackCommandPaletteOpen,
+		close: trackCommandPaletteClose,
+	},
 };
 
 /**
  * Mapping of Events by DOM selector.
  * Events are matched by selector and their handlers called.
- *
  * @type {Array}
  */
 const EVENT_TYPES = [ 'keyup', 'click' ];
 
+// Store original and rewritten redux actions locally so we can return the same references when
+// needed.
+const rewrittenActions = {};
+const originalActions = {};
 // Registering tracking handlers.
 if (
 	undefined === window ||
@@ -900,32 +961,47 @@ if (
 	use( ( registry ) => ( {
 		dispatch: ( namespace ) => {
 			const namespaceName = typeof namespace === 'object' ? namespace.name : namespace;
-			const actions = { ...registry.dispatch( namespaceName ) };
+			const actions = registry.dispatch( namespaceName );
 			const trackers = REDUX_TRACKING[ namespaceName ];
+
+			// Initialize namespace level objects if not yet done.
+			if ( ! rewrittenActions[ namespaceName ] ) {
+				rewrittenActions[ namespaceName ] = {};
+			}
+			if ( ! originalActions[ namespaceName ] ) {
+				originalActions[ namespaceName ] = {};
+			}
 
 			if ( trackers ) {
 				Object.keys( trackers ).forEach( ( actionName ) => {
 					const originalAction = actions[ actionName ];
 					const tracker = trackers[ actionName ];
-					actions[ actionName ] = ( ...args ) => {
-						debug( 'action "%s" called with %o arguments', actionName, [ ...args ] );
-						// We use a try-catch here to make sure the `originalAction`
-						// is always called. We don't want to break the original
-						// behaviour when our tracking throws an error.
-						try {
-							if ( typeof tracker === 'string' ) {
-								// Simple track - just based on the event name.
-								tracksRecordEvent( tracker );
-							} else if ( typeof tracker === 'function' ) {
-								// Advanced tracking - call function.
-								tracker( ...args );
+					// If we haven't stored the originalAction we need to update.
+					if ( ! originalActions[ namespaceName ][ actionName ] ) {
+						// Save the originalAction and rewrittenAction for future reference.
+						originalActions[ namespaceName ][ actionName ] = originalAction;
+						rewrittenActions[ namespaceName ][ actionName ] = ( ...args ) => {
+							debug( 'action "%s" called with %o arguments', actionName, [ ...args ] );
+							// We use a try-catch here to make sure the `originalAction`
+							// is always called. We don't want to break the original
+							// behaviour when our tracking throws an error.
+							try {
+								if ( typeof tracker === 'string' ) {
+									// Simple track - just based on the event name.
+									tracksRecordEvent( tracker );
+								} else if ( typeof tracker === 'function' ) {
+									// Advanced tracking - call function.
+									tracker( ...args );
+								}
+							} catch ( err ) {
+								// eslint-disable-next-line no-console
+								console.error( err );
 							}
-						} catch ( err ) {
-							// eslint-disable-next-line no-console
-							console.error( err );
-						}
-						return originalAction( ...args );
-					};
+							return originalAction( ...args );
+						};
+					}
+					// Replace the action in the registry with the rewrittenAction.
+					actions[ actionName ] = rewrittenActions[ namespaceName ][ actionName ];
 				} );
 			}
 			return actions;

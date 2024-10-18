@@ -1,18 +1,7 @@
-// import { subscribeIsDesktop } from '@automattic/viewport';
-import {
-	getPlan,
-	PLAN_FREE,
-	is2023PricingGridActivePage,
-	TYPE_FREE,
-	TYPE_PERSONAL,
-	TYPE_PREMIUM,
-	TYPE_BUSINESS,
-	TYPE_ECOMMERCE,
-} from '@automattic/calypso-products';
-import { getUrlParts } from '@automattic/calypso-url';
+import config from '@automattic/calypso-config';
+import { PRODUCT_1GB_SPACE } from '@automattic/calypso-products';
 import { Button } from '@automattic/components';
 import {
-	DOMAIN_UPSELL_FLOW,
 	START_WRITING_FLOW,
 	isLinkInBioFlow,
 	isNewsletterFlow,
@@ -27,49 +16,47 @@ import {
 import { MinimalRequestCartProduct } from '@automattic/shopping-cart';
 import { useDesktopBreakpoint } from '@automattic/viewport-react';
 import { useSelect, useDispatch } from '@wordpress/data';
+import { useState } from '@wordpress/element';
 import { useI18n } from '@wordpress/react-i18n';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { localize, useTranslate } from 'i18n-calypso';
-import React from 'react';
-import { connect } from 'react-redux';
-import QueryPlans from 'calypso/components/data/query-plans';
-import { LoadingEllipsis } from 'calypso/components/loading-ellipsis';
+import React, { useLayoutEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router';
+import { useSaveHostingFlowPathStep } from 'calypso/landing/stepper/hooks/use-save-hosting-flow-path-step';
 import { useSite } from 'calypso/landing/stepper/hooks/use-site';
-import { isInHostingFlow } from 'calypso/landing/stepper/utils/is-in-hosting-flow';
+import { getPlanCartItem } from 'calypso/lib/cart-values/cart-items';
 import PlansFeaturesMain from 'calypso/my-sites/plans-features-main';
+import PlanFAQ from 'calypso/my-sites/plans-features-main/components/plan-faq';
 import StepWrapper from 'calypso/signup/step-wrapper';
+import { getIntervalType } from 'calypso/signup/steps/plans/util';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
-import { getPlanSlug } from 'calypso/state/plans/selectors';
 import { ONBOARD_STORE } from '../../../../stores';
 import type { OnboardSelect } from '@automattic/data-stores';
+import type { PlansIntent } from '@automattic/plans-grid-next';
 import './style.scss';
 
-type IntervalType = 'yearly' | 'monthly';
 interface Props {
+	shouldIncludeFAQ?: boolean;
 	flowName: string | null;
-	onSubmit: ( pickedPlan: MinimalRequestCartProduct | null ) => void;
-	plansLoaded: boolean;
-	is2023PricingGridVisible: boolean;
-	hostingFlow: boolean;
+	onSubmit: ( planCartItem: MinimalRequestCartProduct | null ) => void;
 }
 
-function getPlanTypes( flowName: string | null, hideFreePlan: boolean, hostingFlow: boolean ) {
+function getPlansIntent( flowName: string | null, isWordCampPromo?: boolean ): PlansIntent | null {
 	switch ( flowName ) {
 		case START_WRITING_FLOW:
 		case DESIGN_FIRST_FLOW:
-			return hideFreePlan
-				? [ TYPE_PERSONAL, TYPE_PREMIUM, TYPE_BUSINESS ]
-				: [ TYPE_FREE, TYPE_PERSONAL, TYPE_PREMIUM, TYPE_BUSINESS ];
+			return 'plans-blog-onboarding';
 		case NEWSLETTER_FLOW:
-			return [ TYPE_FREE, TYPE_PERSONAL, TYPE_PREMIUM ];
+			return 'plans-newsletter';
 		case LINK_IN_BIO_FLOW:
-			return [ TYPE_FREE, TYPE_PERSONAL, TYPE_PREMIUM ];
+			return 'plans-link-in-bio';
 		case NEW_HOSTED_SITE_FLOW:
-			return hostingFlow
-				? [ TYPE_BUSINESS, TYPE_ECOMMERCE ]
-				: [ TYPE_FREE, TYPE_PERSONAL, TYPE_PREMIUM, TYPE_BUSINESS, TYPE_ECOMMERCE ];
+			if ( isWordCampPromo ) {
+				return 'plans-new-hosted-site-business-only';
+			}
+			return 'plans-new-hosted-site';
 		default:
-			return undefined;
+			return null;
 	}
 }
 
@@ -78,39 +65,74 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 		hideFreePlan: reduxHideFreePlan,
 		domainCartItem,
 		hidePlansFeatureComparison,
+		couponCode,
 	} = useSelect( ( select ) => {
 		return {
 			hideFreePlan: ( select( ONBOARD_STORE ) as OnboardSelect ).getHideFreePlan(),
 			domainCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getDomainCartItem(),
+			domainCartItems: ( select( ONBOARD_STORE ) as OnboardSelect ).getDomainCartItems(),
 			hidePlansFeatureComparison: (
 				select( ONBOARD_STORE ) as OnboardSelect
 			 ).getHidePlansFeatureComparison(),
+			couponCode: ( select( ONBOARD_STORE ) as OnboardSelect ).getCouponCode(),
 		};
 	}, [] );
+	const { flowName } = props;
 
-	const { setPlanCartItem } = useDispatch( ONBOARD_STORE );
+	const { setPlanCartItem, setDomain, setDomainCartItem, setProductCartItems } =
+		useDispatch( ONBOARD_STORE );
 
 	const site = useSite();
+	const currentPath = window.location.pathname + window.location.search;
+
+	useSaveHostingFlowPathStep( flowName, currentPath );
+
+	const [ planIntervalPath, setPlanIntervalPath ] = useState< string >( '' );
 	const { __ } = useI18n();
-
-	const isDesktop = useDesktopBreakpoint();
-	const stepName = 'plans';
-	const isReskinned = true;
-	const customerType = 'personal';
-	const isInVerticalScrollingPlansExperiment = true;
-	const planTypes = getPlanTypes( props?.flowName, reduxHideFreePlan, props.hostingFlow );
-	const headerText = __( 'Choose a plan' );
-	const isInSignup = props?.flowName === DOMAIN_UPSELL_FLOW ? false : true;
-
-	const hideFreePlan = planTypes ? ! planTypes.includes( TYPE_FREE ) : reduxHideFreePlan;
-
 	const translate = useTranslate();
+	const isDesktop = useDesktopBreakpoint();
+	const navigate = useNavigate();
+	const location = useLocation();
 
-	const onSelectPlan = ( selectedPlan: any ) => {
-		if ( selectedPlan ) {
+	const stepName = 'plans';
+	const customerType = 'personal';
+	const headerText = __( 'Choose a plan' );
+	const isInSignup = isDomainUpsellFlow( flowName ) ? false : true;
+	/**
+	 * isWordCampPromo is temporary
+	 */
+	const isWordCampPromo = new URLSearchParams( location.search ).has( 'utm_source', 'wordcamp' );
+	const plansIntent = getPlansIntent( flowName, isWordCampPromo );
+
+	const hideFreePlan = plansIntent
+		? reduxHideFreePlan && 'plans-blog-onboarding' === plansIntent
+		: reduxHideFreePlan;
+
+	useLayoutEffect( () => {
+		// Plan intervals are changed by parsing query params. Updating query params
+		// with react-router, however, rerenders the whole page. The effect is that,
+		// whenever a new plan interval is selected, the viewport is reset to the top
+		// of the page. Because of this, we manually restore scroll position here.
+		// Ideally we'd switch to using react-router <ScrollRestoration> whenever stepper
+		// flows are refactored to use a data router
+		document.documentElement.scrollTop = location.state?.scrollTop || 0;
+	}, [ location.state?.scrollTop, planIntervalPath ] );
+
+	const onPlanIntervalUpdate = ( path: string ) => {
+		setPlanIntervalPath( path );
+
+		navigate( path, {
+			preventScrollReset: true,
+			replace: true,
+			state: { scrollTop: document.documentElement.scrollTop },
+		} );
+	};
+
+	const onUpgradeClick = ( cartItems?: MinimalRequestCartProduct[] | null ) => {
+		const planCartItem = getPlanCartItem( cartItems );
+		if ( planCartItem ) {
 			recordTracksEvent( 'calypso_signup_plan_select', {
-				product_slug: selectedPlan?.product_slug,
-				free_trial: selectedPlan?.free_trial,
+				product_slug: planCartItem?.product_slug,
 				from_section: 'default',
 			} );
 		} else {
@@ -119,76 +141,67 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 			} );
 		}
 
-		setPlanCartItem( selectedPlan );
-		props.onSubmit?.( selectedPlan );
+		const cartItemForStorageAddOn = cartItems?.find(
+			( items ) => items.product_slug === PRODUCT_1GB_SPACE
+		);
+
+		cartItemForStorageAddOn && setProductCartItems( [ cartItemForStorageAddOn ] );
+		setPlanCartItem( planCartItem );
+		props.onSubmit?.( planCartItem );
 	};
 
-	const getDomainName = () => {
+	const getPaidDomainName = () => {
 		return domainCartItem?.meta;
 	};
 
 	const handleFreePlanButtonClick = () => {
-		onSelectPlan( null ); // onUpgradeClick expects a cart item -- null means Free Plan.
+		onUpgradeClick( null ); // onUpgradeClick expects a cart item -- null means Free Plan.
 		props.onSubmit( null );
 	};
 
-	const renderLoading = () => {
-		return (
-			<div className="plans__loading">
-				<LoadingEllipsis className="active" />
-			</div>
-		);
+	const removePaidDomain = () => {
+		setDomainCartItem( null );
 	};
 
-	const getIntervalType: () => IntervalType = () => {
-		const urlParts = getUrlParts( typeof window !== 'undefined' ? window.location?.href : '' );
-		const intervalType = urlParts?.searchParams.get( 'intervalType' );
-		switch ( intervalType ) {
-			case 'monthly':
-			case 'yearly':
-				return intervalType as IntervalType;
-			default:
-				return 'yearly';
-		}
+	const setSiteUrlAsFreeDomainSuggestion = ( freeDomainSuggestion: { domain_name: string } ) => {
+		setDomain( freeDomainSuggestion );
 	};
 
 	const plansFeaturesList = () => {
-		const { flowName } = props;
-
-		if ( ! props.plansLoaded ) {
-			return renderLoading();
-		}
-
 		return (
 			<div>
 				<PlansFeaturesMain
-					isPlansInsideStepper={ true }
-					site={ site || {} } // `PlanFeaturesMain` expects a default prop of `{}` if no site is provided
+					siteId={ site?.ID }
+					displayedIntervals={ [ 'yearly', '2yearly', '3yearly', 'monthly' ] }
 					hideFreePlan={ hideFreePlan }
 					isInSignup={ isInSignup }
-					isStepperUpgradeFlow={ true }
+					isStepperUpgradeFlow
 					intervalType={ getIntervalType() }
-					onUpgradeClick={ onSelectPlan }
-					showFAQ={ false }
-					domainName={ getDomainName() }
+					onUpgradeClick={ onUpgradeClick }
+					paidDomainName={ getPaidDomainName() }
 					customerType={ customerType }
 					plansWithScroll={ isDesktop }
-					planTypes={ planTypes }
 					flowName={ flowName }
-					isAllPaidPlansShown={ true }
-					isInVerticalScrollingPlansExperiment={ isInVerticalScrollingPlansExperiment }
-					shouldShowPlansFeatureComparison={ isDesktop } // Show feature comparison layout in signup flow and desktop resolutions
-					isReskinned={ isReskinned }
-					is2023PricingGridVisible={ props.is2023PricingGridVisible }
-					hidePlansFeatureComparison={ hidePlansFeatureComparison }
+					hidePlansFeatureComparison={ hidePlansFeatureComparison || isWordCampPromo }
+					intent={ plansIntent }
+					removePaidDomain={ removePaidDomain }
+					setSiteUrlAsFreeDomainSuggestion={ setSiteUrlAsFreeDomainSuggestion }
+					renderSiblingWhenLoaded={ () => props.shouldIncludeFAQ && <PlanFAQ /> }
+					showPlanTypeSelectorDropdown={ config.isEnabled( 'onboarding/interval-dropdown' ) }
+					hidePlanTypeSelector={ isWordCampPromo }
+					onPlanIntervalUpdate={ onPlanIntervalUpdate }
+					coupon={ couponCode }
 				/>
 			</div>
 		);
 	};
 
 	const getHeaderText = () => {
-		const { flowName } = props;
-		if ( flowName === DOMAIN_UPSELL_FLOW || isNewHostedSiteCreationFlow( flowName ) ) {
+		if ( isNewHostedSiteCreationFlow( flowName ) ) {
+			return __( 'The right plan for the right project' );
+		}
+
+		if ( isDomainUpsellFlow( flowName ) ) {
 			return __( 'Choose your flavor of WordPress' );
 		}
 
@@ -208,8 +221,6 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 	};
 
 	const getSubHeaderText = () => {
-		const { flowName } = props;
-
 		const freePlanButton = (
 			<Button onClick={ handleFreePlanButtonClick } className="is-borderless" />
 		);
@@ -223,6 +234,12 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 			return;
 		}
 
+		if ( isNewHostedSiteCreationFlow( flowName ) ) {
+			return translate(
+				'Get the advanced features you need without ever thinking about overages.'
+			);
+		}
+
 		if ( ! hideFreePlan ) {
 			return translate(
 				`Unlock a powerful bundle of features. Or {{link}}start with a free plan{{/link}}.`,
@@ -232,11 +249,8 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 
 		return;
 	};
-	const is2023PricingGridVisible = is2023PricingGridActivePage( window );
 
 	const plansFeaturesSelection = () => {
-		const { flowName } = props;
-
 		const headerText = getHeaderText();
 		const fallbackHeaderText = headerText;
 		const subHeaderText = getSubHeaderText();
@@ -247,11 +261,11 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 				<StepWrapper
 					flowName={ flowName }
 					stepName={ stepName }
-					shouldHideNavButtons={ true }
+					shouldHideNavButtons
 					fallbackHeaderText={ fallbackHeaderText }
 					fallbackSubHeaderText={ fallbackSubHeaderText }
-					isWideLayout={ ! is2023PricingGridVisible }
-					isExtraWideLayout={ is2023PricingGridVisible }
+					isWideLayout={ false }
+					isExtraWideLayout
 					stepContent={ plansFeaturesList() }
 					allowBackFirstStep={ false }
 				/>
@@ -259,24 +273,17 @@ const PlansWrapper: React.FC< Props > = ( props ) => {
 		);
 	};
 
-	const classes = classNames( 'plans-step', {
-		'in-vertically-scrolled-plans-experiment': isInVerticalScrollingPlansExperiment,
+	const classes = clsx( 'plans-step', {
 		'has-no-sidebar': true,
-		'is-wide-layout': ! is2023PricingGridVisible,
-		'is-extra-wide-layout': is2023PricingGridVisible,
+		'is-wide-layout': false,
+		'is-extra-wide-layout': true,
 	} );
 
 	return (
 		<div className="stepper-plans">
-			<QueryPlans />
 			<div className={ classes }>{ plansFeaturesSelection() }</div>
 		</div>
 	);
 };
 
-export default connect( ( state ) => {
-	return {
-		plansLoaded: Boolean( getPlanSlug( state, getPlan( PLAN_FREE )?.getProductId() || 0 ) ),
-		hostingFlow: isInHostingFlow( state ),
-	};
-} )( localize( PlansWrapper ) );
+export default localize( PlansWrapper );

@@ -1,8 +1,8 @@
 import { useTranslate } from 'i18n-calypso';
 import { useMemo } from 'react';
-import { useSelector } from 'react-redux';
 import { ThankYouSteps } from 'calypso/components/thank-you/types';
 import useMarketplaceAdditionalSteps from 'calypso/my-sites/marketplace/pages/marketplace-product-install/use-marketplace-additional-steps';
+import { useSelector } from 'calypso/state';
 import { isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 import { hasMultipleProductTypes } from './utils';
@@ -44,12 +44,23 @@ export function useThankYouSteps( {
 		[ translate ]
 	);
 
-	const steps = multipleProductTypes
-		? defaultSteps
-		: [
-				...( pluginSlugs.length > 0 ? pluginsProgressbarSteps : [] ),
-				...( themeSlugs.length > 0 ? themesProgressbarSteps : [] ),
-		  ];
+	const steps = useMemo(
+		() =>
+			multipleProductTypes
+				? defaultSteps
+				: [
+						...( pluginSlugs.length > 0 ? pluginsProgressbarSteps : [] ),
+						...( themeSlugs.length > 0 ? themesProgressbarSteps : [] ),
+				  ],
+		[
+			defaultSteps,
+			multipleProductTypes,
+			pluginSlugs.length,
+			pluginsProgressbarSteps,
+			themeSlugs.length,
+			themesProgressbarSteps,
+		]
+	);
 
 	return { steps, additionalSteps };
 }

@@ -4,7 +4,8 @@ import {
 	List,
 	WindowScroller,
 } from '@automattic/react-virtualized';
-import React, { useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import withDimensions from 'calypso/lib/with-dimensions';
 
 type VirtualizedListFunctionProps< T > = {
@@ -27,11 +28,48 @@ const cellMeasureCache = new CellMeasurerCache( {
 	keyMapper: () => 1,
 } );
 
+type RowRenderProps = {
+	index: number;
+	key: string;
+	style: React.CSSProperties;
+	parent: unknown;
+};
+
+const getScrollContainer = ( node: HTMLElement | null ): HTMLElement | Window => {
+	// Default to window if the node is null or it's the root element.
+	if ( ! node || node.ownerDocument === node.parentNode ) {
+		return window;
+	}
+
+	// Return when overflow is defined to either auto or scroll.
+	const { overflowY } = getComputedStyle( node );
+	if ( /(auto|scroll)/.test( overflowY ) ) {
+		return node;
+	}
+
+	// Continue traversing if parentNode is an HTMLElement.
+	const parentNode = node.parentNode;
+	if ( parentNode && parentNode instanceof HTMLElement ) {
+		return getScrollContainer( parentNode );
+	}
+
+	// Default to window if no scroll container is found.
+	return window;
+};
+
 const VirtualizedList = < T, >( { width, items, children }: VirtualizedListProps< T > ) => {
 	const windowScrollerRef = useRef();
+	const scrollContainerRef = useRef< HTMLElement | Window >( window );
+
+	useEffect( () => {
+		if ( windowScrollerRef.current ) {
+			const domNode = ReactDOM.findDOMNode( windowScrollerRef.current ) as HTMLElement;
+			scrollContainerRef.current = getScrollContainer( domNode );
+		}
+	}, [] );
 
 	const rowRenderer = useCallback(
-		( { index, key, style, parent } ) => {
+		( { index, key, style, parent }: RowRenderProps ) => {
 			const item = items?.[ index ];
 			return item ? (
 				<CellMeasurer
@@ -51,7 +89,7 @@ const VirtualizedList = < T, >( { width, items, children }: VirtualizedListProps
 	);
 
 	return (
-		<WindowScroller ref={ windowScrollerRef }>
+		<WindowScroller ref={ windowScrollerRef } scrollElement={ scrollContainerRef.current }>
 			{ ( {
 				height,
 				scrollTop,

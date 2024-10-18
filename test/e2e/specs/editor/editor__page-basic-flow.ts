@@ -39,6 +39,7 @@ describe( DataHelper.createSuiteTitle( 'Editor: Basic Post Flow' ), function () 
 	let editorPage: EditorPage;
 	let pagesPage: PagesPage;
 	let publishedUrl: URL;
+	let pageTemplateToSelect: string;
 
 	beforeAll( async () => {
 		page = await browser.newPage();
@@ -58,13 +59,22 @@ describe( DataHelper.createSuiteTitle( 'Editor: Basic Post Flow' ), function () 
 
 	it( 'Select page template', async function () {
 		editorPage = new EditorPage( page );
-		await editorPage.selectTemplateCategory( 'About' );
-		await editorPage.selectTemplate( 'About me' );
+		// Allow some time for CPU and/or network to catch up.
+		await editorPage.selectTemplateCategory( 'About', { timeout: 20 * 1000 } );
+
+		const editorParent = await editorPage.getEditorParent();
+		pageTemplateToSelect =
+			( await editorParent
+				.getByRole( 'listbox', { name: 'Block patterns' } )
+				.getByRole( 'option' )
+				.first()
+				.getAttribute( 'aria-label' ) ) ?? '';
+		await editorPage.selectTemplate( pageTemplateToSelect, { timeout: 15 * 1000 } );
 	} );
 
 	it( 'Template content loads into editor', async function () {
 		const editorCanvas = await editorPage.getEditorCanvas();
-		await editorCanvas.locator( `h1:text-is("About Me")` ).waitFor();
+		await editorCanvas.locator( `h1.wp-block:text-is('${ pageTemplateToSelect }')` ).waitFor();
 	} );
 
 	it( 'Open setting sidebar', async function () {
@@ -91,6 +101,6 @@ describe( DataHelper.createSuiteTitle( 'Editor: Basic Post Flow' ), function () 
 	it( 'Published page contains template content', async function () {
 		// Not a typo, it's the POM page class for a WordPress page. :)
 		const publishedPagePage = new PublishedPostPage( page );
-		await publishedPagePage.validateTextInPost( 'About Me' );
+		await publishedPagePage.validateTextInPost( pageTemplateToSelect );
 	} );
 } );

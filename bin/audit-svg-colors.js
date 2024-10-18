@@ -19,7 +19,6 @@ const chroma = require( 'chroma-js' );
 
 /**
  * Native Sort - replacement of _.sortBy Lodash function
- *
  * @returns Sorted array.
  */
 const compareByName = ( objA, objB ) => {
@@ -92,7 +91,7 @@ const SVG_IGNORE_PATHS = [
 
 	// Credit card and payment gateway logos (the disabled versions are allowed)
 	/upgrades\/cc-(?:amex|diners|discover|jcb|mastercard|unionpay|visa)\.svg$/,
-	/upgrades\/(?:alipay|bancontact|emergent-paywall|eps|giropay|ideal|netbanking|p24|paypal|paytm|sofort|tef|wechat)/,
+	/upgrades\/(?:alipay|bancontact|emergent-paywall|eps|ideal|netbanking|p24|paypal|paytm|sofort|tef|wechat|razorpay)/,
 
 	// Color scheme thumbnails that rely on .org colors
 	/color-scheme-thumbnail-(?:blue|classic-dark|coffee|ectoplasm|light|modern|ocean|sunrise)\.svg$/,
@@ -101,7 +100,6 @@ const SVG_IGNORE_PATHS = [
 	/ninja-joy\.svg$/,
 
 	// Specific images directories
-	/^apps\/editing-toolkit\/editing-toolkit-plugin/,
 	/^static\/images\/marketing/,
 	/^static\/images\/me/,
 	/^static\/images\/illustrations\/illustration-woo-magic-link.svg/,

@@ -1,8 +1,12 @@
-import { PLAN_PERSONAL, WPCOM_FEATURES_UPLOAD_AUDIO_FILES } from '@automattic/calypso-products';
-import { Button, Card } from '@automattic/components';
-import classNames from 'classnames';
+import {
+	PLAN_PERSONAL,
+	WPCOM_FEATURES_UPLOAD_AUDIO_FILES,
+	getPlan,
+} from '@automattic/calypso-products';
+import { Button, Card, FormLabel } from '@automattic/components';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
-import { map, pick, flowRight } from 'lodash';
+import { pick, flowRight } from 'lodash';
 import { Component, Fragment } from 'react';
 import { connect } from 'react-redux';
 import TermTreeSelector from 'calypso/blocks/term-tree-selector';
@@ -10,12 +14,13 @@ import UpsellNudge from 'calypso/blocks/upsell-nudge';
 import DocumentHead from 'calypso/components/data/document-head';
 import QueryTerms from 'calypso/components/data/query-terms';
 import FormFieldset from 'calypso/components/forms/form-fieldset';
-import FormLabel from 'calypso/components/forms/form-label';
 import FormSelect from 'calypso/components/forms/form-select';
 import FormSettingExplanation from 'calypso/components/forms/form-setting-explanation';
 import FormInput from 'calypso/components/forms/form-text-input';
 import FormTextarea from 'calypso/components/forms/form-textarea';
-import HeaderCake from 'calypso/components/header-cake';
+import InlineSupportLink from 'calypso/components/inline-support-link';
+import Main from 'calypso/components/main';
+import NavigationHeader from 'calypso/components/navigation-header';
 import Notice from 'calypso/components/notice';
 import { decodeEntities } from 'calypso/lib/formatting';
 import scrollTo from 'calypso/lib/scroll-to';
@@ -35,8 +40,7 @@ import PodcastingNoPermissionsMessage from './no-permissions';
 import PodcastingNotSupportedMessage from './not-supported';
 import PodcastingPrivateSiteMessage from './private-site';
 import PodcastingPublishNotice from './publish-notice';
-import PodcastingSupportLink from './support-link';
-import podcastingTopics from './topics';
+import TopicsSelector from './topics-selector';
 
 /**
  * Selectors, actions, and query components
@@ -131,32 +135,13 @@ class PodcastingDetails extends Component {
 	renderTopicSelector( key ) {
 		const { fields, handleSelect, isRequestingSettings, isPodcastingEnabled } = this.props;
 		return (
-			<FormSelect
+			<TopicsSelector
 				id={ key }
 				name={ key }
 				onChange={ handleSelect }
 				value={ fields[ key ] || 0 }
 				disabled={ isRequestingSettings || ! isPodcastingEnabled }
-			>
-				<option value="0">None</option>
-				{ map( Object.entries( podcastingTopics ), ( [ topic, subtopics ] ) => {
-					// The keys for podcasting in Apple Podcasts use &amp;
-					const topicKey = topic.replace( '&', '&amp;' );
-					return [
-						<option key={ topicKey } value={ topicKey }>
-							{ topic }
-						</option>,
-						...map( subtopics, ( subtopic ) => {
-							const subtopicKey = topicKey + ',' + subtopic.replace( '&', '&amp;' );
-							return (
-								<option key={ subtopicKey } value={ subtopicKey }>
-									{ topic } » { subtopic }
-								</option>
-							);
-						} ),
-					];
-				} ) }
-			</FormSelect>
+			/>
 		);
 	}
 
@@ -181,7 +166,6 @@ class PodcastingDetails extends Component {
 	render() {
 		const {
 			handleSubmitForm,
-			siteSlug,
 			siteId,
 			translate,
 			isPodcastingEnabled,
@@ -195,33 +179,34 @@ class PodcastingDetails extends Component {
 		}
 
 		const error = this.renderSettingsError();
-		const writingHref = `/settings/writing/${ siteSlug }`;
 
-		const classes = classNames( 'podcasting-details__wrapper', {
+		const classes = clsx( 'podcasting-details__wrapper', {
 			'is-disabled': ! error && ! isPodcastingEnabled,
 		} );
 
 		return (
-			<div
-				className="main main-column" // eslint-disable-line
-				role="main"
-			>
-				<DocumentHead title={ translate( 'Podcasting Settings' ) } />
+			<Main>
+				<DocumentHead title={ translate( 'Podcasting' ) } />
+				<NavigationHeader
+					navigationItems={ [] }
+					title={ translate( 'Podcasting' ) }
+					subtitle={ translate(
+						'Publish a podcast feed to Apple Podcasts and other podcasting services. {{learnMoreLink}}Learn more{{/learnMoreLink}}.',
+						{
+							components: {
+								learnMoreLink: <InlineSupportLink supportContext="podcasting" showIcon={ false } />,
+							},
+						}
+					) }
+				/>
+
 				<form id="site-settings" onSubmit={ handleSubmitForm }>
-					<HeaderCake
-						actionButton={ error ? null : this.renderSaveButton() }
-						backHref={ writingHref }
-						backText={ translate( 'Writing' ) }
-					>
-						<h1>
-							{ translate( 'Podcasting Settings' ) }
-							<PodcastingSupportLink showText={ false } iconSize={ 16 } />
-						</h1>
-					</HeaderCake>
 					{ ! error && plansDataLoaded && (
 						<UpsellNudge
 							plan={ PLAN_PERSONAL }
-							title={ translate( 'Upload Audio with WordPress.com Personal' ) }
+							title={ translate( 'Upload Audio with WordPress.com %(personalPlanName)s', {
+								args: { personalPlanName: getPlan( PLAN_PERSONAL ).getTitle() },
+							} ) }
 							description={ translate(
 								'Embed podcast episodes directly from your media library.'
 							) }
@@ -229,7 +214,7 @@ class PodcastingDetails extends Component {
 							event="podcasting_details_upload_audio"
 							tracksImpressionName="calypso_upgrade_nudge_impression"
 							tracksClickName="calypso_upgrade_nudge_cta_click"
-							showIcon={ true }
+							showIcon
 						/>
 					) }
 					{ ! error && (
@@ -256,7 +241,7 @@ class PodcastingDetails extends Component {
 						</div>
 					) }
 				</form>
-			</div>
+			</Main>
 		);
 	}
 
@@ -294,7 +279,7 @@ class PodcastingDetails extends Component {
 						selected={ podcastingCategoryId ? [ podcastingCategoryId ] : [] }
 						podcastingCategoryId={ podcastingCategoryId }
 						onChange={ this.onCategorySelected }
-						addTerm={ true }
+						addTerm
 						onAddTermSuccess={ this.onCategorySelected }
 						height={ 200 }
 					/>
@@ -332,8 +317,9 @@ class PodcastingDetails extends Component {
 						label: translate( 'Title' ),
 					} ) }
 					{ this.renderTextField( {
-						key: 'podcasting_subtitle',
-						label: translate( 'Subtitle' ),
+						FormComponent: FormTextarea,
+						key: 'podcasting_summary',
+						label: translate( 'Summary/Description' ),
 					} ) }
 				</div>
 				{ this.renderTopics() }
@@ -341,11 +327,6 @@ class PodcastingDetails extends Component {
 				{ this.renderTextField( {
 					key: 'podcasting_talent_name',
 					label: translate( 'Hosts/Artist/Producer' ),
-				} ) }
-				{ this.renderTextField( {
-					FormComponent: FormTextarea,
-					key: 'podcasting_summary',
-					label: translate( 'Summary' ),
 				} ) }
 				{ this.renderTextField( {
 					key: 'podcasting_email',
@@ -357,14 +338,6 @@ class PodcastingDetails extends Component {
 				{ this.renderTextField( {
 					key: 'podcasting_copyright',
 					label: translate( 'Copyright' ),
-				} ) }
-				{ this.renderTextField( {
-					key: 'podcasting_keywords',
-					label: translate( 'Keywords' ),
-					explanation: translate(
-						'The keywords setting has been deprecated. This field is for reference only.'
-					),
-					isDisabled: true,
 				} ) }
 				{ isPodcastingEnabled && this.renderSaveButton( true ) }
 			</Fragment>
@@ -401,11 +374,6 @@ class PodcastingDetails extends Component {
 			// use the site title.
 			if ( ! fields.podcasting_title ) {
 				fieldsToUpdate.podcasting_title = settings.blogname;
-			}
-			// If we are newly enabling podcasting, and no podcast subtitle is set,
-			// use the site description.
-			if ( ! fields.podcasting_subtitle ) {
-				fieldsToUpdate.podcasting_subtitle = settings.blogdescription;
 			}
 		}
 
@@ -446,13 +414,11 @@ const getFormSettings = ( settings ) => {
 	return pick( settings, [
 		'podcasting_category_id',
 		'podcasting_title',
-		'podcasting_subtitle',
 		'podcasting_talent_name',
 		'podcasting_summary',
 		'podcasting_copyright',
 		'podcasting_explicit',
 		'podcasting_image',
-		'podcasting_keywords',
 		'podcasting_category_1',
 		'podcasting_category_2',
 		'podcasting_category_3',
@@ -488,7 +454,6 @@ const connectComponent = connect( ( state, ownProps ) => {
 
 	return {
 		siteId,
-		siteSlug,
 		isPrivate: isPrivateSite( state, siteId ),
 		isComingSoon: isSiteComingSoon( state, siteId ),
 		isPodcastingEnabled,

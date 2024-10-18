@@ -1,6 +1,5 @@
 import { Button, Gridicon } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
 import { canCurrentUserAddEmail, getCurrentUserCannotAddEmailReason } from 'calypso/lib/domains';
 import {
@@ -9,7 +8,8 @@ import {
 	isTitanMailAccount,
 } from 'calypso/lib/emails';
 import { getGoogleAdminWithTosUrl } from 'calypso/lib/gsuite';
-import { emailManagementTitanSetUpMailbox } from 'calypso/my-sites/email/paths';
+import { getTitanSetUpMailboxPath } from 'calypso/my-sites/email/paths';
+import { useSelector } from 'calypso/state';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 import { EmailPlanWarningNotice } from './email-plan-warning-notice';
 import type { EmailAccount } from 'calypso/data/emails/types';
@@ -37,11 +37,7 @@ const EmailPlanWarnings = ( { domain, emailAccount }: EmailPlanWarningsProps ) =
 
 	if ( hasUnusedMailboxWarning( emailAccount ) && isTitanMailAccount( emailAccount ) ) {
 		cta = (
-			<Button
-				compact
-				primary
-				href={ emailManagementTitanSetUpMailbox( selectedSiteSlug ?? '', domain.name ) }
-			>
+			<Button compact primary href={ getTitanSetUpMailboxPath( selectedSiteSlug, domain.name ) }>
 				{ translate( 'Set up mailbox' ) }
 			</Button>
 		);

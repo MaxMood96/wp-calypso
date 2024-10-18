@@ -5,12 +5,12 @@ interface ConfigurationData {
 	expectedVideoTitle: string;
 }
 
-const blockParentSelector = '[aria-label="Block: YouTube"]:has-text("YouTube URL")';
+const blockParentSelector = '[aria-label*="Block: YouTube"]:has-text("YouTube")';
 const selectors = {
 	embedUrlInput: `${ blockParentSelector } input`,
 	embedButton: `${ blockParentSelector } button:has-text("Embed")`,
-	editorYouTubeIframe: 'iframe[title="Embedded content from youtube.com"]',
-	publishedYouTubeIframe: `iframe.youtube-player`,
+	editorYouTubeIframe: 'iframe[title="Embedded content from www.youtube.com"]',
+	publishedYouTubeIframe: '',
 };
 
 /**
@@ -26,9 +26,10 @@ export class YouTubeBlockFlow implements BlockFlow {
 	 */
 	constructor( configurationData: ConfigurationData ) {
 		this.configurationData = configurationData;
+		selectors.publishedYouTubeIframe = `iframe[title="${ this.configurationData.expectedVideoTitle }"]`;
 	}
 
-	blockSidebarName = 'YouTube';
+	blockSidebarName = 'YouTube Embed';
 	blockEditorSelector = blockParentSelector;
 
 	/**

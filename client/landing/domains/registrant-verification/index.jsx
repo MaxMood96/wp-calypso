@@ -1,7 +1,7 @@
+import { CALYPSO_CONTACT } from '@automattic/urls';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
-import { CALYPSO_CONTACT } from 'calypso/lib/url/support';
 import wp from 'calypso/lib/wp';
 import { domainManagementRoot } from 'calypso/my-sites/domains/paths';
 import DomainsLandingContentCard from '../content-card';
@@ -58,7 +58,7 @@ class RegistrantVerificationPage extends Component {
 		return {
 			title: translate( 'Success!' ),
 			message: translate(
-				'Thank your for verifying your contact information for:{{br /}}{{strong}}{{domainLinks /}}{{/strong}}.',
+				'Thank you for verifying your contact information for:{{br /}}{{strong}}{{domainLinks /}}{{/strong}}.',
 				{
 					components: {
 						domainLinks: DomainLinks,

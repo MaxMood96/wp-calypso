@@ -7,10 +7,11 @@ import QueryJetpackModules from 'calypso/components/data/query-jetpack-modules';
 import QuerySiteSettings from 'calypso/components/data/query-site-settings';
 import Notice from 'calypso/components/notice';
 import NoticeAction from 'calypso/components/notice/notice-action';
+import { useActiveThemeQuery } from 'calypso/data/themes/use-active-theme-query';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { protectForm } from 'calypso/lib/protect-form';
 import { recordGoogleEvent, recordTracksEvent } from 'calypso/state/analytics/actions';
-import { activateModule } from 'calypso/state/jetpack/modules/actions';
+import { activateModule, deactivateModule } from 'calypso/state/jetpack/modules/actions';
 import { successNotice, errorNotice } from 'calypso/state/notices/actions';
 import getCurrentRouteParameterized from 'calypso/state/selectors/get-current-route-parameterized';
 import isFetchingJetpackModules from 'calypso/state/selectors/is-fetching-jetpack-modules';
@@ -22,9 +23,10 @@ import {
 	isSavingSiteSettings,
 	isSiteSettingsSaveSuccessful,
 } from 'calypso/state/site-settings/selectors';
-import { isJetpackSite } from 'calypso/state/sites/selectors';
+import { isJetpackSite, isJetpackMinimumVersion } from 'calypso/state/sites/selectors';
 import { getSelectedSiteId, getSelectedSiteSlug } from 'calypso/state/ui/selectors';
 import ButtonsAppearance from './appearance';
+import ButtonsBlockAppearance from './components/buttons-block-appearance';
 import ButtonsOptions from './options';
 import { useSharingButtonsQuery, useSaveSharingButtonsMutation } from './use-sharing-buttons-query';
 
@@ -95,6 +97,7 @@ class SharingButtons extends Component {
 			) {
 				this.props.successNotice( this.props.translate( 'Settings saved successfully!' ) );
 				this.props.markSaved();
+				// eslint-disable-next-line react/no-did-update-set-state
 				this.setState( {
 					values: {},
 					buttonsPendingSave: null,
@@ -123,20 +126,28 @@ class SharingButtons extends Component {
 	render() {
 		const {
 			buttons,
+			isBlockTheme,
 			isJetpack,
-			isPrivate,
 			isSavingSettings,
 			isSavingButtons,
 			settings,
 			siteId,
-			siteSlug,
 			isSharingButtonsModuleActive,
 			isFetchingModules,
+			isPrivate,
+			siteSlug,
+			supportsSharingBlock,
 			translate,
 		} = this.props;
 		const updatedSettings = this.getUpdatedSettings();
 		const updatedButtons = this.state.buttonsPendingSave || buttons;
 		const isSaving = isSavingSettings || isSavingButtons;
+		const isSharingModuleInactive =
+			isJetpack && ! isFetchingModules && ! isSharingButtonsModuleActive;
+
+		if ( isBlockTheme && supportsSharingBlock && isSharingModuleInactive ) {
+			return <ButtonsBlockAppearance isJetpack={ isJetpack } siteId={ siteId } />;
+		}
 
 		return (
 			<form
@@ -150,7 +161,9 @@ class SharingButtons extends Component {
 				/>
 				<QuerySiteSettings siteId={ siteId } />
 				{ isJetpack && <QueryJetpackModules siteId={ siteId } /> }
-				{ isJetpack && ! isFetchingModules && ! isSharingButtonsModuleActive && (
+
+				{ /* Rendering notice in a separate function */ }
+				{ isSharingModuleInactive && (
 					<Notice
 						status="is-warning"
 						showDismiss={ false }
@@ -170,6 +183,22 @@ class SharingButtons extends Component {
 						</NoticeAction>
 					</Notice>
 				) }
+				{ ! isFetchingModules && ! isSharingModuleInactive && isBlockTheme && (
+					<Notice
+						status="is-info"
+						showDismiss={ false }
+						text={ translate(
+							'You are using a block-based theme. We recommend you disable the legacy sharing feature below and add a sharing button block to your themes’s template instead.'
+						) }
+					>
+						{ isJetpack && (
+							<NoticeAction onClick={ () => this.props.deactivateModule( siteId, 'sharedaddy' ) }>
+								{ translate( 'Disable' ) }
+							</NoticeAction>
+						) }
+					</Notice>
+				) }
+
 				<ButtonsOptions
 					buttons={ buttons }
 					settings={ updatedSettings }
@@ -198,6 +227,8 @@ const withSharingButtons = createHigherOrderComponent(
 			isLoading: isSavingButtons,
 			isSuccess: isSaveButtonsSuccessful,
 		} = useSaveSharingButtonsMutation( siteId );
+		const { data: activeThemeData } = useActiveThemeQuery( siteId, true );
+		const isBlockTheme = activeThemeData?.[ 0 ]?.is_block_theme ?? false;
 
 		return (
 			<Wrapped
@@ -206,6 +237,7 @@ const withSharingButtons = createHigherOrderComponent(
 				saveSharingButtons={ saveSharingButtons }
 				isSavingButtons={ isSavingButtons }
 				isSaveButtonsSuccessful={ isSaveButtonsSuccessful }
+				isBlockTheme={ isBlockTheme }
 			/>
 		);
 	},
@@ -225,6 +257,7 @@ const connectComponent = connect(
 		const isSaveSettingsSuccessful = isSiteSettingsSaveSuccessful( state, siteId );
 		const isPrivate = isPrivateSite( state, siteId );
 		const path = getCurrentRouteParameterized( state, siteId );
+		const supportsSharingBlock = ! isJetpack || isJetpackMinimumVersion( state, siteId, '13.1' );
 
 		return {
 			isJetpack,
@@ -238,10 +271,12 @@ const connectComponent = connect(
 			siteId,
 			siteSlug,
 			path,
+			supportsSharingBlock,
 		};
 	},
 	{
 		activateModule,
+		deactivateModule,
 		errorNotice,
 		recordGoogleEvent,
 		recordTracksEvent,

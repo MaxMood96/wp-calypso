@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useQueryJetpackPartnerPortalPartner } from 'calypso/components/data/query-jetpack-partner-portal-partner';
 import JetpackLogo from 'calypso/components/jetpack-logo';
 import SelectPartnerKey from 'calypso/jetpack-cloud/sections/partner-portal/primary/select-partner-key';
+import { useSelector } from 'calypso/state';
 import {
 	hasActivePartnerKey,
 	hasFetchedPartner,
@@ -9,21 +10,29 @@ import {
 } from 'calypso/state/partner-portal/partner/selectors';
 import SitesOverview from '../sites-overview';
 import SitesOverviewContext from '../sites-overview/context';
+import SitesDashboardV2 from '../sites-overview/sites-dashboard-v2';
 import type { DashboardOverviewContextInterface, Site } from '../sites-overview/types';
 
 import '../style.scss';
 
 export default function DashboardOverview( {
+	path,
 	search,
 	currentPage,
 	filter,
 	sort,
+	showSitesDashboardV2,
 }: DashboardOverviewContextInterface ) {
+	useQueryJetpackPartnerPortalPartner();
+
 	const hasFetched = useSelector( hasFetchedPartner );
 	const isFetching = useSelector( isFetchingPartner );
 	const hasActiveKey = useSelector( hasActivePartnerKey );
 	const [ isBulkManagementActive, setIsBulkManagementActive ] = useState( false );
 	const [ selectedSites, setSelectedSites ] = useState< Site[] >( [] );
+	const [ currentLicenseInfo, setCurrentLicenseInfo ] = useState< string | null >( null );
+	const [ mostRecentConnectedSite, setMostRecentConnectedSite ] = useState< string | null >( null );
+	const [ isPopoverOpen, setIsPopoverOpen ] = useState( false );
 
 	if ( hasFetched && ! hasActiveKey ) {
 		return <SelectPartnerKey />;
@@ -36,8 +45,17 @@ export default function DashboardOverview( {
 		}
 	};
 
+	const onShowLicenseInfo = ( license: string ) => {
+		setCurrentLicenseInfo( license );
+	};
+
+	const onHideLicenseInfo = () => {
+		setCurrentLicenseInfo( null );
+	};
+
 	if ( hasFetched ) {
 		const context = {
+			path,
 			search,
 			currentPage,
 			filter,
@@ -46,10 +64,18 @@ export default function DashboardOverview( {
 			setIsBulkManagementActive: handleSetBulkManagementActive,
 			selectedSites,
 			setSelectedSites,
+			currentLicenseInfo,
+			showLicenseInfo: onShowLicenseInfo,
+			hideLicenseInfo: onHideLicenseInfo,
+			mostRecentConnectedSite,
+			setMostRecentConnectedSite,
+			isPopoverOpen,
+			setIsPopoverOpen,
+			showSitesDashboardV2,
 		};
 		return (
 			<SitesOverviewContext.Provider value={ context }>
-				<SitesOverview />
+				{ showSitesDashboardV2 ? <SitesDashboardV2 /> : <SitesOverview /> }
 			</SitesOverviewContext.Provider>
 		);
 	}

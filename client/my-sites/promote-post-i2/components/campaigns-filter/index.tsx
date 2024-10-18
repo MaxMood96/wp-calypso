@@ -1,43 +1,44 @@
-import { useTranslate } from 'i18n-calypso';
-import SegmentedControl from 'calypso/components/segmented-control';
+import { SegmentedControl } from '@automattic/components';
+import { useRef } from 'react';
+import { DropdownOption } from '../search-bar';
 
-export type CampaignsFilterType = 'all' | 'active' | 'created' | 'rejected';
+export type CampaignsFilterType = '' | 'active' | 'created' | 'finished' | 'rejected';
 
 interface Props {
 	campaignsFilter: CampaignsFilterType;
 	handleChangeFilter: ( type: CampaignsFilterType ) => void;
+	options: DropdownOption[];
 }
 
 export default function CampaignsFilter( props: Props ) {
-	const translate = useTranslate();
+	// Smooth horizontal scrolling on mobile views
+	const tabsRef = useRef< { [ key: string ]: HTMLSpanElement | null } >( {} );
+	const onTabClick = ( key: string ) => {
+		tabsRef.current[ key ]?.scrollIntoView( {
+			behavior: 'smooth',
+			block: 'nearest',
+			inline: 'center',
+		} );
+	};
 
-	const { handleChangeFilter, campaignsFilter } = props;
+	const { handleChangeFilter, campaignsFilter, options } = props;
+
+	const handleChange = ( type: CampaignsFilterType ) => {
+		onTabClick( type );
+		handleChangeFilter( type );
+	};
+
 	return (
 		<SegmentedControl compact primary>
-			<SegmentedControl.Item
-				selected={ campaignsFilter === 'all' || ! campaignsFilter }
-				onClick={ () => handleChangeFilter( 'all' ) }
-			>
-				{ translate( 'All' ) }
-			</SegmentedControl.Item>
-			<SegmentedControl.Item
-				selected={ campaignsFilter === 'active' }
-				onClick={ () => handleChangeFilter( 'active' ) }
-			>
-				{ translate( 'Active', { context: 'comment status' } ) }
-			</SegmentedControl.Item>
-			<SegmentedControl.Item
-				selected={ campaignsFilter === 'created' }
-				onClick={ () => handleChangeFilter( 'created' ) }
-			>
-				{ translate( 'In moderation', { context: 'comment status' } ) }
-			</SegmentedControl.Item>
-			<SegmentedControl.Item
-				selected={ campaignsFilter === 'rejected' }
-				onClick={ () => handleChangeFilter( 'rejected' ) }
-			>
-				{ translate( 'Rejected', { context: 'comment status' } ) }
-			</SegmentedControl.Item>
+			{ options.map( ( option ) => (
+				<SegmentedControl.Item
+					key={ option.value }
+					selected={ campaignsFilter === option.value }
+					onClick={ () => handleChange( option.value as CampaignsFilterType ) }
+				>
+					<span ref={ ( el ) => ( tabsRef.current[ option.value ] = el ) }>{ option.label }</span>
+				</SegmentedControl.Item>
+			) ) }
 		</SegmentedControl>
 	);
 }

@@ -1,15 +1,18 @@
 import { Gridicon } from '@automattic/components';
+import { Icon, download as downloadIcon } from '@wordpress/icons';
 import { useTranslate } from 'i18n-calypso';
 import { useRef, useState } from 'react';
 import * as React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import ExternalLink from 'calypso/components/external-link';
 import Button from 'calypso/components/forms/form-button';
 import missingCredentialsIcon from 'calypso/components/jetpack/daily-backup-status/missing-credentials.svg';
 import PopoverMenu from 'calypso/components/popover-menu';
 import { getActionableRewindId } from 'calypso/lib/jetpack/actionable-rewind-id';
+import { SUCCESSFUL_BACKUP_ACTIVITIES } from 'calypso/lib/jetpack/backup-utils';
 import { settingsPath } from 'calypso/lib/jetpack/paths';
 import { backupDownloadPath, backupRestorePath } from 'calypso/my-sites/backup/paths';
+import { useDispatch, useSelector } from 'calypso/state';
+import { rewindRequestBackup } from 'calypso/state/activity-log/actions';
 import { recordTracksEvent } from 'calypso/state/analytics/actions/record';
 import { areJetpackCredentialsInvalid } from 'calypso/state/jetpack/credentials/selectors';
 import getDoesRewindNeedCredentials from 'calypso/state/selectors/get-does-rewind-need-credentials';
@@ -17,18 +20,20 @@ import getIsRestoreInProgress from 'calypso/state/selectors/get-is-restore-in-pr
 import isSiteAutomatedTransfer from 'calypso/state/selectors/is-site-automated-transfer';
 import { getSiteSlug, isJetpackSiteMultiSite } from 'calypso/state/sites/selectors';
 import { Activity } from '../types';
-import downloadIcon from './download-icon.svg';
+import ViewFilesButton from './buttons/view-files-button';
 
 type SingleSiteOwnProps = {
 	siteId: number;
 	siteSlug: string;
 	rewindId: string;
+	isSuccessfulBackup: boolean;
 };
 
 const SingleSiteActionsButton: React.FC< SingleSiteOwnProps > = ( {
 	siteId,
 	siteSlug,
 	rewindId,
+	isSuccessfulBackup,
 } ) => {
 	const translate = useTranslate();
 	const dispatch = useDispatch();
@@ -58,6 +63,19 @@ const SingleSiteActionsButton: React.FC< SingleSiteOwnProps > = ( {
 	const isRestoreDisabled =
 		doesRewindNeedCredentials || isRestoreInProgress || ( ! isAtomic && areCredentialsInvalid );
 
+	const onRestoreClick = () => {
+		dispatch( recordTracksEvent( 'calypso_jetpack_backup_actions_restore_click' ) );
+	};
+
+	const onDownloadClick = () => {
+		dispatch(
+			recordTracksEvent( 'calypso_jetpack_backup_actions_download_click', {
+				rewind_id: rewindId,
+			} )
+		);
+		dispatch( rewindRequestBackup( siteId, rewindId ) );
+	};
+
 	return (
 		<>
 			<Button
@@ -80,6 +98,7 @@ const SingleSiteActionsButton: React.FC< SingleSiteOwnProps > = ( {
 					href={ ! isRestoreDisabled && backupRestorePath( siteSlug, rewindId ) }
 					className="toolbar__restore-button"
 					disabled={ isRestoreDisabled }
+					onClick={ onRestoreClick }
 				>
 					{ translate( 'Restore to this point' ) }
 				</Button>
@@ -98,19 +117,16 @@ const SingleSiteActionsButton: React.FC< SingleSiteOwnProps > = ( {
 						</div>
 					</div>
 				) }
+				{ isSuccessfulBackup && <ViewFilesButton siteSlug={ siteSlug } rewindId={ rewindId } /> }
 				<Button
 					borderless
 					compact
 					isPrimary={ false }
+					onClick={ onDownloadClick }
 					href={ backupDownloadPath( siteSlug, rewindId ) }
 					className="toolbar__download-button"
 				>
-					<img
-						src={ downloadIcon }
-						className="toolbar__download-button-icon"
-						role="presentation"
-						alt=""
-					/>
+					<Icon icon={ downloadIcon } className="toolbar__download-button-icon" size={ 18 } />
 					{ translate( 'Download backup' ) }
 				</Button>
 			</PopoverMenu>
@@ -129,7 +145,7 @@ const MultisiteActionsButton: React.FC< MultisiteOwnProps > = ( { siteSlug, rewi
 	return (
 		<Button
 			compact
-			isPrimary={ true }
+			isPrimary
 			href={ backupDownloadPath( siteSlug, rewindId ) }
 			className="toolbar__download-button--multisite"
 		>
@@ -178,6 +194,9 @@ const ActionsButton: React.FC< OwnProps > = ( {
 	// to a valid restore/download point when they click an action button
 	const actionableRewindId = getActionableRewindId( activity );
 
+	// Let's validate if the activity is a successful backup so we could decide which actions to show.
+	const isSuccessfulBackup = SUCCESSFUL_BACKUP_ACTIVITIES.includes( activity?.activityName );
+
 	const isMultisite = useSelector( ( state ) => isJetpackSiteMultiSite( state, siteId ) );
 	if ( isMultisite ) {
 		return (
@@ -200,6 +219,7 @@ const ActionsButton: React.FC< OwnProps > = ( {
 			siteId={ siteId }
 			siteSlug={ siteSlug ?? '' }
 			rewindId={ actionableRewindId ?? '' }
+			isSuccessfulBackup={ isSuccessfulBackup }
 		/>
 	);
 };

@@ -1,33 +1,48 @@
-import { OnboardSelect, updateLaunchpadSettings } from '@automattic/data-stores';
-import { useLocale } from '@automattic/i18n-utils';
-import { DESIGN_FIRST_FLOW, replaceProductsInCart } from '@automattic/onboarding';
-import { MinimalRequestCartProduct } from '@automattic/shopping-cart';
-import { useSelect, useDispatch, dispatch } from '@wordpress/data';
-import { addQueryArgs } from '@wordpress/url';
+import { updateLaunchpadSettings } from '@automattic/data-stores';
+import { DESIGN_FIRST_FLOW } from '@automattic/onboarding';
+import { useDispatch } from '@wordpress/data';
+import { useEffect } from '@wordpress/element';
+import { addQueryArgs, getQueryArg } from '@wordpress/url';
+import { translate } from 'i18n-calypso';
 import { useSelector } from 'react-redux';
-import { recordSubmitStep } from 'calypso/landing/stepper/declarative-flow/internals/analytics/record-submit-step';
+import { useLaunchpadDecider } from 'calypso/landing/stepper/declarative-flow/internals/hooks/use-launchpad-decider';
 import { redirect } from 'calypso/landing/stepper/declarative-flow/internals/steps-repository/import/util';
 import {
-	AssertConditionResult,
+	type AssertConditionResult,
 	AssertConditionState,
-	Flow,
-	ProvidedDependencies,
+	type Flow,
+	type ProvidedDependencies,
 } from 'calypso/landing/stepper/declarative-flow/internals/types';
-import { useSite } from 'calypso/landing/stepper/hooks/use-site';
-import { useSiteSlug } from 'calypso/landing/stepper/hooks/use-site-slug';
 import { SITE_STORE, ONBOARD_STORE } from 'calypso/landing/stepper/stores';
-import { freeSiteAddressType } from 'calypso/lib/domains/constants';
+import { skipLaunchpad } from 'calypso/landing/stepper/utils/skip-launchpad';
 import { getCurrentUserSiteCount, isUserLoggedIn } from 'calypso/state/current-user/selectors';
-import { requestSiteAddressChange } from 'calypso/state/site-address-change/actions';
+import { useExitFlow } from '../hooks/use-exit-flow';
+import { useSiteData } from '../hooks/use-site-data';
+import { stepsWithRequiredLogin } from '../utils/steps-with-required-login';
 
 const designFirst: Flow = {
 	name: DESIGN_FIRST_FLOW,
-	title: 'Blog',
+	get title() {
+		return translate( 'Blog' );
+	},
+	isSignupFlow: true,
 	useSteps() {
-		return [
+		return stepsWithRequiredLogin( [
 			{
-				slug: 'site-creation-step',
-				asyncComponent: () => import( './internals/steps-repository/site-creation-step' ),
+				slug: 'check-sites',
+				asyncComponent: () => import( './internals/steps-repository/sites-checker' ),
+			},
+			{
+				slug: 'new-or-existing-site',
+				asyncComponent: () => import( './internals/steps-repository/new-or-existing-site' ),
+			},
+			{
+				slug: 'site-picker',
+				asyncComponent: () => import( './internals/steps-repository/site-picker-list' ),
+			},
+			{
+				slug: 'create-site',
+				asyncComponent: () => import( './internals/steps-repository/create-site' ),
 			},
 			{
 				slug: 'processing',
@@ -35,7 +50,7 @@ const designFirst: Flow = {
 			},
 			{
 				slug: 'domains',
-				asyncComponent: () => import( './internals/steps-repository/choose-a-domain' ),
+				asyncComponent: () => import( './internals/steps-repository/domains' ),
 			},
 			{
 				slug: 'use-my-domain',
@@ -51,58 +66,114 @@ const designFirst: Flow = {
 				asyncComponent: () => import( './internals/steps-repository/launchpad' ),
 			},
 			{
+				slug: 'site-launch',
+				asyncComponent: () => import( './internals/steps-repository/site-launch' ),
+			},
+			{
 				slug: 'celebration-step',
 				asyncComponent: () => import( './internals/steps-repository/celebration-step' ),
 			},
-		];
+		] );
 	},
 
 	useStepNavigation( currentStep, navigate ) {
 		const flowName = this.name;
-		const siteSlug = useSiteSlug();
-		const { getDomainCartItem, getPlanCartItem } = useSelect(
-			( select ) => ( {
-				getDomainCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getDomainCartItem,
-				getPlanCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getPlanCartItem,
-			} ),
-			[]
-		);
 		const { saveSiteSettings, setIntentOnSite } = useDispatch( SITE_STORE );
 		const { setSelectedSite } = useDispatch( ONBOARD_STORE );
-		const state = useSelect(
-			( select ) => select( ONBOARD_STORE ) as OnboardSelect,
-			[]
-		).getState();
-		const site = useSite();
+		const { site, siteSlug, siteId } = useSiteData();
+		const { exitFlow } = useExitFlow();
+
+		const { postFlowNavigator, initializeLaunchpadState } = useLaunchpadDecider( {
+			exitFlow,
+			navigate,
+		} );
+
+		// This flow clear the site_intent when flow is completed.
+		// We need to check if the site is launched and if so, clear the site_intent to avoid errors.
+		// See https://github.com/Automattic/dotcom-forge/issues/2886
+		const isSiteLaunched = site?.launch_status === 'launched' || false;
+		useEffect( () => {
+			if ( isSiteLaunched ) {
+				setIntentOnSite( siteSlug, '' );
+			}
+		}, [ siteSlug, setIntentOnSite, isSiteLaunched ] );
 
 		async function submit( providedDependencies: ProvidedDependencies = {} ) {
-			recordSubmitStep( providedDependencies, '', flowName, currentStep );
-			const returnUrl = `/setup/design-first/celebration-step?siteSlug=${ siteSlug }`;
-
 			switch ( currentStep ) {
-				case 'site-creation-step':
+				case 'check-sites':
+					// Check for unlaunched sites
+					if ( providedDependencies?.filteredSitesCount === 0 ) {
+						// No unlaunched sites, redirect to new site creation step
+						return navigate( 'create-site' );
+					}
+					// With unlaunched sites, continue to new-or-existing-site step
+					return navigate( 'new-or-existing-site' );
+				case 'new-or-existing-site':
+					if ( 'new-site' === providedDependencies?.newExistingSiteChoice ) {
+						return navigate( 'create-site' );
+					}
+					return navigate( 'site-picker' );
+				case 'site-picker': {
+					if ( providedDependencies?.siteId && providedDependencies?.siteSlug ) {
+						setSelectedSite( providedDependencies?.siteId );
+						await Promise.all( [
+							setIntentOnSite( providedDependencies?.siteSlug, DESIGN_FIRST_FLOW ),
+							saveSiteSettings( providedDependencies?.siteId, {
+								launchpad_screen: 'full',
+							} ),
+						] );
+
+						return window.location.assign(
+							addQueryArgs( `/setup/update-design/designSetup`, {
+								siteSlug: providedDependencies?.siteSlug,
+								flowToReturnTo: DESIGN_FIRST_FLOW,
+								theme: getQueryArg( window.location.href, 'theme' ),
+								style_variation: getQueryArg( window.location.href, 'style_variation' ),
+							} )
+						);
+					}
+					return navigate( 'launchpad' );
+				}
+				case 'create-site':
 					return navigate( 'processing' );
 				case 'processing': {
 					// If we just created a new site.
 					const siteSlug = providedDependencies?.siteSlug;
-					if ( ! providedDependencies?.blogLaunched && siteSlug ) {
+					if ( ! providedDependencies?.isLaunched && siteSlug ) {
 						const siteId = providedDependencies?.siteId;
 						setSelectedSite( siteId );
 						setIntentOnSite( siteSlug, DESIGN_FIRST_FLOW );
 						saveSiteSettings( siteId, {
 							launchpad_screen: 'full',
 						} );
+						initializeLaunchpadState( {
+							siteId: siteId as number,
+							siteSlug: ( providedDependencies?.siteSlug ?? siteSlug ) as string,
+						} );
+
+						if ( providedDependencies?.hasSetPreselectedTheme ) {
+							updateLaunchpadSettings( siteSlug as string, {
+								checklist_statuses: { design_completed: true },
+							} );
+
+							return postFlowNavigator( {
+								siteId: siteId as number,
+								siteSlug: siteSlug as string,
+							} );
+						}
 
 						return window.location.assign(
 							addQueryArgs( `/setup/update-design/designSetup`, {
 								siteSlug: siteSlug,
 								flowToReturnTo: flowName,
+								theme: getQueryArg( window.location.href, 'theme' ),
+								style_variation: getQueryArg( window.location.href, 'style_variation' ),
 							} )
 						);
 					}
 
 					// If the user's site has just been launched.
-					if ( providedDependencies?.blogLaunched && siteSlug ) {
+					if ( providedDependencies?.isLaunched && siteSlug ) {
 						await Promise.all( [
 							// We set launchpad_screen to off because users can choose to
 							// complete the first_post_published checklist task or not.
@@ -112,128 +183,103 @@ const designFirst: Flow = {
 							// Remove the site_intent.
 							setIntentOnSite( providedDependencies?.siteSlug, '' ),
 						] );
-
-						// If the user launched their site with a plan or domain in their cart, redirect them to
-						// checkout before sending them home.
-						if ( getPlanCartItem() || getDomainCartItem() ) {
-							const encodedReturnUrl = encodeURIComponent( returnUrl );
-
-							return window.location.assign(
-								`/checkout/${ encodeURIComponent(
-									( siteSlug as string ) ?? ''
-								) }?redirect_to=${ encodedReturnUrl }`
-							);
-						}
-						return window.location.replace( returnUrl );
+						return navigate( 'celebration-step' );
+					}
+					if ( providedDependencies?.goToCheckout ) {
+						// Do nothing and wait for checkout redirect
+						return;
 					}
 					return navigate( 'launchpad' );
 				}
 				case 'domains':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { domain_upsell_deferred: true },
 						} );
 					}
 
 					if ( providedDependencies?.freeDomain ) {
-						const freeDomainSuffix = '.wordpress.com';
-						const newDomainName = String( providedDependencies?.domainName ).replace(
-							freeDomainSuffix,
-							''
-						);
-
-						if ( providedDependencies?.domainName ) {
-							await requestSiteAddressChange(
-								site?.ID,
-								newDomainName,
-								'wordpress.com',
-								siteSlug,
-								freeSiteAddressType.BLOG,
-								true,
-								false
-							)( dispatch, state );
-						}
-
-						const currentSiteSlug = String( providedDependencies?.domainName ?? siteSlug );
-
-						await replaceProductsInCart(
-							currentSiteSlug as string,
-							[ getPlanCartItem() ].filter( Boolean ) as MinimalRequestCartProduct[]
-						);
-
-						return window.location.assign(
-							`/setup/design-first/launchpad?siteSlug=${ currentSiteSlug }`
-						);
+						return window.location.assign( `/setup/design-first/launchpad?siteId=${ site?.ID }` );
 					}
 
 					return navigate( 'plans' );
 				case 'use-my-domain':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { domain_upsell_deferred: true },
 						} );
 					}
 					return navigate( 'plans' );
 				case 'plans':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { plan_completed: true },
 						} );
 					}
-					if ( providedDependencies?.goToCheckout ) {
-						const items = [ getPlanCartItem(), getDomainCartItem() ].filter(
-							Boolean
-						) as MinimalRequestCartProduct[];
-
-						// Always replace items in the cart so we can remove old plan/domain items.
-						await replaceProductsInCart( siteSlug as string, items );
-					}
 					return navigate( 'launchpad' );
 				case 'setup-blog':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { setup_blog: true },
 						} );
 					}
 					return navigate( 'launchpad' );
 				case 'launchpad':
 					return navigate( 'processing' );
+				case 'site-launch':
+					return navigate( 'processing' );
+				case 'celebration-step':
+					return window.location.assign( providedDependencies.destinationUrl as string );
 			}
 		}
-		return { submit };
+
+		const goNext = async () => {
+			switch ( currentStep ) {
+				case 'launchpad':
+					skipLaunchpad( {
+						checklistSlug: site?.options?.site_intent,
+						siteId,
+						siteSlug,
+					} );
+					return;
+			}
+		};
+
+		return { goNext, submit };
 	},
 
 	useAssertConditions(): AssertConditionResult {
 		const flowName = this.name;
 		const isLoggedIn = useSelector( isUserLoggedIn );
 		const currentUserSiteCount = useSelector( getCurrentUserSiteCount );
-		const locale = useLocale();
 		const currentPath = window.location.pathname;
-		const isSiteCreationStep =
+		const isCreateSite =
+			currentPath.endsWith( 'setup/design-first' ) ||
 			currentPath.endsWith( 'setup/design-first/' ) ||
-			currentPath.includes( 'setup/design-first/site-creation-step' );
+			currentPath.includes( 'setup/design-first/check-sites' );
 		const userAlreadyHasSites = currentUserSiteCount && currentUserSiteCount > 0;
 
-		const logInUrl =
-			locale && locale !== 'en'
-				? `/start/account/user/${ locale }?variationName=${ flowName }&pageTitle=Pick%20a%20design&redirect_to=/setup/${ flowName }`
-				: `/start/account/user?variationName=${ flowName }&pageTitle=Pick%20a%20design&redirect_to=/setup/${ flowName }`;
+		// Despite sending a CHECKING state, this function gets called again with the
+		// /setup/design-first/create-site route which has no locale in the path so we need to
+		// redirect off of the first render.
+		// This effects both /setup/design-first/<locale> starting points and /setup/design-first/create-site/<locale> urls.
+		// The double call also hapens on urls without locale.
+		useEffect( () => {
+			if (
+				isLoggedIn &&
+				isCreateSite &&
+				( ! userAlreadyHasSites || getQueryArg( window.location.href, 'ref' ) === 'calypshowcase' )
+			) {
+				redirect( `/setup/design-first/create-site${ window.location.search }` );
+			}
+		}, [] );
 
 		let result: AssertConditionResult = { state: AssertConditionState.SUCCESS };
 
-		if ( ! isLoggedIn ) {
-			redirect( logInUrl );
+		if ( isLoggedIn && isCreateSite && ! userAlreadyHasSites ) {
 			result = {
 				state: AssertConditionState.CHECKING,
-				message: `${ flowName } requires a logged in user`,
-			};
-		} else if ( userAlreadyHasSites && isSiteCreationStep ) {
-			// Redirect users with existing sites out of the flow as we create a new site as the first step in this flow.
-			// This prevents a bunch of sites being created accidentally.
-			redirect( `/post?${ DESIGN_FIRST_FLOW }=true` );
-			result = {
-				state: AssertConditionState.CHECKING,
-				message: `${ flowName } requires no preexisting sites`,
+				message: `${ flowName } with no preexisting sites`,
 			};
 		}
 

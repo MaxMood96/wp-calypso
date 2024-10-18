@@ -6,6 +6,7 @@
  *
  * IF YOU CHANGE THIS FUNCTION ALSO CHANGE THE TESTS!
  */
+import config from '@automattic/calypso-config';
 import {
 	JETPACK_PRODUCTS_LIST,
 	JETPACK_RESET_PLANS,
@@ -17,7 +18,8 @@ import {
 	isPlan,
 	isWpComPremiumPlan,
 	isTitanMail,
-	isDomainRegistration,
+	is100Year,
+	isValidFeatureKey,
 } from '@automattic/calypso-products';
 import {
 	URL_TYPE,
@@ -28,6 +30,7 @@ import {
 } from '@automattic/calypso-url';
 import { isTailoredSignupFlow } from '@automattic/onboarding';
 import debugFactory from 'debug';
+import { REMOTE_PATH_AUTH } from 'calypso/jetpack-connect/constants';
 import {
 	getGoogleApps,
 	hasGoogleApps,
@@ -47,10 +50,13 @@ import {
 	hasStarterPlan,
 } from 'calypso/lib/cart-values/cart-items';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
-import { isValidFeatureKey } from 'calypso/lib/plans/features-list';
 import { getEligibleTitanDomain } from 'calypso/lib/titan';
 import { addQueryArgs, isExternal, resemblesUrl } from 'calypso/lib/url';
 import { managePurchase } from 'calypso/me/purchases/paths';
+import {
+	getEmailManagementPath,
+	getProfessionalEmailCheckoutUpsellPath,
+} from 'calypso/my-sites/email/paths';
 import {
 	clearSignupCompleteFlowName,
 	getSignupCompleteFlowName,
@@ -97,6 +103,15 @@ export interface PostCheckoutUrlArguments {
 	jetpackTemporarySiteId?: string;
 	adminPageRedirect?: string;
 	domains?: ResponseDomain[];
+	connectAfterCheckout?: boolean;
+	/**
+	 * `fromSiteSlug` is the Jetpack site slug passed from the site via url query arg (into
+	 * checkout), for use cases when the site slug cannot be retrieved from state, ie- when there
+	 * is not a site in context, such as in siteless checkout. As opposed to `siteSlug` which is
+	 * the site slug present when the site is in context (ie- when site is connected and user is
+	 * logged in).
+	 */
+	fromSiteSlug?: string;
 }
 
 /**
@@ -133,6 +148,8 @@ export default function getThankYouPageUrl( {
 	jetpackTemporarySiteId,
 	adminPageRedirect,
 	domains,
+	connectAfterCheckout,
+	fromSiteSlug,
 }: PostCheckoutUrlArguments ): string {
 	debug( 'starting getThankYouPageUrl' );
 
@@ -216,7 +233,7 @@ export default function getThankYouPageUrl( {
 	const firstRenewalInCart =
 		cart && hasRenewalItem( cart ) ? getRenewalItems( cart )[ 0 ] : undefined;
 
-	// jetpack userless & siteless checkout uses a special thank you page
+	// Jetpack userless & siteless checkout uses a special thank you page
 	if ( sitelessCheckoutType === 'jetpack' ) {
 		// extract a product from the cart, in userless/siteless checkout there should only be one
 		const productSlug = cart?.products[ 0 ]?.product_slug ?? 'no_product';
@@ -224,6 +241,42 @@ export default function getThankYouPageUrl( {
 		if ( siteSlug ) {
 			debug( 'redirecting to userless jetpack thank you' );
 			return `/checkout/jetpack/thank-you/${ siteSlug }/${ productSlug }`;
+		}
+
+		// siteless checkout - "Connect After Checkout" flow.
+		if ( connectAfterCheckout && adminUrl && fromSiteSlug ) {
+			debug( 'Redirecting to the site to initiate Jetpack connection' );
+			// Remove "/wp-admin/" from the beginning of the REMOTE_PATH_AUTH because it's already
+			// part of the `adminUrl` that we prepend to this path (below).
+			const jetpackSiteAuthPath = REMOTE_PATH_AUTH.replace( /^\/wp-admin\//, '' );
+
+			const calypsoHost =
+				typeof window !== 'undefined'
+					? window.location.protocol + '//' + window.location.host
+					: 'https://wordpress.com';
+
+			// Then After connection authorization, we'll redirect to the product license activation page.
+			const redirectAfterAuthUrl = addQueryArgs(
+				{
+					receiptId: receiptIdOrPlaceholder,
+					siteId: jetpackTemporarySiteId && parseInt( jetpackTemporarySiteId ),
+					fromSiteSlug,
+					productSlug,
+					redirect_to: redirectTo,
+				},
+				`${ calypsoHost }/checkout/jetpack/thank-you/licensing-auto-activate/${ productSlug }`
+			);
+
+			const remoteSiteConnectUrl = addQueryArgs(
+				{
+					redirect_after_auth: redirectAfterAuthUrl,
+					from: 'connect-after-checkout',
+					...( config( 'env_id' ) === 'development' && { calypso_env: 'development' } ),
+				},
+				`${ adminUrl }${ jetpackSiteAuthPath }`
+			);
+
+			return remoteSiteConnectUrl;
 		}
 
 		// siteless checkout
@@ -234,6 +287,7 @@ export default function getThankYouPageUrl( {
 			{
 				receiptId: receiptIdOrPlaceholder,
 				siteId: jetpackTemporarySiteId && parseInt( jetpackTemporarySiteId ),
+				redirect_to: redirectTo,
 			},
 			thankYouUrl
 		);
@@ -307,12 +361,10 @@ export default function getThankYouPageUrl( {
 	// signup flow that is not only for domain registrations and the cookie
 	// post-checkout URL is not the signup "intent" flow.
 	const signupFlowName = getSignupCompleteFlowName();
-	const isDomainOnly =
-		siteSlug === 'no-site' && getAllCartItems( cart ).every( isDomainRegistration );
+
 	if (
 		( [ 'no-user', 'no-site' ].includes( String( cart?.cart_key ?? '' ) ) ||
 			signupFlowName === 'domain' ) &&
-		! isDomainOnly &&
 		urlFromCookie &&
 		receiptIdOrPlaceholder &&
 		! urlFromCookie.includes( '/start/setup-site' )
@@ -323,7 +375,7 @@ export default function getThankYouPageUrl( {
 		return newBlogReceiptUrl;
 	}
 
-	// disable upsell for tailored signup users
+	// disable upsell for given tailored signup users
 	const isTailoredSignup = isTailoredSignupFlow( signupFlowName );
 
 	const redirectUrlForPostCheckoutUpsell =
@@ -334,7 +386,6 @@ export default function getThankYouPageUrl( {
 					siteSlug,
 					hideUpsell: Boolean( hideNudge ),
 					domains,
-					isDomainOnly,
 			  } )
 			: undefined;
 
@@ -531,30 +582,48 @@ function getFallbackDestination( {
 		return `/checkout/thank-you/features/${ feature }/${ siteSlug }/${ receiptIdOrPlaceholder }`;
 	}
 
+	const is100YearPlanProduct = cart?.products?.some( is100Year );
+	if ( is100YearPlanProduct ) {
+		debug( 'site with 100 year plan' );
+		return `/checkout/100-year/thank-you/${ siteSlug }/${ receiptIdOrPlaceholder }`;
+	}
+
 	const titanProducts = cart?.products?.filter( ( product ) => isTitanMail( product ) );
 	if ( titanProducts && titanProducts.length > 0 ) {
 		const emails = titanProducts[ 0 ].extra?.email_users;
 		if ( emails && emails.length > 0 ) {
 			debug( 'site with titan products' );
+			if ( cart?.products?.length === 1 ) {
+				const domain = titanProducts[ 0 ].meta;
+				if ( domain ) {
+					return getEmailManagementPath( siteSlug, domain, null, {
+						'new-email': emails[ 0 ].email,
+					} );
+				}
+			}
 			return `/checkout/thank-you/${ siteSlug }/${ receiptIdOrPlaceholder }?email=${ emails[ 0 ].email }`;
 		}
 	}
 
 	const marketplaceProducts =
 		cart?.products?.filter( ( product ) => product?.extra?.is_marketplace_product ) || [];
-
-	const marketplacePluginSlugs = marketplaceProducts
-		.filter( ( { extra } ) => extra.product_type === 'marketplace_plugin' )
-		.map( ( { extra } ) => extra.product_slug );
-
-	const marketplaceThemeSlugs = marketplaceProducts
-		.filter( ( { extra } ) => extra.product_type === 'marketplace_theme' )
-		.map( ( { extra } ) => extra.product_slug );
-
 	if ( marketplaceProducts.length > 0 ) {
 		debug( 'site with marketplace products' );
+		const marketplacePluginSlugs = marketplaceProducts
+			.filter(
+				( { extra } ) =>
+					extra.product_type === 'marketplace_plugin' || extra.product_type === 'saas_plugin'
+			)
+			.map( ( { extra } ) => extra.product_slug );
+
+		const marketplaceThemeSlugs = marketplaceProducts
+			.filter( ( { extra } ) => extra.product_type === 'marketplace_theme' )
+			.map( ( { extra } ) => extra.product_slug );
 		return addQueryArgs(
-			{ plugins: marketplacePluginSlugs.join( ',' ), themes: marketplaceThemeSlugs.join( ',' ) },
+			{
+				...( marketplacePluginSlugs.length ? { plugins: marketplacePluginSlugs.join( ',' ) } : {} ),
+				...( marketplaceThemeSlugs.length ? { themes: marketplaceThemeSlugs.join( ',' ) } : {} ),
+			},
 			`/marketplace/thank-you/${ siteSlug }`
 		);
 	}
@@ -566,7 +635,6 @@ function getFallbackDestination( {
 /**
  * This function returns the product slug of the next higher plan of the plan item in the cart.
  * Currently, it only supports premium plans.
- *
  * @param {ResponseCart} cart the cart object
  * @returns {string|undefined} the product slug of the next higher plan if it exists, undefined otherwise.
  */
@@ -612,14 +680,12 @@ function getRedirectUrlForPostCheckoutUpsell( {
 	siteSlug,
 	hideUpsell,
 	domains,
-	isDomainOnly,
 }: {
 	receiptId: ReceiptId | ReceiptIdPlaceholder;
 	cart: ResponseCart | undefined;
 	siteSlug: string | undefined;
 	hideUpsell: boolean;
 	domains: ResponseDomain[] | undefined;
-	isDomainOnly?: boolean;
 } ): string | undefined {
 	if ( hideUpsell ) {
 		return;
@@ -629,7 +695,6 @@ function getRedirectUrlForPostCheckoutUpsell( {
 		cart,
 		siteSlug,
 		domains,
-		isDomainOnly,
 	} );
 
 	if ( professionalEmailUpsellUrl ) {
@@ -664,13 +729,11 @@ function getProfessionalEmailUpsellUrl( {
 	cart,
 	siteSlug,
 	domains,
-	isDomainOnly,
 }: {
 	receiptId: ReceiptId | ReceiptIdPlaceholder;
 	cart: ResponseCart | undefined;
 	siteSlug: string | undefined;
 	domains: ResponseDomain[] | undefined;
-	isDomainOnly?: boolean;
 } ): string | undefined {
 	if ( ! cart ) {
 		return;
@@ -685,7 +748,6 @@ function getProfessionalEmailUpsellUrl( {
 	}
 
 	if (
-		! isDomainOnly &&
 		! hasBloggerPlan( cart ) &&
 		! hasPersonalPlan( cart ) &&
 		! hasBusinessPlan( cart ) &&
@@ -715,7 +777,7 @@ function getProfessionalEmailUpsellUrl( {
 		return;
 	}
 
-	return `/checkout/offer-professional-email/${ domainName }/${ receiptId }/${ siteSlug }`;
+	return getProfessionalEmailCheckoutUpsellPath( siteSlug ?? domainName, domainName, receiptId );
 }
 
 function getNoticeType(
