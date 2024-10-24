@@ -1,21 +1,19 @@
-import classNames from 'classnames';
+import { Tooltip } from '@automattic/components';
+import clsx from 'clsx';
 import { localize, withRtl } from 'i18n-calypso';
 import PropTypes from 'prop-types';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import Notice from 'calypso/components/notice';
-import Tooltip from 'calypso/components/tooltip';
 import { hasTouch } from 'calypso/lib/touch-detect';
 import { useWindowResizeCallback } from 'calypso/lib/track-element-size';
 import BarContainer from './bar-container';
 
 import './style.scss';
 
-const noop = () => {};
 const isTouch = hasTouch();
 
 /**
  * Auxiliary method to calculate the maximum value for the Y axis, based on a dataset.
- *
  * @param {Array} values An array of numeric values.
  * @returns {number} The maximum value for the Y axis.
  */
@@ -47,18 +45,18 @@ function Chart( {
 	barClick,
 	children,
 	data,
-	isPlaceholder,
+	isPlaceholder = false,
 	isRtl,
-	minBarWidth,
-	minTouchBarWidth,
+	minBarWidth = 15,
+	minTouchBarWidth = 42,
 	numberFormat,
 	translate,
-	chartXPadding,
-	sliceFromBeginning,
+	chartXPadding = 20,
+	sliceFromBeginning = true,
 	onChangeMaxBars,
 	minBarsToBeShown,
-	hideYAxis,
-	hideXAxis,
+	hideYAxis = false,
+	hideXAxis = false,
 } ) {
 	const [ tooltip, setTooltip ] = useState( { isTooltipVisible: false } );
 	const [ sizing, setSizing ] = useState( { clientWidth: 0, hasResized: false } );
@@ -172,7 +170,7 @@ function Chart( {
 	}
 
 	return (
-		<div ref={ resizeRef } className={ classNames( 'chart', { 'is-placeholder': isPlaceholder } ) }>
+		<div ref={ resizeRef } className={ clsx( 'chart', { 'is-placeholder': isPlaceholder } ) }>
 			<div className="chart__y-axis-markers">
 				<div className="chart__y-axis-marker is-hundred" />
 				<div className="chart__y-axis-marker is-fifty" />
@@ -236,17 +234,6 @@ Chart.propTypes = {
 	minBarsToBeShown: PropTypes.number,
 	hideYAxis: PropTypes.bool,
 	hideXAxis: PropTypes.bool,
-};
-
-Chart.defaultProps = {
-	barClick: noop,
-	isPlaceholder: false,
-	minBarWidth: 15,
-	minTouchBarWidth: 42,
-	chartXPadding: 20,
-	sliceFromBeginning: true,
-	hideYAxis: false,
-	hideXAxis: false,
 };
 
 export default withRtl( localize( Chart ) );

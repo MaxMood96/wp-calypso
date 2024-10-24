@@ -3,55 +3,136 @@
  * External Dependencies
  */
 import { recordTracksEvent } from '@automattic/calypso-analytics';
-import { CardBody } from '@wordpress/components';
+import { CardBody, Disabled } from '@wordpress/components';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { useEffect, useRef } from '@wordpress/element';
-import classnames from 'classnames';
-import { useSelector } from 'react-redux';
-import { Route, Routes, useLocation } from 'react-router-dom';
-import { getSectionName } from 'calypso/state/ui/selectors';
+import React, { useState } from 'react';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 /**
  * Internal Dependencies
  */
+import { useHelpCenterContext } from '../contexts/HelpCenterContext';
+import { useSupportStatus } from '../data/use-support-status';
+import { useChatStatus, useShouldRenderEmailOption } from '../hooks';
+import { HELP_CENTER_STORE } from '../stores';
+import { HelpCenterArticle } from './help-center-article';
+import { HelpCenterChat } from './help-center-chat';
+import { HelpCenterChatHistory } from './help-center-chat-history';
 import { HelpCenterContactForm } from './help-center-contact-form';
 import { HelpCenterContactPage } from './help-center-contact-page';
-import { HelpCenterEmbedResult } from './help-center-embed-result';
-import InlineChat from './help-center-inline-chat';
 import { HelpCenterSearch } from './help-center-search';
 import { SuccessScreen } from './ticket-success-screen';
+import type { HelpCenterSelect } from '@automattic/data-stores';
 
-const HelpCenterContent: React.FC = () => {
+import './help-center-content.scss';
+
+// Disabled component only applies the class if isDisabled is true, we want it always.
+function Wrapper( {
+	isDisabled,
+	className,
+	children,
+}: React.PropsWithChildren< { isDisabled: boolean; className: string } > ) {
+	if ( isDisabled ) {
+		return (
+			<Disabled isDisabled={ isDisabled } className={ className }>
+				{ children }
+			</Disabled>
+		);
+	}
+	return <div className={ className }>{ children }</div>;
+}
+
+const HelpCenterContent: React.FC< { isRelative?: boolean; currentRoute?: string } > = ( {
+	currentRoute,
+} ) => {
+	const [ searchTerm, setSearchTerm ] = useState( '' );
 	const location = useLocation();
-	const className = classnames( 'help-center__container-content' );
 	const containerRef = useRef< HTMLDivElement >( null );
-	const section = useSelector( getSectionName );
+	const navigate = useNavigate();
+	const { setNavigateToRoute } = useDispatch( HELP_CENTER_STORE );
+	const { sectionName } = useHelpCenterContext();
+	const { isLoading: isLoadingEmailStatus } = useShouldRenderEmailOption();
+	const { isLoading: isLoadingChatStatus } = useChatStatus();
+
+	const { data, isLoading: isLoadingEligibility } = useSupportStatus();
+
+	const isUserEligibleForPaidSupport = data?.eligibility.is_user_eligible ?? false;
+	const isLoadingEnvironment = isLoadingEmailStatus || isLoadingChatStatus || isLoadingEligibility;
 
 	useEffect( () => {
 		recordTracksEvent( 'calypso_helpcenter_page_open', {
 			pathname: location.pathname,
 			search: location.search,
-			section,
+			section: sectionName,
 			force_site_id: true,
 			location: 'help-center',
+			is_free_user: ! isUserEligibleForPaidSupport,
 		} );
-	}, [ location, section ] );
+	}, [ location, sectionName, isUserEligibleForPaidSupport ] );
 
-	// reset the scroll location on navigation, TODO: unless there's an anchor
+	const { navigateToRoute, isMinimized } = useSelect( ( select ) => {
+		const store = select( HELP_CENTER_STORE ) as HelpCenterSelect;
+		return {
+			navigateToRoute: store.getNavigateToRoute(),
+			isMinimized: store.getIsMinimized(),
+		};
+	}, [] );
+
 	useEffect( () => {
-		if ( containerRef.current ) {
+		if ( navigateToRoute ) {
+			const fullLocation = [ location.pathname, location.search, location.hash ].join( '' );
+			// On navigate once to keep the back button responsive.
+			if ( fullLocation !== navigateToRoute ) {
+				navigate( navigateToRoute );
+			}
+			setNavigateToRoute( null );
+		}
+	}, [ navigate, navigateToRoute, setNavigateToRoute, location ] );
+
+	useEffect( () => {
+		setSearchTerm( '' );
+		if ( containerRef.current && ! location.hash && ! location.pathname.includes( '/odie' ) ) {
 			containerRef.current.scrollTo( 0, 0 );
 		}
 	}, [ location ] );
 
 	return (
-		<CardBody ref={ containerRef } className={ className }>
-			<Routes>
-				<Route path="/" element={ <HelpCenterSearch /> } />
-				<Route path="/post" element={ <HelpCenterEmbedResult /> } />
-				<Route path="/contact-options" element={ <HelpCenterContactPage /> } />
-				<Route path="/contact-form" element={ <HelpCenterContactForm /> } />
-				<Route path="/success" element={ <SuccessScreen /> } />
-				<Route path="/inline-chat" element={ <InlineChat /> } />
-			</Routes>
+		<CardBody ref={ containerRef } className="help-center__container-content">
+			<Wrapper isDisabled={ isMinimized } className="help-center__container-content-wrapper">
+				<Routes>
+					<Route
+						path="/"
+						element={
+							<HelpCenterSearch onSearchChange={ setSearchTerm } currentRoute={ currentRoute } />
+						}
+					/>
+					<Route path="/post" element={ <HelpCenterArticle /> } />
+					<Route path="/contact-options" element={ <HelpCenterContactPage /> } />
+					<Route path="/contact-form" element={ <HelpCenterContactForm /> } />
+					<Route path="/success" element={ <SuccessScreen /> } />
+					<Route
+						path="/odie"
+						element={
+							<HelpCenterChat
+								isLoadingEnvironment={ isLoadingEnvironment }
+								isUserEligibleForPaidSupport={ isUserEligibleForPaidSupport }
+								searchTerm={ searchTerm }
+							/>
+						}
+					/>
+					<Route
+						path="/odie/:id"
+						element={
+							<HelpCenterChat
+								isLoadingEnvironment={ isLoadingEnvironment }
+								isUserEligibleForPaidSupport={ isUserEligibleForPaidSupport }
+								searchTerm={ searchTerm }
+							/>
+						}
+					/>
+					<Route path="/chat-history" element={ <HelpCenterChatHistory /> } />
+				</Routes>
+			</Wrapper>
 		</CardBody>
 	);
 };

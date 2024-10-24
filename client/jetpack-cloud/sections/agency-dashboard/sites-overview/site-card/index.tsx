@@ -1,12 +1,14 @@
+import { isEnabled } from '@automattic/calypso-config';
 import { Card, Gridicon, Button } from '@automattic/components';
 import { Icon, chevronDown, chevronUp } from '@wordpress/icons';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useState, useCallback, MouseEvent, KeyboardEvent } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import useFetchTestConnection from 'calypso/data/agency-dashboard/use-fetch-test-connection';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import {
 	getSelectedLicenses,
+	getSelectedSiteLicenses,
 	getSelectedLicensesSiteId,
 } from 'calypso/state/jetpack-agency-dashboard/selectors';
 import { getIsPartnerOAuthTokenLoaded } from 'calypso/state/partner-portal/partner/selectors';
@@ -16,6 +18,7 @@ import SiteErrorContent from '../site-error-content';
 import SiteExpandedContent from '../site-expanded-content';
 import SitePhpVersion from '../site-expanded-content/site-php-version';
 import SiteStatusContent from '../site-status-content';
+import { SiteHostInfo } from '../site-status-content/site-host-info';
 import type { SiteData, SiteColumns, AllowedTypes } from '../types';
 
 import './style.scss';
@@ -29,16 +32,16 @@ export default function SiteCard( { rows, columns }: Props ) {
 	const dispatch = useDispatch();
 	const isPartnerOAuthTokenLoaded = useSelector( getIsPartnerOAuthTokenLoaded );
 
-	const recordEvent = useJetpackAgencyDashboardRecordTrackEvent( null, true );
+	const recordEvent = useJetpackAgencyDashboardRecordTrackEvent( null, false );
 
 	const [ isExpanded, setIsExpanded ] = useState( false );
 	const [ expandedColumn, setExpandedColumn ] = useState< AllowedTypes | null >( null );
 	const blogId = rows.site.value.blog_id;
 	const isConnectionHealthy = rows.site.value?.is_connection_healthy;
 
-	useFetchTestConnection( isPartnerOAuthTokenLoaded, isConnectionHealthy, blogId );
+	const { data } = useFetchTestConnection( isPartnerOAuthTokenLoaded, isConnectionHealthy, blogId );
 
-	const isSiteConnected = rows.site.value.is_connected;
+	const isSiteConnected = data?.connected ?? true;
 
 	const handleSetExpandedColumn = ( column: AllowedTypes ) => {
 		recordEvent( 'expandable_block_column_toggled', {
@@ -78,19 +81,23 @@ export default function SiteCard( { rows, columns }: Props ) {
 	const siteUrl = site.value.url;
 	const isFavorite = rows.isFavorite;
 
+	const isStreamlinedPurchasesEnabled = isEnabled( 'jetpack/streamline-license-purchases' );
+
 	const selectedLicenses = useSelector( getSelectedLicenses );
 	const selectedLicensesSiteId = useSelector( getSelectedLicensesSiteId );
+	const selectedSiteLicenses = useSelector( getSelectedSiteLicenses );
 
 	const currentSiteHasSelectedLicenses =
 		selectedLicensesSiteId === blogId && selectedLicenses?.length;
 
 	// We should disable the license selection for all sites, but the active one.
-	const shouldDisableLicenseSelection =
-		selectedLicenses?.length && ! currentSiteHasSelectedLicenses;
+	const shouldDisableLicenseSelection = isStreamlinedPurchasesEnabled
+		? selectedSiteLicenses?.length
+		: selectedLicenses?.length && ! currentSiteHasSelectedLicenses;
 
 	return (
 		<Card
-			className={ classNames( 'site-card__card', {
+			className={ clsx( 'site-card__card', {
 				'site-card__card-disabled': shouldDisableLicenseSelection,
 				'site-card__card-active': currentSiteHasSelectedLicenses,
 			} ) }
@@ -125,7 +132,7 @@ export default function SiteCard( { rows, columns }: Props ) {
 							if ( row.type ) {
 								return (
 									<div
-										className={ classNames(
+										className={ clsx(
 											'site-card__expanded-content-list',
 											isSiteConnected && 'site-card__content-list-no-error'
 										) }
@@ -169,6 +176,7 @@ export default function SiteCard( { rows, columns }: Props ) {
 								);
 							}
 						} ) }
+					<SiteHostInfo site={ rows.site.value } />
 					<div className="site-card__expanded-content-list site-card__content-list-no-error">
 						<SitePhpVersion phpVersion={ rows.site.value.php_version_num } />
 					</div>

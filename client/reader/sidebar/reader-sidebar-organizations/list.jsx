@@ -1,9 +1,9 @@
+import { Count } from '@automattic/components';
 import { localize } from 'i18n-calypso';
 import { map } from 'lodash';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
-import Count from 'calypso/components/count';
 import ExpandableSidebarMenu from 'calypso/layout/sidebar/expandable';
 import SidebarItem from 'calypso/layout/sidebar/item';
 import ReaderA8cIcon from 'calypso/reader/components/icons/a8c-icon';
@@ -80,7 +80,7 @@ export class ReaderSidebarOrganizationsList extends Component {
 				title={ organization.title }
 				onClick={ this.handleClick }
 				customIcon={ this.renderIcon() }
-				disableFlyout={ true }
+				disableFlyout
 				className={
 					( '/read/' + organization.slug === path ||
 						sites.some( ( site ) => `/read/feeds/${ site.feed_ID }` === path ) ) &&

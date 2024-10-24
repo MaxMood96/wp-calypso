@@ -80,7 +80,7 @@ export class SidebarComponent {
 		if ( subitem ) {
 			const subitemSelector = `.is-toggle-open :text-is("${ subitem }"):visible`;
 			await Promise.all( [
-				this.page.waitForNavigation(),
+				this.page.waitForNavigation( { timeout: 30 * 1000 } ),
 				this.page.dispatchEvent( subitemSelector, 'click' ),
 			] );
 		}
@@ -228,7 +228,7 @@ export class SidebarComponent {
 		await this.waitForSidebarInitialization();
 
 		const navbarComponent = new NavbarComponent( this.page );
-		await navbarComponent.clickMySites();
+		await navbarComponent.clickMobileMenu();
 
 		// `focus-sidebar` attribute is added to the main layout screen.
 		const layoutElement = await this.page.waitForSelector( selectors.focusedLayout( 'Sidebar' ) );

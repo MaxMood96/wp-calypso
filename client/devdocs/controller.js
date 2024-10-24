@@ -1,7 +1,8 @@
+import page from '@automattic/calypso-router';
 import { debounce } from 'lodash';
-import page from 'page';
 import { stringify } from 'qs';
 import { createElement } from 'react';
+import noSitesIllustration from 'calypso/assets/images/illustrations/illustration-nosites.svg';
 import EmptyContent from 'calypso/components/empty-content';
 import { login } from 'calypso/lib/paths';
 import { isUserLoggedIn } from 'calypso/state/current-user/selectors';
@@ -139,7 +140,7 @@ const devdocs = {
 				actionURL: login( { redirectTo } ),
 				secondaryAction: 'Register',
 				secondaryActionURL: '/start/account',
-				illustration: '/calypso/images/illustrations/illustration-nosites.svg',
+				illustration: noSitesIllustration,
 			} );
 			next();
 		} else {

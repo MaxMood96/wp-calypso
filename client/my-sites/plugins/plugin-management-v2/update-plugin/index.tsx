@@ -1,13 +1,12 @@
 import { Button } from '@automattic/components';
 import { Icon, arrowRight } from '@wordpress/icons';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
-import { useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useCallback, useState } from 'react';
+import ConfirmModal from 'calypso/components/confirm-modal';
 import { UPDATE_PLUGIN } from 'calypso/lib/plugins/constants';
-import { siteObjectsToSiteIds } from 'calypso/my-sites/plugins/utils';
-import { getPluginOnSites } from 'calypso/state/plugins/installed/selectors';
-import getSites from 'calypso/state/selectors/get-sites';
+import { useSelector } from 'calypso/state';
+import usePluginVersionInfo from '../hooks/use-plugin-version-info';
 import PluginActionStatus from '../plugin-action-status';
 import { getAllowedPluginActions } from '../utils/get-allowed-plugin-actions';
 import { getPluginActionStatuses } from '../utils/get-plugin-action-statuses';
@@ -21,70 +20,24 @@ interface Props {
 	selectedSite?: SiteDetails;
 	className?: string;
 	updatePlugin?: ( plugin: PluginComponentProps ) => void;
+	siteCount?: number;
 }
 
-export default function UpdatePlugin( { plugin, selectedSite, className, updatePlugin }: Props ) {
+export default function UpdatePlugin( {
+	plugin,
+	selectedSite,
+	className,
+	updatePlugin,
+	siteCount,
+}: Props ) {
 	const translate = useTranslate();
-	const allSites = useSelector( getSites );
 	const state = useSelector( ( state ) => state );
+	const [ displayConfirmModal, setDisplayConfirmModal ] = useState( false );
 
-	const getPluginSites = ( plugin: PluginComponentProps ) => {
-		return Object.keys( plugin.sites ).map( ( siteId ) => {
-			const site = allSites.find( ( s ) => s?.ID === parseInt( siteId ) );
-			return {
-				...site,
-				...plugin.sites[ siteId ],
-			} as any; // This must be cast as any until this file is updated to work with the selectors in state/plugins/installed/selectors
-		} );
-	};
-
-	const sites = getPluginSites( plugin );
-	const siteIds = siteObjectsToSiteIds( sites );
-	const pluginsOnSites: any = getPluginOnSites( state, siteIds, plugin?.slug );
-
-	const currentVersions = sites
-		.map( ( site ) => {
-			const siteId = selectedSite ? selectedSite.ID : site.ID;
-			const sitePlugin = pluginsOnSites?.sites[ siteId ];
-			return sitePlugin?.version;
-		} )
-		.filter( ( version ) => version );
-
-	const updatedVersions = sites
-		.map( ( site ) => {
-			const siteId = selectedSite ? selectedSite.ID : site.ID;
-			const sitePlugin = pluginsOnSites?.sites[ siteId ];
-			return sitePlugin?.update?.new_version;
-		} )
-		.filter( ( version ) => version );
-
-	const currentVersionsRange = useMemo( () => {
-		const versions = [
-			// We want to remove the duplicated versions in the array, because if multiple sites have
-			// the same plugin version, we don't want to display the range.
-			...new Set(
-				// Sort the plugin versions, respecting semantic version convention.
-				currentVersions.sort( ( a: string, b: string ): number =>
-					a.localeCompare( b, undefined, {
-						numeric: true,
-						sensitivity: 'case',
-						caseFirst: 'upper',
-					} )
-				)
-			),
-		];
-
-		return {
-			min: versions[ 0 ],
-			max: versions.length > 1 ? versions[ versions.length - 1 ] : null,
-		};
-	}, [ currentVersions ] );
-
-	const hasUpdate = sites.some( ( site ) => {
-		const siteId = selectedSite ? selectedSite.ID : site.ID;
-		const sitePlugin = pluginsOnSites?.sites[ siteId ];
-		return sitePlugin?.update?.new_version && site.canUpdateFiles;
-	} );
+	const { currentVersionsRange, updatedVersions, hasUpdate } = usePluginVersionInfo(
+		plugin,
+		selectedSite?.ID
+	);
 
 	const allowedActions = getAllowedPluginActions( plugin, state, selectedSite );
 
@@ -100,29 +53,46 @@ export default function UpdatePlugin( { plugin, selectedSite, className, updateP
 			( selectedSite ? parseInt( status.siteId ) === selectedSite.ID : true )
 	);
 
+	const pluginUpdateConfirmationTitle = translate( 'Update %(plugin)s', {
+		args: {
+			plugin: plugin.name ?? plugin.slug,
+		},
+	} );
+
+	const onUpdatePlugin = useCallback( () => {
+		updatePlugin && updatePlugin( plugin );
+		setDisplayConfirmModal( false );
+	}, [ plugin, updatePlugin ] );
+
+	const onShowUpdateConfirmationModal = useCallback( () => {
+		setDisplayConfirmModal( true );
+	}, [] );
+
+	const onHideUpdateConfirmationModal = useCallback( () => {
+		setDisplayConfirmModal( false );
+	}, [] );
+
 	if ( ! allowedActions?.autoupdate ) {
 		content = <div>{ translate( 'Auto-managed on this site' ) }</div>;
 	} else if ( updateStatuses.length > 0 ) {
 		content = (
-			<>
-				<div className="update-plugin__plugin-action-status">
-					<PluginActionStatus
-						showMultipleStatuses={ false }
-						currentSiteStatuses={ updateStatuses }
-						selectedSite={ selectedSite }
-						retryButton={
-							<Button
-								onClick={ () => updatePlugin && updatePlugin( plugin ) }
-								className="update-plugin__retry-button"
-								borderless
-								compact
-							>
-								{ translate( 'Retry' ) }
-							</Button>
-						}
-					/>
-				</div>
-			</>
+			<div className="update-plugin__plugin-action-status">
+				<PluginActionStatus
+					showMultipleStatuses={ false }
+					currentSiteStatuses={ updateStatuses }
+					selectedSite={ selectedSite }
+					retryButton={
+						<Button
+							onClick={ onUpdatePlugin }
+							className="update-plugin__retry-button"
+							borderless
+							compact
+						>
+							{ translate( 'Retry' ) }
+						</Button>
+					}
+				/>
+			</div>
 		);
 	} else if ( hasUpdate ) {
 		content = (
@@ -136,9 +106,8 @@ export default function UpdatePlugin( { plugin, selectedSite, className, updateP
 				</span>
 				<Button
 					primary
-					onClick={ () => updatePlugin && updatePlugin( plugin ) }
+					onClick={ onShowUpdateConfirmationModal }
 					className="update-plugin__new-version"
-					borderless
 					compact
 				>
 					{ translate( '{{span}}Update to {{/span}}%s', {
@@ -148,8 +117,29 @@ export default function UpdatePlugin( { plugin, selectedSite, className, updateP
 						args: updatedVersions[ 0 ],
 					} ) }
 				</Button>
+
+				<ConfirmModal
+					isVisible={ displayConfirmModal }
+					confirmButtonLabel={ translate( 'Update' ) }
+					text={ translate(
+						'You are about to update the %(plugin)s plugin to version %(version)s, on %(siteCount)d site. ',
+						'You are about to update the %(plugin)s plugin to version %(version)s, on %(siteCount)d sites. ',
+						{
+							count: siteCount ?? 1,
+							args: {
+								version: updatedVersions[ 0 ],
+								plugin: plugin.name ?? plugin.slug,
+								siteCount: String( siteCount ),
+							},
+						}
+					) }
+					title={ String( pluginUpdateConfirmationTitle ) }
+					onCancel={ onHideUpdateConfirmationModal }
+					onConfirm={ onUpdatePlugin }
+				/>
 			</div>
 		);
 	}
-	return content ? <div className={ classNames( className ) }>{ content }</div> : null;
+
+	return content ? <div className={ clsx( className ) }>{ content }</div> : null;
 }

@@ -17,13 +17,11 @@ import { getSelectedSite, getSelectedSiteId } from 'calypso/state/ui/selectors';
  *
  * When adding tips for more services, please update the list in addition to adding
  * a method with the tip's content.
- *
  * @type {string[]}
  */
 const SERVICES_WITH_TIPS = [ 'instagram', 'google_plus' ];
 /**
  * List of services we provide tips for, only if the site is connected to Jetpack.
- *
  * @type {string[]}
  */
 const JETPACK_SERVICES_WITH_TIPS = SERVICES_WITH_TIPS.concat( [ 'facebook', 'twitter' ] );
@@ -48,13 +46,13 @@ class SharingServiceTip extends Component {
 
 	facebook() {
 		return this.props.translate(
-			'You can also add a {{likeBoxLink}}Like Box{{/likeBoxLink}}, a {{shareButtonLink}}share button{{/shareButtonLink}}, or {{embedLink}}embed{{/embedLink}} your page or profile on your site.',
+			'You can also add a {{pagePluginWidgetLink}}Page Plugin Widget{{/pagePluginWidgetLink}}, a {{shareButtonLink}}share button{{/shareButtonLink}}, or {{embedLink}}embed{{/embedLink}} your page or profile on your site.',
 			{
 				components: {
-					likeBoxLink: (
+					pagePluginWidgetLink: (
 						<a
 							href={ localizeUrl(
-								'https://wordpress.com/support/facebook-integration/#facebook-like-box'
+								'https://wordpress.com/support/facebook-embeds/#facebook-page-plugin-widget'
 							) }
 						/>
 					),

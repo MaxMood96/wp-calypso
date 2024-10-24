@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-imports */
 import { WordPressWordmark } from '@automattic/components';
 import { useLocalizeUrl, useIsEnglishLocale, useLocale } from '@automattic/i18n-utils';
-import { __ } from '@wordpress/i18n';
+import { useI18n } from '@wordpress/react-i18n';
 import { addQueryArgs } from '@wordpress/url';
 import { useState } from 'react';
 import { HeaderProps } from '../types';
@@ -10,28 +10,34 @@ import './style.scss';
 
 const UniversalNavbarHeader = ( {
 	className,
+	hideGetStartedCta = false,
 	isLoggedIn = false,
 	sectionName,
 	logoColor,
 	variant = 'default',
+	startUrl,
+	loginUrl,
 }: HeaderProps ) => {
 	const locale = useLocale();
 	const localizeUrl = useLocalizeUrl();
+	const { __ } = useI18n();
 	const [ isMobileMenuOpen, setMobileMenuOpen ] = useState( false );
 	const isEnglishLocale = useIsEnglishLocale();
 
-	const startUrl = addQueryArgs(
-		// url
-		sectionName === 'plugins'
-			? localizeUrl( '//wordpress.com/start/business', locale, isLoggedIn )
-			: localizeUrl( '//wordpress.com/start', locale, isLoggedIn ),
-		// query
-		sectionName
-			? {
-					ref: sectionName + '-lp',
-			  }
-			: {}
-	);
+	if ( ! startUrl ) {
+		startUrl = addQueryArgs(
+			// url
+			sectionName === 'plugins'
+				? localizeUrl( '//wordpress.com/start/business', locale, isLoggedIn )
+				: localizeUrl( '//wordpress.com/start', locale, isLoggedIn ),
+			// query
+			sectionName
+				? {
+						ref: sectionName + '-lp',
+				  }
+				: {}
+		);
+	}
 
 	return (
 		<div className={ className }>
@@ -76,35 +82,47 @@ const UniversalNavbarHeader = ( {
 												>
 													<ul>
 														<ClickableItem
-															titleValue={ __( 'WordPress Hosting', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'WordPress Hosting', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/hosting/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Domain Names', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Domain Names', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/domains/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Website Builder', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Website Builder', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/website-builder/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Create a Blog', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Create a Blog', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/create-blog/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Professional Email', __i18n_text_domain__ ) }
+															titleValue=""
+															content={ __( 'Newsletter', __i18n_text_domain__ ) }
+															urlValue={ localizeUrl(
+																'//wordpress.com/newsletter',
+																locale,
+																isLoggedIn,
+																true
+															) }
+															type="dropdown"
+															target="_self"
+														/>
+														<ClickableItem
+															titleValue=""
 															content={ __( 'Professional Email', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/professional-email/' ) }
 															type="dropdown"
@@ -112,52 +130,19 @@ const UniversalNavbarHeader = ( {
 														/>
 														{ isEnglishLocale && (
 															<ClickableItem
-																titleValue={ __( 'Website Design Services', __i18n_text_domain__ ) }
+																titleValue=""
 																content={ __( 'Website Design Services', __i18n_text_domain__ ) }
 																urlValue={ localizeUrl(
-																	'//wordpress.com/built-by/?ref=main-menu'
+																	'//wordpress.com/website-design-service/'
 																) }
 																type="dropdown"
 																target="_self"
 															/>
 														) }
 														<ClickableItem
-															titleValue={ __( 'Link in Bio', __i18n_text_domain__ ) }
-															content={ __( 'Link in Bio', __i18n_text_domain__ ) }
-															urlValue={ localizeUrl(
-																'//wordpress.com/setup/link-in-bio/intro?ref=main-menu',
-																locale,
-																isLoggedIn
-															) }
-															type="dropdown"
-															target="_self"
-														/>
-														<ClickableItem
-															titleValue={ __( 'Newsletter', __i18n_text_domain__ ) }
-															content={ __( 'Newsletter', __i18n_text_domain__ ) }
-															urlValue={ localizeUrl(
-																'//wordpress.com/setup/newsletter/intro?ref=main-menu',
-																locale,
-																isLoggedIn
-															) }
-															type="dropdown"
-															target="_self"
-														/>
-														<ClickableItem
-															titleValue={ __( 'Video', __i18n_text_domain__ ) }
-															content={ __( 'Video', __i18n_text_domain__ ) }
-															urlValue={ localizeUrl(
-																'//wordpress.com/setup/videopress/intro?ref=main-menu',
-																locale,
-																isLoggedIn
-															) }
-															type="dropdown"
-															target="_self"
-														/>
-														<ClickableItem
-															titleValue={ __( 'Course', __i18n_text_domain__ ) }
-															content={ __( 'Course', __i18n_text_domain__ ) }
-															urlValue={ localizeUrl( '//wordpress.com/create-a-course/' ) }
+															titleValue=""
+															content={ __( 'Commerce', __i18n_text_domain__ ) }
+															urlValue={ localizeUrl( '//wordpress.com/ecommerce/' ) }
 															type="dropdown"
 															target="_self"
 														/>
@@ -165,7 +150,7 @@ const UniversalNavbarHeader = ( {
 													<div className="x-dropdown-content-separator"></div>
 													<ul>
 														<ClickableItem
-															titleValue={ __( 'Enterprise', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Enterprise', __i18n_text_domain__ ) }
 															urlValue="https://wpvip.com/?utm_source=WordPresscom&utm_medium=automattic_referral&utm_campaign=top_nav"
 															type="dropdown"
@@ -187,7 +172,7 @@ const UniversalNavbarHeader = ( {
 												>
 													<ul>
 														<ClickableItem
-															titleValue={ __( 'Features', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Overview', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/features/' ) }
 															type="dropdown"
@@ -197,7 +182,7 @@ const UniversalNavbarHeader = ( {
 													<div className="x-dropdown-content-separator"></div>
 													<ul>
 														<ClickableItem
-															titleValue={ __( 'WordPress Themes', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'WordPress Themes', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl(
 																'//wordpress.com/themes',
@@ -208,7 +193,7 @@ const UniversalNavbarHeader = ( {
 															type="dropdown"
 														/>
 														<ClickableItem
-															titleValue={ __( 'WordPress Plugins', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'WordPress Plugins', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl(
 																'//wordpress.com/plugins',
@@ -219,7 +204,18 @@ const UniversalNavbarHeader = ( {
 															type="dropdown"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Google Apps', __i18n_text_domain__ ) }
+															titleValue=""
+															content={ __( 'WordPress Patterns', __i18n_text_domain__ ) }
+															urlValue={ localizeUrl(
+																'//wordpress.com/patterns',
+																locale,
+																isLoggedIn,
+																true
+															) }
+															type="dropdown"
+														/>
+														<ClickableItem
+															titleValue=""
 															content={ __( 'Google Apps', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/google/' ) }
 															type="dropdown"
@@ -242,50 +238,62 @@ const UniversalNavbarHeader = ( {
 												>
 													<ul>
 														<ClickableItem
-															titleValue={ __( 'Support', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'WordPress.com Support', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/support/' ) }
 															type="dropdown"
 														/>
 														<ClickableItem
-															titleValue={ __( 'News', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'News', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/blog/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Website Building Tips', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Website Building Tips', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/go/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Business Name Generator', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Business Name Generator', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/business-name-generator/' ) }
 															type="dropdown"
 															target="_self"
 														/>
 														<ClickableItem
-															titleValue={ __( 'Logo Maker', __i18n_text_domain__ ) }
+															titleValue=""
 															content={ __( 'Logo Maker', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/logo-maker/' ) }
 															type="dropdown"
 															target="_self"
 														/>
-														{ isEnglishLocale && (
-															<ClickableItem
-																titleValue={ __( 'Popular Tags', __i18n_text_domain__ ) }
-																content={ __( 'Popular Tags', __i18n_text_domain__ ) }
-																urlValue={ localizeUrl( '//wordpress.com/tags/' ) }
-																type="dropdown"
-																target="_self"
-															/>
-														) }
 														<ClickableItem
-															titleValue={ __( 'Daily Webinars', __i18n_text_domain__ ) }
+															titleValue=""
+															content={ __( 'Discover New Posts', __i18n_text_domain__ ) }
+															urlValue={ localizeUrl( '//wordpress.com/discover/' ) }
+															type="dropdown"
+															target="_self"
+														/>
+														<ClickableItem
+															titleValue=""
+															content={ __( 'Popular Tags', __i18n_text_domain__ ) }
+															urlValue={ localizeUrl( '//wordpress.com/tags/' ) }
+															type="dropdown"
+															target="_self"
+														/>
+														<ClickableItem
+															titleValue=""
+															content={ __( 'Blog Search', __i18n_text_domain__ ) }
+															urlValue={ localizeUrl( '//wordpress.com/read/search/' ) }
+															type="dropdown"
+															target="_self"
+														/>
+														<ClickableItem
+															titleValue=""
 															content={ __( 'Daily Webinars', __i18n_text_domain__ ) }
 															urlValue={ localizeUrl( '//wordpress.com/webinars/' ) }
 															type="dropdown"
@@ -293,7 +301,7 @@ const UniversalNavbarHeader = ( {
 														/>
 														{ isEnglishLocale && (
 															<ClickableItem
-																titleValue={ __( 'Learn WordPress', __i18n_text_domain__ ) }
+																titleValue=""
 																content={ __( 'Learn WordPress', __i18n_text_domain__ ) }
 																urlValue={ localizeUrl( '//wordpress.com/learn/' ) }
 																type="dropdown"
@@ -305,7 +313,7 @@ const UniversalNavbarHeader = ( {
 											</li>
 											<ClickableItem
 												className="x-nav-item x-nav-item__wide"
-												titleValue={ __( 'Plans & Pricing', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Plans & Pricing', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/pricing/' ) }
 												type="nav"
@@ -318,20 +326,25 @@ const UniversalNavbarHeader = ( {
 									{ ! isLoggedIn && (
 										<ClickableItem
 											className="x-nav-item x-nav-item__wide"
-											titleValue={ __( 'Log In', __i18n_text_domain__ ) }
+											titleValue=""
 											content={ __( 'Log In', __i18n_text_domain__ ) }
-											urlValue={ localizeUrl( '//wordpress.com/log-in', locale, isLoggedIn, true ) }
+											urlValue={
+												loginUrl ||
+												localizeUrl( '//wordpress.com/log-in', locale, isLoggedIn, true )
+											}
 											type="nav"
 										/>
 									) }
-									<ClickableItem
-										className="x-nav-item x-nav-item__wide"
-										titleValue={ __( 'Get Started', __i18n_text_domain__ ) }
-										content={ __( 'Get Started', __i18n_text_domain__ ) }
-										urlValue={ startUrl }
-										type="nav"
-										typeClassName="x-nav-link x-nav-link__primary x-link cta-btn-nav"
-									/>
+									{ ! hideGetStartedCta && (
+										<ClickableItem
+											className="x-nav-item x-nav-item__wide"
+											titleValue=""
+											content={ __( 'Get Started', __i18n_text_domain__ ) }
+											urlValue={ startUrl }
+											type="nav"
+											typeClassName="x-nav-link x-nav-link__primary x-link cta-btn-nav"
+										/>
+									) }
 									<li className="x-nav-item x-nav-item__narrow">
 										<button
 											role="menuitem"
@@ -388,14 +401,24 @@ const UniversalNavbarHeader = ( {
 								{ ! isLoggedIn && (
 									<ul className="x-menu-grid">
 										<ClickableItem
-											titleValue={ __( 'Sign Up', __i18n_text_domain__ ) }
-											content={ __( 'Sign Up', __i18n_text_domain__ ) }
+											titleValue=""
+											content={
+												<>
+													{ __( 'Sign Up', __i18n_text_domain__ ) }{ ' ' }
+													<span className="x-menu-link-chevron" />
+												</>
+											}
 											urlValue={ startUrl }
 											type="menu"
 										/>
 										<ClickableItem
-											titleValue={ __( 'Log In', __i18n_text_domain__ ) }
-											content={ __( 'Log In', __i18n_text_domain__ ) }
+											titleValue=""
+											content={
+												<>
+													{ __( 'Log In', __i18n_text_domain__ ) }{ ' ' }
+													<span className="x-menu-link-chevron" />
+												</>
+											}
 											urlValue={ localizeUrl( '//wordpress.com/log-in', locale, isLoggedIn, true ) }
 											type="menu"
 										/>
@@ -408,7 +431,7 @@ const UniversalNavbarHeader = ( {
 										<div className="x-hidden">{ __( 'About', __i18n_text_domain__ ) }</div>
 										<ul className="x-menu-grid">
 											<ClickableItem
-												titleValue={ __( 'Plans & Pricing', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Plans & Pricing', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/pricing/' ) }
 												type="menu"
@@ -421,82 +444,63 @@ const UniversalNavbarHeader = ( {
 										</div>
 										<ul className="x-menu-grid">
 											<ClickableItem
-												titleValue={ __( 'WordPress Hosting', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'WordPress Hosting', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/hosting/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Domain Names', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Domain Names', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/domains/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Website Builder', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Website Builder', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/website-builder/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Create a Blog', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Create a Blog', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/create-blog/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Professional Email', __i18n_text_domain__ ) }
+												titleValue=""
+												content={ __( 'Newsletter', __i18n_text_domain__ ) }
+												urlValue={ localizeUrl(
+													'//wordpress.com/newsletter',
+													locale,
+													isLoggedIn,
+													true
+												) }
+												type="menu"
+											/>
+											<ClickableItem
+												titleValue=""
 												content={ __( 'Professional Email', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/professional-email/' ) }
 												type="menu"
 											/>
 											{ isEnglishLocale && (
 												<ClickableItem
-													titleValue={ __( 'Website Design Services', __i18n_text_domain__ ) }
+													titleValue=""
 													content={ __( 'Website Design Services', __i18n_text_domain__ ) }
-													urlValue={ localizeUrl( '//wordpress.com/built-by/?ref=main-menu' ) }
+													urlValue={ localizeUrl( '//wordpress.com/website-design-service/' ) }
 													type="menu"
 													target="_self"
 												/>
 											) }
 											<ClickableItem
-												titleValue={ __( 'Link in Bio', __i18n_text_domain__ ) }
-												content={ __( 'Link in Bio', __i18n_text_domain__ ) }
-												urlValue={ localizeUrl(
-													'//wordpress.com/setup/link-in-bio/intro?ref=main-menu',
-													locale,
-													isLoggedIn
-												) }
+												titleValue=""
+												content={ __( 'Commerce', __i18n_text_domain__ ) }
+												urlValue={ localizeUrl( '//wordpress.com/ecommerce/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Newsletter', __i18n_text_domain__ ) }
-												content={ __( 'Newsletter', __i18n_text_domain__ ) }
-												urlValue={ localizeUrl(
-													'//wordpress.com/setup/newsletter/intro?ref=main-menu',
-													locale,
-													isLoggedIn
-												) }
-												type="menu"
-											/>
-											<ClickableItem
-												titleValue={ __( 'Video', __i18n_text_domain__ ) }
-												content={ __( 'Video', __i18n_text_domain__ ) }
-												urlValue={ localizeUrl(
-													'//wordpress.com/setup/videopress/intro?ref=main-menu',
-													locale,
-													isLoggedIn
-												) }
-												type="menu"
-											/>
-											<ClickableItem
-												titleValue={ __( 'Course', __i18n_text_domain__ ) }
-												content={ __( 'Course', __i18n_text_domain__ ) }
-												urlValue={ localizeUrl( '//wordpress.com/create-a-course/' ) }
-												type="menu"
-											/>
-											<ClickableItem
-												titleValue={ __( 'Enterprise', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Enterprise', __i18n_text_domain__ ) }
 												urlValue="https://wpvip.com/?utm_source=WordPresscom&utm_medium=automattic_referral&utm_campaign=top_nav"
 												type="menu"
@@ -509,15 +513,13 @@ const UniversalNavbarHeader = ( {
 										</div>
 										<ul className="x-menu-grid">
 											<ClickableItem
-												titleValue={ __( 'Features', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Overview', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/features/' ) }
 												type="menu"
 											/>
-										</ul>
-										<ul className="x-menu-grid">
 											<ClickableItem
-												titleValue={ __( 'WordPress Themes', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'WordPress Themes', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl(
 													'//wordpress.com/themes',
@@ -528,7 +530,7 @@ const UniversalNavbarHeader = ( {
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'WordPress Plugins', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'WordPress Plugins', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl(
 													'//wordpress.com/plugins',
@@ -539,7 +541,18 @@ const UniversalNavbarHeader = ( {
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Google Apps', __i18n_text_domain__ ) }
+												titleValue=""
+												content={ __( 'WordPress Patterns', __i18n_text_domain__ ) }
+												urlValue={ localizeUrl(
+													'//wordpress.com/patterns',
+													locale,
+													isLoggedIn,
+													true
+												) }
+												type="menu"
+											/>
+											<ClickableItem
+												titleValue=""
 												content={ __( 'Google Apps', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/google/' ) }
 												type="menu"
@@ -552,52 +565,62 @@ const UniversalNavbarHeader = ( {
 										</div>
 										<ul className="x-menu-grid">
 											<ClickableItem
-												titleValue={ __( 'Support', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'WordPress.com Support', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/support/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'News', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'News', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/blog/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Website Building Tips', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Website Building Tips', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/go/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Business Name Generator', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Business Name Generator', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/business-name-generator/' ) }
 												type="menu"
 											/>
 											<ClickableItem
-												titleValue={ __( 'Logo Maker', __i18n_text_domain__ ) }
+												titleValue=""
 												content={ __( 'Logo Maker', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/logo-maker/' ) }
 												type="menu"
 											/>
-											{ isEnglishLocale && (
-												<ClickableItem
-													titleValue={ __( 'Popular Tags', __i18n_text_domain__ ) }
-													content={ __( 'Popular Tags', __i18n_text_domain__ ) }
-													urlValue={ localizeUrl( '//wordpress.com/tags/' ) }
-													type="menu"
-												/>
-											) }
 											<ClickableItem
-												titleValue={ __( 'Daily Webinars', __i18n_text_domain__ ) }
+												titleValue=""
+												content={ __( 'Discover New Posts', __i18n_text_domain__ ) }
+												urlValue={ localizeUrl( '//wordpress.com/discover/' ) }
+												type="menu"
+											/>
+											<ClickableItem
+												titleValue=""
+												content={ __( 'Popular Tags', __i18n_text_domain__ ) }
+												urlValue={ localizeUrl( '//wordpress.com/tags/' ) }
+												type="menu"
+											/>
+											<ClickableItem
+												titleValue=""
+												content={ __( 'Blog Search', __i18n_text_domain__ ) }
+												urlValue={ localizeUrl( '//wordpress.com/read/search/' ) }
+												type="menu"
+											/>
+											<ClickableItem
+												titleValue=""
 												content={ __( 'Daily Webinars', __i18n_text_domain__ ) }
 												urlValue={ localizeUrl( '//wordpress.com/webinars/' ) }
 												type="menu"
 											/>
 											{ isEnglishLocale && (
 												<ClickableItem
-													titleValue={ __( 'Learn WordPress', __i18n_text_domain__ ) }
+													titleValue=""
 													content={ __( 'Learn WordPress', __i18n_text_domain__ ) }
 													urlValue={ localizeUrl( '//wordpress.com/learn/' ) }
 													type="menu"

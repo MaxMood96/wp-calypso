@@ -1,7 +1,6 @@
 import { Card, Spinner } from '@automattic/components';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
 import DocumentHead from 'calypso/components/data/document-head';
 import { useLocalizedMoment } from 'calypso/components/localized-moment';
 import Main from 'calypso/components/main';
@@ -9,6 +8,7 @@ import SidebarNavigation from 'calypso/components/sidebar-navigation';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
 import { applySiteOffset } from 'calypso/lib/site/timezone';
 import wpcom from 'calypso/lib/wp';
+import { useSelector } from 'calypso/state';
 import { fromActivityApi } from 'calypso/state/data-layer/wpcom/sites/activity/from-api';
 import getSiteGmtOffset from 'calypso/state/selectors/get-site-gmt-offset';
 import getSiteTimezoneValue from 'calypso/state/selectors/get-site-timezone-value';
@@ -16,6 +16,7 @@ import getSiteUrl from 'calypso/state/sites/selectors/get-site-url';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 import BackupDownloadFlow from './download';
 import Error from './error';
+import BackupGranularRestoreFlow from './granular-restore';
 import Loading from './loading';
 import BackupRestoreFlow from './restore';
 import { RewindFlowPurpose } from './types';
@@ -95,14 +96,29 @@ const BackupRewindFlow: FunctionComponent< Props > = ( { rewindId, purpose } ) =
 			timezone,
 		} ).format( 'LLL' );
 		if ( siteId && rewindId && backupDisplayDate ) {
-			return purpose === RewindFlowPurpose.RESTORE ? (
-				<BackupRestoreFlow
-					backupDisplayDate={ backupDisplayDate }
-					rewindId={ rewindId }
-					siteId={ siteId }
-					siteUrl={ siteUrl }
-				/>
-			) : (
+			if ( purpose === RewindFlowPurpose.RESTORE ) {
+				return (
+					<BackupRestoreFlow
+						backup={ activityQuery.data }
+						backupDisplayDate={ backupDisplayDate }
+						rewindId={ rewindId }
+						siteId={ siteId }
+						siteUrl={ siteUrl }
+					/>
+				);
+			} else if ( purpose === RewindFlowPurpose.GRANULAR_RESTORE ) {
+				return (
+					<BackupGranularRestoreFlow
+						backupDisplayDate={ backupDisplayDate }
+						rewindId={ rewindId }
+						siteId={ siteId }
+						siteUrl={ siteUrl }
+					/>
+				);
+			}
+
+			// Default to RewindFlowPurpose.DOWNLOAD
+			return (
 				<BackupDownloadFlow
 					backupDisplayDate={ backupDisplayDate }
 					rewindId={ rewindId }

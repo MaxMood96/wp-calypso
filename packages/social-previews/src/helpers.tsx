@@ -1,7 +1,7 @@
 import { createInterpolateElement } from '@wordpress/element';
 import { sprintf } from '@wordpress/i18n';
 
-export type Formatter = ( text: string, options?: any ) => string;
+export type Formatter< Options = unknown > = ( text: string, options?: Options ) => string;
 type AugmentFormatterReturnType< T extends Formatter, TNewReturn > = (
 	...a: Parameters< T >
 ) => ReturnType< T > | TNewReturn;
@@ -34,10 +34,19 @@ export const firstValid: ( ...args: ConditionalFormatter[] ) => NullableFormatte
 	( a ) =>
 		( predicates.find( ( p ) => false !== p( a ) ) as Formatter )?.( a );
 
-export const stripHtmlTags: Formatter = ( description, allowedTags = [] ) => {
+export const stripHtmlTags: Formatter< Array< string > > = ( description, allowedTags = [] ) => {
 	const pattern = new RegExp( `(<([^${ allowedTags.join( '' ) }>]+)>)`, 'gi' );
 
 	return description ? description.replace( pattern, '' ) : '';
+};
+
+/**
+ * For social note posts we use the first 50 characters of the description.
+ * @param description The post description.
+ * @returns The first 50 characters of the description.
+ */
+export const getTitleFromDescription = ( description: string ): string => {
+	return stripHtmlTags( description ).substring( 0, 50 );
 };
 
 export const hasTag = ( text: string, tag: string ): boolean => {
@@ -46,13 +55,41 @@ export const hasTag = ( text: string, tag: string ): boolean => {
 	return pattern.test( text );
 };
 
+export const formatNextdoorDate = new Intl.DateTimeFormat( 'en-GB', {
+	// Result: "7 Oct", "31 Dec"
+	day: 'numeric',
+	month: 'short',
+} ).format;
+
+export const formatThreadsDate = new Intl.DateTimeFormat( 'en-US', {
+	// Result: "'06/21/2024"
+	day: '2-digit',
+	month: '2-digit',
+	year: 'numeric',
+} ).format;
+
 export const formatTweetDate = new Intl.DateTimeFormat( 'en-US', {
 	// Result: "Apr 7", "Dec 31"
 	month: 'short',
 	day: 'numeric',
 } ).format;
 
-export type Platform = 'twitter' | 'facebook' | 'linkedin' | 'instagram' | 'mastodon';
+export const formatMastodonDate = new Intl.DateTimeFormat( 'en-US', {
+	// Result: "Apr 7, 2024", "Dec 31, 2023"
+	month: 'short',
+	day: 'numeric',
+	year: 'numeric',
+} ).format;
+
+export type Platform =
+	| 'bluesky'
+	| 'facebook'
+	| 'instagram'
+	| 'linkedin'
+	| 'mastodon'
+	| 'nextdoor'
+	| 'threads'
+	| 'twitter';
 
 type PreviewTextOptions = {
 	platform: Platform;
@@ -69,6 +106,9 @@ export const hashtagUrlMap: Record< Platform, string > = {
 	linkedin: 'https://www.linkedin.com/feed/hashtag/?keywords=%1$s',
 	instagram: 'https://www.instagram.com/explore/tags/%1$s',
 	mastodon: 'https://%2$s/tags/%1$s',
+	nextdoor: 'https://nextdoor.com/hashtag/%1$s',
+	threads: 'https://www.threads.net/search?q=%1$s&serp_type=tags',
+	bluesky: 'https://bsky.app/hashtag/%1$s',
 };
 
 /**
@@ -86,8 +126,13 @@ export function preparePreviewText( text: string, options: PreviewTextOptions ):
 
 	let result = stripHtmlTags( text );
 
+	// Replace multiple new lines (2+) with 2 new lines
+	// There can be any whitespace characters in empty lines
+	// That is why "\s*"
+	result = result.replaceAll( /(?:\s*[\n\r]){2,}/g, '\n\n' );
+
 	if ( maxChars && result.length > maxChars ) {
-		result = result.substring( 0, maxChars );
+		result = hardTruncation( maxChars )( result );
 	}
 
 	if ( maxLines ) {
@@ -98,7 +143,7 @@ export function preparePreviewText( text: string, options: PreviewTextOptions ):
 		}
 	}
 
-	const componentMap: Record< string, React.ReactNode > = {};
+	const componentMap: Record< string, React.ReactElement > = {};
 
 	if ( hyperlinkUrls ) {
 		// Convert URLs to hyperlinks.

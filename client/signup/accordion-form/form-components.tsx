@@ -2,7 +2,7 @@ import { FormInputValidation } from '@automattic/components';
 import styled from '@emotion/styled';
 import { Icon } from '@wordpress/icons';
 import { TranslateResult, useTranslate } from 'i18n-calypso';
-import { ChangeEvent, ChangeEventHandler, ReactChild } from 'react';
+import { ChangeEvent, ChangeEventHandler, ReactNode } from 'react';
 import FormCheckbox from 'calypso/components/forms/form-checkbox';
 import FormFieldset from 'calypso/components/forms/form-fieldset';
 import FormSettingExplanation from 'calypso/components/forms/form-setting-explanation';
@@ -106,12 +106,8 @@ const FormSettingExplanationContainer = styled.div`
 	}
 `;
 
-const StyledFormInputValidation = styled( FormInputValidation )`
-	span {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
+const StyledFormInputValidation = styled( FormInputValidation )< { isWarning?: boolean } >`
+	margin-top: ${ ( props ) => ( props.isWarning ? '24px' : 0 ) };
 `;
 
 const FlexFormFieldset = styled( FormFieldset )`
@@ -125,14 +121,20 @@ const StyledFormFieldset = styled( FormFieldset, {
 } ) );
 
 const StyledFormCheckbox = styled( FormCheckbox )`
-	margin-right: 6px;
+	&.form-checkbox {
+		margin-right: 6px;
+	}
 `;
 
 const ClickableLabel = styled( Label )`
 	cursor: pointer;
 `;
 
-interface TextInputFieldProps {
+const CharacterCounter = styled.small`
+	float: right;
+`;
+
+type TextInputFieldProps = {
 	name: string;
 	label?: TranslateResult;
 	placeholder?: TranslateResult;
@@ -143,15 +145,9 @@ interface TextInputFieldProps {
 	explanation?: TranslateResult;
 	disabled?: boolean;
 	onChange?: ( event: ChangeEvent< HTMLInputElement > ) => void;
-}
+};
 
-export function LabelBlock( {
-	inputName,
-	children,
-}: {
-	inputName?: string;
-	children: ReactChild | ReactChild[];
-} ) {
+export function LabelBlock( { inputName, children }: { inputName?: string; children: ReactNode } ) {
 	return (
 		<LabelContainer>
 			<Label htmlFor={ inputName }>{ children }</Label>
@@ -178,25 +174,44 @@ export function TextInputField( props: TextInputFieldProps ) {
 	);
 }
 
-interface TextAreaFieldProps extends TextInputFieldProps {
+type TextAreaFieldProps = TextInputFieldProps & {
 	rows?: number;
 	hasFillerContentCheckbox?: boolean;
-}
+} & (
+		| {
+				characterLimit?: never;
+				characterLimitError?: never;
+		  }
+		| {
+				characterLimitError: TranslateResult;
+				characterLimit: number;
+		  }
+	);
 
 export function TextAreaField( props: TextAreaFieldProps ) {
-	const { hasFillerContentCheckbox, ...otherProps } = props;
+	const { hasFillerContentCheckbox, value, characterLimit, characterLimitError, ...otherProps } =
+		props;
 	return (
 		<StyledFormFieldset hasFillerContentCheckbox={ hasFillerContentCheckbox }>
 			{ props.label && <LabelBlock inputName={ props.name }>{ props.label } </LabelBlock> }
 			{ props.sublabel && <SubLabel htmlFor={ props.name }>{ props.sublabel }</SubLabel> }
 			<TextArea
 				{ ...otherProps }
+				value={ value }
 				rows={ props.rows ? props.rows : 10 }
 				isError={ !! props.error }
 				autoCapitalize="off"
 				autoCorrect="off"
 				spellCheck="false"
 			/>
+			{ characterLimit && value?.length ? (
+				<CharacterCounter>
+					{ value.length }/{ characterLimit }
+				</CharacterCounter>
+			) : null }
+			{ characterLimit && value?.length > characterLimit && (
+				<StyledFormInputValidation isError={ false } isWarning text={ characterLimitError } />
+			) }
 			{ props.error && <StyledFormInputValidation isError text={ props.error } /> }
 		</StyledFormFieldset>
 	);
@@ -223,7 +238,7 @@ export function CheckboxField( props: {
 					{ props.label }
 				</>
 			</ClickableLabel>
-			<InfoPopover showOnHover={ true } position="top">
+			<InfoPopover showOnHover position="top">
 				{ props.helpText }
 			</InfoPopover>
 		</FlexFormFieldset>

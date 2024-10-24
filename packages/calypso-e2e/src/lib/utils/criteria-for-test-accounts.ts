@@ -22,8 +22,10 @@ const defaultCriteria: FeatureCriteria[] = [
 		siteType: 'simple',
 		accountName: 'coBlocksSimpleSiteEdgeUser',
 	},
+	// CoBlocks on Atomic: https://github.com/Automattic/wp-calypso/pull/73052
+	// Like in simple, we have one definition for each gutenberg version, to
+	// ignore gutenberg in this case.
 	{
-		// CoBlocks on Atomic: https://github.com/Automattic/wp-calypso/pull/73052
 		coblocks: 'edge',
 		gutenberg: 'stable',
 		siteType: 'atomic',
@@ -35,6 +37,13 @@ const defaultCriteria: FeatureCriteria[] = [
 		siteType: 'atomic',
 		accountName: 'coBlocksAtomicSiteEdgeUser',
 	},
+	{
+		coblocks: 'edge',
+		gutenberg: 'nightly',
+		siteType: 'atomic',
+		accountName: 'coBlocksAtomicSiteEdgeUser',
+	},
+	// End of criteria for CoBlocks on Atomic.
 	{
 		gutenberg: 'stable',
 		siteType: 'simple',
@@ -55,6 +64,12 @@ const defaultCriteria: FeatureCriteria[] = [
 	},
 	{
 		gutenberg: 'edge',
+		siteType: 'atomic',
+		variant: 'siteEditor',
+		accountName: 'siteEditorAtomicSiteEdgeUser',
+	},
+	{
+		gutenberg: 'nightly',
 		siteType: 'atomic',
 		variant: 'siteEditor',
 		accountName: 'siteEditorAtomicSiteEdgeUser',
@@ -82,13 +97,13 @@ const defaultCriteria: FeatureCriteria[] = [
 	// Jetpack users
 	{
 		siteType: 'simple',
-		jetpackTarget: 'wpcom-staging',
+		jetpackTarget: 'wpcom-deployment',
 		gutenberg: 'stable',
 		accountName: 'jetpackStagingUser',
 	},
 	{
 		siteType: 'simple',
-		jetpackTarget: 'wpcom-staging',
+		jetpackTarget: 'wpcom-deployment',
 		gutenberg: 'stable',
 		variant: 'siteEditor',
 		accountName: 'jetpackStagingFseUser',
@@ -98,6 +113,118 @@ const defaultCriteria: FeatureCriteria[] = [
 		gutenberg: 'stable',
 		jetpackTarget: 'remote-site',
 		accountName: 'jetpackRemoteSiteUser',
+	},
+	// Jetpack Atomic Deploy Users
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		accountName: 'jetpackAtomicDefaultUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'php-old',
+		accountName: 'jetpackAtomicPhpOldUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'php-new',
+		accountName: 'jetpackAtomicPhpNewUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'ecomm-plan',
+		accountName: 'jetpackAtomicEcommPlanUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'private',
+		accountName: 'jetpackAtomicPrivateUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'wp-beta',
+		accountName: 'jetpackAtomicWpBetaUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'wp-previous',
+		accountName: 'jetpackAtomicWpPreviousUser',
+	},
+	// Jetpack Atomic Deploy Users, but with the
+	// variant: siteEditor set.
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicDefaultUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'php-old',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicPhpOldUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'php-new',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicPhpNewUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'ecomm-plan',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicEcommPlanUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'private',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicPrivateUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'wp-beta',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicWpBetaUser',
+	},
+	{
+		siteType: 'atomic',
+		gutenberg: 'stable',
+		jetpackTarget: 'wpcom-deployment',
+		atomicVariation: 'wp-previous',
+		variant: 'siteEditor',
+		accountName: 'jetpackAtomicWpPreviousUser',
+	},
+	// Atomic GB nightly tests
+	{
+		siteType: 'atomic',
+		gutenberg: 'nightly',
+		accountName: 'gutenbergAtomicSiteEdgeNightliesUser',
 	},
 
 	// They aren't run in atomic.

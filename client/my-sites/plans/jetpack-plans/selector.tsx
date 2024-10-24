@@ -1,8 +1,7 @@
 import { TERM_ANNUALLY } from '@automattic/calypso-products';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useEffect, useState, useMemo } from 'react';
 import * as React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import QueryIntroOffers from 'calypso/components/data/query-intro-offers';
 import QueryJetpackSaleCoupon from 'calypso/components/data/query-jetpack-sale-coupon';
 import QueryJetpackUserLicenses from 'calypso/components/data/query-jetpack-user-licenses';
@@ -13,13 +12,12 @@ import QuerySitePurchases from 'calypso/components/data/query-site-purchases';
 import QuerySites from 'calypso/components/data/query-sites';
 import Main from 'calypso/components/main';
 import { MAIN_CONTENT_ID } from 'calypso/jetpack-cloud/sections/pricing/jpcom-masterbar';
-import { JPC_PATH_PLANS } from 'calypso/jetpack-connect/constants';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { useExperiment } from 'calypso/lib/explat';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
 import CalypsoShoppingCartProvider from 'calypso/my-sites/checkout/calypso-shopping-cart-provider';
 import { EXTERNAL_PRODUCTS_LIST } from 'calypso/my-sites/plans/jetpack-plans/constants';
-import { loadTrackingTool } from 'calypso/state/analytics/actions';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions/record';
 import { showMasterbar } from 'calypso/state/ui/actions';
 import { getSelectedSiteId, getSelectedSiteSlug } from 'calypso/state/ui/selectors';
@@ -49,8 +47,8 @@ const SelectorPage: React.FC< SelectorPageProps > = ( {
 }: SelectorPageProps ) => {
 	const dispatch = useDispatch();
 
-	const siteId = useSelector( ( state ) => getSelectedSiteId( state ) );
-	const siteSlugState = useSelector( ( state ) => getSelectedSiteSlug( state ) ) || '';
+	const siteId = useSelector( getSelectedSiteId );
+	const siteSlugState = useSelector( getSelectedSiteSlug ) || '';
 	const siteSlug = siteSlugProp || siteSlugState;
 	const [ currentDuration, setDuration ] = useState< Duration >( defaultDuration );
 	const viewTrackerPath = getViewTrackerPath( rootUrl, siteSlugProp );
@@ -59,22 +57,6 @@ const SelectorPage: React.FC< SelectorPageProps > = ( {
 
 	const [ , experimentAssignment ] = useExperiment( 'calypso_jetpack_upsell_page_2022_06' );
 	const showUpsellPage = experimentAssignment?.variationName === 'treatment';
-
-	useEffect( () => {
-		if (
-			/**
-			 * Load the HotJar script on routes 'cloud.jetpack.com/pricing/..' and
-			 * 'wordpress.com/jetpack/connect/plans/:site/..' (Jetpack plugin post-conneciton route)
-			 */
-			isJetpackCloud() ||
-			window.location.pathname.startsWith( JPC_PATH_PLANS )
-		) {
-			// HotJar analytics tracking
-			// https://github.com/Automattic/wp-calypso/blob/trunk/client/state/analytics/README_HotJar.md
-			dispatch( loadTrackingTool( 'HotJar' ) );
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [] );
 
 	useEffect( () => {
 		dispatch(
@@ -99,7 +81,7 @@ const SelectorPage: React.FC< SelectorPageProps > = ( {
 		}
 	}, [ legacyPlan, dispatch, rootUrl, siteSlug, viewTrackerPath ] );
 
-	const { unlinked, purchasetoken, purchaseNonce, site } = urlQueryArgs;
+	const { unlinked, purchasetoken, purchaseNonce, site, currency: currencyCode } = urlQueryArgs;
 	const canDoSiteOnlyCheckout = unlinked && !! site && !! ( purchasetoken || purchaseNonce );
 	useEffect( () => {
 		if ( canDoSiteOnlyCheckout ) {
@@ -186,7 +168,7 @@ const SelectorPage: React.FC< SelectorPageProps > = ( {
 			{ nav }
 
 			<Main
-				className={ classNames(
+				className={ clsx(
 					'selector__main',
 					iterationClassName,
 					'fs-unmask',
@@ -214,8 +196,8 @@ const SelectorPage: React.FC< SelectorPageProps > = ( {
 					/>
 				</CalypsoShoppingCartProvider>
 
-				<QueryProductsList type="jetpack" />
-				<QueryIntroOffers siteId={ siteId ?? 'none' } />
+				<QueryProductsList type="jetpack" currency={ currencyCode ?? undefined } />
+				<QueryIntroOffers siteId={ siteId ?? 'none' } currency={ currencyCode ?? undefined } />
 				{ siteId && <QuerySiteProducts siteId={ siteId } /> }
 				{ siteId && <QuerySitePurchases siteId={ siteId } /> }
 				{ siteId && <QuerySites siteId={ siteId } /> }

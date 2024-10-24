@@ -1,38 +1,41 @@
+import config from '@automattic/calypso-config';
 import '../campaigns-table/style.scss';
-
-import React from 'react';
+import { BlazablePost } from 'calypso/data/promote-post/types';
 import PostItem from 'calypso/my-sites/promote-post-i2/components/post-item';
-import { CampaignItemLoading } from '../campaigns-table';
+import { ItemsLoading, SingleItemLoading } from '../campaigns-table';
 import PostsListHeader from '../posts-list/header';
 
 interface Props {
-	posts: any;
+	posts: BlazablePost[];
+	type: string;
 	isLoading: boolean;
 	isFetchingPageResults: boolean;
+	hasPaymentsBlocked: boolean;
 }
 
 export default function PostsTable( props: Props ) {
-	const { posts, isLoading, isFetchingPageResults } = props;
+	const { posts, type, isLoading, isFetchingPageResults, hasPaymentsBlocked } = props;
+	const isRunningInWooStore = config.isEnabled( 'is_running_in_woo_site' );
 
 	return (
 		<table className="promote-post-i2__table">
-			<PostsListHeader />
-
+			<PostsListHeader type={ isRunningInWooStore && type === 'product' ? type : 'post' } />
 			<tbody>
 				{ isLoading && ! isFetchingPageResults ? (
-					<>
-						<CampaignItemLoading totalRows={ 8 } />
-						<CampaignItemLoading totalRows={ 8 } />
-						<CampaignItemLoading totalRows={ 8 } />
-						<CampaignItemLoading totalRows={ 8 } />
-						<CampaignItemLoading totalRows={ 8 } />
-					</>
+					<ItemsLoading />
 				) : (
 					<>
-						{ posts.map( ( post: any ) => {
-							return <PostItem key={ `post-id${ post.ID }` } post={ post } />;
+						{ posts.map( ( post: BlazablePost ) => {
+							return (
+								<PostItem
+									key={ `post-id${ post.ID }` }
+									post={ post }
+									filterType={ type }
+									hasPaymentsBlocked={ hasPaymentsBlocked }
+								/>
+							);
 						} ) }
-						{ isFetchingPageResults && <CampaignItemLoading /> }
+						{ isFetchingPageResults && <SingleItemLoading /> }
 					</>
 				) }
 			</tbody>

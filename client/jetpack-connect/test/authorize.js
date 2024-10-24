@@ -7,7 +7,6 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import deepFreeze from 'deep-freeze';
 import documentHeadReducer from 'calypso/state/document-head/reducer';
-import happychatReducer from 'calypso/state/happychat/reducer';
 import purchasesReducer from 'calypso/state/purchases/reducer';
 import siteConnectionReducer from 'calypso/state/site-connection/reducer';
 import uiReducer from 'calypso/state/ui/reducer';
@@ -90,15 +89,27 @@ function renderWithRedux( ui ) {
 			ui: uiReducer,
 			documentHead: documentHeadReducer,
 			purchases: purchasesReducer,
-			happychat: happychatReducer,
 			siteConnection: siteConnectionReducer,
 		},
 	} );
 }
 
+let windowOpenSpy;
+
 // If feature flag is jetpack/magic-link-signup then false, else true
 beforeEach( () => {
-	config.isEnabled.mockImplementation( ( flag ) => flag !== 'jetpack/magic-link-signup' );
+	windowOpenSpy = jest.spyOn( global.window, 'open' ).mockImplementation( jest.fn() );
+	config.isEnabled.mockImplementation( ( flag ) => {
+		const disabledFlags = [
+			'jetpack/magic-link-signup',
+			'woocommerce/core-profiler-passwordless-auth',
+		];
+		return ! disabledFlags.includes( flag );
+	} );
+} );
+
+afterEach( () => {
+	windowOpenSpy?.mockRestore();
 } );
 
 describe( 'JetpackAuthorize', () => {
@@ -370,27 +381,6 @@ describe( 'JetpackAuthorize', () => {
 			global.window.location = originalWindowLocation;
 		} );
 
-		test( 'should redirect to pressable if partnerSlug is "pressable"', async () => {
-			renderWithRedux(
-				<JetpackAuthorize
-					{ ...DEFAULT_PROPS }
-					authQuery={ {
-						...DEFAULT_PROPS.authQuery,
-						alreadyAuthorized: true,
-					} }
-					partnerSlug="pressable"
-					isAlreadyOnSitesList
-					isFetchingSites
-				/>
-			);
-
-			await userEvent.click( screen.getByText( 'Return to your site' ) );
-
-			const target = global.window.location.href;
-
-			expect( target ).toBe( `/start/pressable-nux?blogid=${ DEFAULT_PROPS.authQuery.clientId }` );
-		} );
-
 		test( 'should redirect to /checkout if the selected plan/product is Jetpack plan/product', async () => {
 			renderWithRedux(
 				<JetpackAuthorize
@@ -407,9 +397,10 @@ describe( 'JetpackAuthorize', () => {
 
 			await userEvent.click( screen.getByText( 'Return to your site' ) );
 
-			const target = global.window.location.href;
-
-			expect( target ).toBe( `/checkout/${ SITE_SLUG }/${ OFFER_RESET_FLOW_TYPES[ 0 ] }` );
+			expect( windowOpenSpy ).toHaveBeenCalledWith(
+				`/checkout/${ SITE_SLUG }/${ OFFER_RESET_FLOW_TYPES[ 0 ] }`,
+				expect.any( String )
+			);
 		} );
 
 		test( 'should redirect to wp-admin when site has a purchased plan/product', async () => {
@@ -434,9 +425,10 @@ describe( 'JetpackAuthorize', () => {
 
 			await userEvent.click( screen.getByText( 'Return to your site' ) );
 
-			const target = global.window.location.href;
-
-			expect( target ).toBe( DEFAULT_PROPS.authQuery.redirectAfterAuth );
+			expect( windowOpenSpy ).toHaveBeenCalledWith(
+				DEFAULT_PROPS.authQuery.redirectAfterAuth,
+				expect.any( String )
+			);
 		} );
 
 		test( 'should redirect to /jetpack/connect/plans when user has an unattached "user"(not partner) license key', async () => {
@@ -455,12 +447,11 @@ describe( 'JetpackAuthorize', () => {
 
 			await userEvent.click( screen.getByText( 'Return to your site' ) );
 
-			const target = global.window.location.href;
-
-			expect( target ).toBe(
-				`${ JPC_PATH_PLANS }/${ SITE_SLUG }?redirect=${ encodeURIComponent(
+			expect( windowOpenSpy ).toHaveBeenCalledWith(
+				`${ JPC_PATH_PLANS }/${ SITE_SLUG }?redirect_to=${ encodeURIComponent(
 					DEFAULT_PROPS.authQuery.redirectAfterAuth
-				) }`
+				) }`,
+				expect.any( String )
 			);
 		} );
 
@@ -479,12 +470,11 @@ describe( 'JetpackAuthorize', () => {
 
 			await userEvent.click( screen.getByText( 'Return to your site' ) );
 
-			const target = global.window.location.href;
-
-			expect( target ).toBe(
-				`${ JPC_PATH_PLANS }/${ SITE_SLUG }?redirect=${ encodeURIComponent(
+			expect( windowOpenSpy ).toHaveBeenCalledWith(
+				`${ JPC_PATH_PLANS }/${ SITE_SLUG }?redirect_to=${ encodeURIComponent(
 					DEFAULT_PROPS.authQuery.redirectAfterAuth
-				) }`
+				) }`,
+				expect.any( String )
 			);
 		} );
 
@@ -507,12 +497,11 @@ describe( 'JetpackAuthorize', () => {
 
 			await userEvent.click( screen.getByText( 'Return to your site' ) );
 
-			const target = global.window.location.href;
-
-			expect( target ).toBe(
-				`${ JPC_PATH_PLANS }/${ SITE_SLUG }?redirect=${ encodeURIComponent(
+			expect( windowOpenSpy ).toHaveBeenCalledWith(
+				`${ JPC_PATH_PLANS }/${ SITE_SLUG }?redirect_to=${ encodeURIComponent(
 					DEFAULT_PROPS.authQuery.redirectAfterAuth
-				) }`
+				) }`,
+				expect.any( String )
 			);
 		} );
 
@@ -532,9 +521,90 @@ describe( 'JetpackAuthorize', () => {
 
 			await userEvent.click( screen.getByText( 'Return to your site' ) );
 
-			const target = global.window.location.href;
+			expect( windowOpenSpy ).toHaveBeenCalledWith(
+				`${ JPC_PATH_PLANS_COMPLETE }/${ SITE_SLUG }`,
+				expect.any( String )
+			);
+		} );
+	} );
 
-			expect( target ).toBe( `${ JPC_PATH_PLANS_COMPLETE }/${ SITE_SLUG }` );
+	describe( 'handleSignIn', () => {
+		let originalWindowLocation;
+
+		beforeEach( () => {
+			originalWindowLocation = global.window.location;
+			delete global.window.location;
+			global.window.location = {
+				href: 'http://wwww.example.com',
+				origin: 'http://www.example.com',
+			};
+		} );
+
+		afterEach( () => {
+			global.window.location = originalWindowLocation;
+		} );
+
+		test( 'should redirect to url that returns from props.logoutUser', async () => {
+			const redirectTo = 'http://www.example.com/redirect';
+			const logoutUser = jest.fn().mockResolvedValue( {
+				redirect_to: redirectTo,
+			} );
+			renderWithRedux(
+				<JetpackAuthorize
+					{ ...DEFAULT_PROPS }
+					authQuery={ {
+						...DEFAULT_PROPS.authQuery,
+						alreadyAuthorized: true,
+					} }
+					isAlreadyOnSitesList
+					isFetchingSites
+					logoutUser={ logoutUser }
+				/>
+			);
+
+			await userEvent.click( screen.getByText( 'Sign in as a different user' ) );
+			expect( global.window.location.href ).toBe( redirectTo );
+			expect( logoutUser ).toHaveBeenCalled();
+		} );
+
+		test( 'should redirect to jetpack login page for woo onboarding', async () => {
+			renderWithRedux(
+				<JetpackAuthorize
+					{ ...DEFAULT_PROPS }
+					authQuery={ {
+						...DEFAULT_PROPS.authQuery,
+						alreadyAuthorized: true,
+						from: 'woocommerce-onboarding',
+					} }
+					isAlreadyOnSitesList
+					isFetchingSites
+				/>
+			);
+
+			await userEvent.click( screen.getByText( 'Sign in as a different user' ) );
+			expect( global.window.location.href ).toBe(
+				'https://example.com/log-in/jetpack?redirect_to=http%3A%2F%2Fwwww.example.com&from=woocommerce-onboarding'
+			);
+		} );
+
+		test( 'should redirect to jetpack login page for woo core profiler', async () => {
+			renderWithRedux(
+				<JetpackAuthorize
+					{ ...DEFAULT_PROPS }
+					authQuery={ {
+						...DEFAULT_PROPS.authQuery,
+						alreadyAuthorized: true,
+						from: 'woocommerce-core-profiler',
+					} }
+					isAlreadyOnSitesList
+					isFetchingSites
+				/>
+			);
+
+			await userEvent.click( screen.getByText( 'Sign in as a different user' ) );
+			expect( global.window.location.href ).toBe(
+				'https://example.com/log-in/jetpack?redirect_to=http%3A%2F%2Fwwww.example.com&from=woocommerce-core-profiler'
+			);
 		} );
 	} );
 } );

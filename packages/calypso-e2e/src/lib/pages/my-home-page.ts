@@ -1,13 +1,8 @@
-import { Page } from 'playwright';
+import { Locator, Page } from 'playwright';
 import { getCalypsoURL } from '../../data-helper';
 
 const selectors = {
 	visitSiteButton: '.button >> text=Visit site',
-
-	// Task card (topmost card)
-	taskHeadingMessage: ( message: string ) =>
-		`.primary__customer-home-location-content :text("${ message }")`,
-
 	domainUpsellCard: `.domain-upsell__card`,
 	domainUpsellSuggestedDomain: `.domain-upsell__card .domain-upsell-illustration`,
 	domainUpsellBuyDomain: ( message: string ) =>
@@ -19,6 +14,7 @@ const selectors = {
  */
 export class MyHomePage {
 	private page: Page;
+	private anchor: Locator;
 
 	/**
 	 * Constructs an instance of the component.
@@ -27,6 +23,7 @@ export class MyHomePage {
 	 */
 	constructor( page: Page ) {
 		this.page = page;
+		this.anchor = page.getByRole( 'main' );
 	}
 
 	/**
@@ -53,27 +50,50 @@ export class MyHomePage {
 	}
 
 	/**
-	 * Validates the domain upsell is showing
+	 * Clicks on the button with matching text.
 	 *
-	 * @returns {Promise<void>} No return value.
+	 * @param {string|RegExp} text Text to match on the button.
 	 */
-	async validateDomainUpsell(): Promise< void > {
-		await this.page.locator( selectors.domainUpsellCard ).waitFor();
+	async clickButton( text: string | RegExp ): Promise< void > {
+		await this.anchor.getByRole( 'button', { name: text } ).click();
 	}
 
 	/**
-	 * Get suggested domain name.
+	 * Returns whether a heading matching the text is present.
 	 *
-	 * @returns {string} No return value.
+	 * Returns true if present. False otherwise.
+	 *
+	 * @param {string|RegExp} text Text to match on for the card title.
 	 */
-	async suggestedDomainName(): Promise< string | null > {
-		await this.page.locator( selectors.domainUpsellSuggestedDomain ).waitFor();
+	async isHeadingPresent( text: string | RegExp ): Promise< boolean > {
+		try {
+			await this.anchor.getByRole( 'heading', { name: new RegExp( text ) } ).waitFor();
+			return true;
+		} catch {
+			return false;
+		}
+	}
 
-		const locator = this.page.locator( selectors.domainUpsellSuggestedDomain );
+	/**
+	 * Get the suggested domain in the upsell card.
+	 *
+	 * @returns {string} Suggested domain. Empty string if not found.
+	 */
+	async getSuggestedUpsellDomain(): Promise< string > {
+		// It's important to wait for an actual svg element to be present.
+		// The handling here is a little funky. We take a blank palceholder img, then we
+		// draw an SVG with just the text on top of it.
+		// There's a race condition where the placeholder img can render before the the text svg does.
+		const svgLocator = this.anchor.locator( '.domain-upsell-illustration svg' );
 
-		await locator.waitFor();
-
-		return await locator.locator( 'text' ).textContent();
+		// But, innerText doesn't work on SVG nodes, so we need this locator to actually fetch the text.
+		const parentDivLocator = this.anchor.locator( '.domain-upsell-illustration' );
+		try {
+			await svgLocator.waitFor();
+			return await parentDivLocator.innerText();
+		} catch {
+			return '';
+		}
 	}
 
 	/**
@@ -96,6 +116,6 @@ export class MyHomePage {
 	 * @param {string} message Partial or fully matching text to search.
 	 */
 	async validateTaskHeadingMessage( message: string ): Promise< void > {
-		await this.page.waitForSelector( selectors.taskHeadingMessage( message ) );
+		await this.page.getByRole( 'heading', { name: message } ).waitFor();
 	}
 }

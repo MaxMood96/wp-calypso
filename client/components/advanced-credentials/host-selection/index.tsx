@@ -1,15 +1,15 @@
-import { Gridicon } from '@automattic/components';
+import { Gridicon, Badge } from '@automattic/components';
 import { useMobileBreakpoint } from '@automattic/viewport-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslate } from 'i18n-calypso';
 import { FunctionComponent, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import Badge from 'calypso/components/badge';
 import { settingsPath } from 'calypso/lib/jetpack/paths';
 import wpcom from 'calypso/lib/wp';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import { getSelectedSiteId, getSelectedSiteSlug } from 'calypso/state/ui/selectors';
 import { getProviderNameFromId, topHosts, otherHosts } from '../host-info';
+import useCredentialsIntroMessage from '../use-credentials-intro-message';
 import type { SiteId } from 'calypso/types';
 import './style.scss';
 
@@ -34,7 +34,7 @@ function useHostingProviderGuessQuery( siteId: SiteId ) {
 const HostSelection: FunctionComponent = () => {
 	const isMobile = useMobileBreakpoint();
 	const siteId = useSelector( getSelectedSiteId ) as SiteId;
-	const siteSlug = useSelector( getSelectedSiteSlug );
+	const siteSlug = useSelector( getSelectedSiteSlug ) as string;
 	const translate = useTranslate();
 	const dispatch = useDispatch();
 
@@ -58,17 +58,12 @@ const HostSelection: FunctionComponent = () => {
 		);
 	};
 
+	const introMessage = useCredentialsIntroMessage( siteId );
+
 	return (
 		<div className="host-selection">
 			<div className="host-selection__header">
-				<div className="host-selection__notice">
-					{ translate(
-						'In order to restore your site, should something go wrong, you’ll need to provide your website’s {{strong}}SSH{{/strong}}, {{strong}}SFTP{{/strong}} or {{strong}}FTP{{/strong}} server credentials. We’ll guide you through it:',
-						{
-							components: { strong: <strong /> },
-						}
-					) }
-				</div>
+				<div className="host-selection__notice">{ introMessage }</div>
 				<h3>
 					{ translate( 'Select your website host for %(siteSlug)s', {
 						args: {

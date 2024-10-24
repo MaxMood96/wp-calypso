@@ -1,54 +1,44 @@
+import config from '@automattic/calypso-config';
 import { safeImageUrl } from '@automattic/calypso-url';
 import './style.scss';
 import { Button } from '@wordpress/components';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { useState } from 'react';
+import InfoPopover from 'calypso/components/info-popover';
+import { BlazablePost } from 'calypso/data/promote-post/types';
 import resizeImageUrl from 'calypso/lib/resize-image-url';
-import PostRelativeTimeStatus from 'calypso/my-sites/post-relative-time-status';
-import { getPostType } from 'calypso/my-sites/promote-post/utils';
 import useOpenPromoteWidget from '../../hooks/use-open-promote-widget';
+import { formatNumber, getShortDateString, getPostType } from '../../utils';
 
-export type BlazablePost = {
-	ID: number;
-	author: string;
-	date: string;
-	date_gtm: string;
-	modified: string;
-	modified_gmt: string;
-	status: string;
-	guid: string;
-	title: string;
-	type: string;
-	comment_count: number;
-	like_count: number;
-	monthly_view_count: number;
-	post_url: string;
-	featured_image: string;
-	post_thumbnail: string;
-};
-
-type Props = {
+export default function PostItem( {
+	post,
+	filterType,
+	hasPaymentsBlocked,
+}: {
 	post: BlazablePost;
-};
-
-export default function PostItem( { post }: Props ) {
-	const [ loading ] = useState( false );
-
+	filterType: string;
+	hasPaymentsBlocked: boolean;
+} ) {
 	const onClickPromote = useOpenPromoteWidget( {
 		keyValue: 'post-' + post.ID,
 		entrypoint: 'promoted_posts-post_item',
 	} );
 
-	const safeUrl = safeImageUrl( post.featured_image );
-	const featuredImage = safeUrl && resizeImageUrl( safeUrl, { h: 80 }, 0 );
+	// API can return "false" as a featured image URL
+	const safeUrl = 'string' === typeof post?.featured_image && safeImageUrl( post.featured_image );
+	const featuredImage = safeUrl && resizeImageUrl( safeUrl, 108, 0 );
+	const isRunningInWooStore = config.isEnabled( 'is_running_in_woo_site' );
 
-	const postDate = (
-		<PostRelativeTimeStatus showPublishedStatus={ false } post={ post } showGridIcon={ false } />
-	);
+	const postDate = post?.date ? getShortDateString( post.date, true ) : '-';
 
 	const viewCount = post?.monthly_view_count ?? 0;
 	const likeCount = post?.like_count ?? 0;
 	const commentCount = post?.comment_count ?? 0;
+	const productPrice = post?.price || '-';
+	const isWooProduct = isRunningInWooStore && filterType === 'product';
+
+	const mobileStatsSeparator = <span className="blazepress-mobile-stats-mid-dot">&#183;</span>;
+	const titleIsLong = post?.title.length > 35;
+	const titleShortened = titleIsLong ? post?.title.slice( 0, 35 ) + '...' : post?.title;
 
 	return (
 		<tr className="post-item__row">
@@ -86,62 +76,108 @@ export default function PostItem( { post }: Props ) {
 					) }
 					<div className="post-item__post-title">
 						<div className="post-item__post-subheading-mobile">
-							{ getPostType( post.type ) }
-							<span className="post-item__mid-dot">&#183;</span>
-							{ postDate }
+							{ isWooProduct ? (
+								<>
+									{ post.sku
+										? sprintf(
+												/* translators: %s its an unique alphanumeric code for a product */
+												__( 'SKU: %s' ),
+												post.sku
+										  )
+										: '-' }
+								</>
+							) : (
+								<>
+									{ sprintf(
+										// translators: %s is number of post's likes
+										_n( '%s like', '%s likes', likeCount ),
+										formatNumber( likeCount, true )
+									) }
+									{ mobileStatsSeparator }
+									{ sprintf(
+										// translators: %s is number of post's comments
+										_n( '%s comment', '%s comments', commentCount ),
+										formatNumber( commentCount, true )
+									) }
+								</>
+							) }
 						</div>
-						<div className="post-item__post-title-content">{ post?.title || __( 'Untitled' ) }</div>
+						<div className="post-item__post-title-content">
+							<span>{ titleShortened || __( 'Untitled' ) }</span>
+							{ titleIsLong && (
+								<InfoPopover position="bottom right">
+									{ __( 'Title: ' ) }
+									<br />
+									<span className="popover-title">{ post?.title }</span>
+								</InfoPopover>
+							) }
+						</div>
+						<div className="post-item__post-subtitle-mobile">
+							{ isWooProduct ? productPrice : getPostType( post.type ) }
+							{ mobileStatsSeparator }
+							{ sprintf(
+								/* translators: %s the post's published date */
+								__( 'Published: %s' ),
+								postDate
+							) }
+						</div>
 					</div>
 				</div>
 				<div className="post-item__post-data-row post-item__post-data-row-mobile">
 					<div className="post-item__stats-mobile">
-						{
-							// translators: %d is number of post's views
-							sprintf( _n( '%d view', '%d views', viewCount ), viewCount )
-						}
-						<span className="post-item__mid-dot">&#183;</span>
-						{
-							// translators: %d is number of post's likes
-							sprintf( _n( '%d like', '%d likes', likeCount ), likeCount )
-						}
-						<span className="post-item__mid-dot">&#183;</span>
-						{
-							// translators: %d is number of post's comments
-							sprintf( _n( '%d comment', '%d comments', commentCount ), commentCount )
-						}
-					</div>
-					<div className="post-item__actions-mobile">
-						<a href={ post.post_url } className="post-item__view-link">
-							{ __( 'View' ) }
-						</a>
-						<Button
-							className="post-item__post-promote-button"
-							isBusy={ loading }
-							disabled={ loading }
-							onClick={ onClickPromote }
-						>
-							{ __( 'Promote' ) }
-						</Button>
+						{ sprintf(
+							// translators: %s is number of post's visitors
+							_n( '%s visitor', '%s visitors', viewCount ),
+							formatNumber( viewCount, true )
+						) }
+						<div className="post-item__actions-mobile">
+							<a
+								href={ post.post_url }
+								className="post-item__view-button"
+								target="_blank"
+								rel="noreferrer"
+							>
+								{ __( 'View' ) }
+							</a>
+							<Button
+								isBusy={ false }
+								disabled={ hasPaymentsBlocked }
+								onClick={ onClickPromote }
+								className="post-item__post-promote-button-mobile"
+							>
+								{ __( 'Promote' ) }
+							</Button>
+						</div>
 					</div>
 				</div>
 			</td>
 
 			<td className="post-item__post-type">{ getPostType( post.type ) }</td>
+			{ isWooProduct && (
+				<>
+					<td className="post-item__post-sku">{ post.sku || '-' }</td>
+					<td className="post-item__post-price">{ post.price || '-' }</td>
+				</>
+			) }
 			<td className="post-item__post-publish-date">{ postDate }</td>
-			<td className="post-item__post-views">{ viewCount }</td>
-			<td className="post-item__post-likes">{ likeCount }</td>
-			<td className="post-item__post-comments">{ commentCount }</td>
+			<td className="post-item__post-views">{ formatNumber( viewCount, true ) }</td>
+			{ ! isWooProduct && (
+				<>
+					<td className="post-item__post-likes">{ formatNumber( likeCount, true ) }</td>
+					<td className="post-item__post-comments">{ formatNumber( commentCount, true ) }</td>
+				</>
+			) }
 			<td className="post-item__post-view">
-				<a href={ post.post_url } className="post-item__view-link">
+				<a href={ post.post_url } className="post-item__view-link" target="_blank" rel="noreferrer">
 					{ __( 'View' ) }
 				</a>
 			</td>
 			<td className="post-item__post-promote">
 				<Button
-					className="post-item__post-promote-button"
-					isBusy={ loading }
-					disabled={ loading }
+					isBusy={ false }
+					disabled={ hasPaymentsBlocked }
 					onClick={ onClickPromote }
+					className="post-item__post-promote-button"
 				>
 					{ __( 'Promote' ) }
 				</Button>

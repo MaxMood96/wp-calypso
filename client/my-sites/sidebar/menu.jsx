@@ -31,7 +31,7 @@ export const MySitesSidebarUnifiedMenu = ( {
 	selected,
 	sidebarCollapsed,
 	shouldOpenExternalLinksInCurrentTab,
-	canNavigate,
+	isUnifiedSiteSidebarVisible,
 	...props
 } ) => {
 	const reduxDispatch = useDispatch();
@@ -87,14 +87,16 @@ export const MySitesSidebarUnifiedMenu = ( {
 			return;
 		}
 
-		if ( ! canNavigate( link ) ) {
-			event?.preventDefault();
-			return;
-		}
-
 		trackClickEvent( link );
 		window.scrollTo( 0, 0 );
 		reduxDispatch( toggleSection( sectionId ) );
+	};
+
+	const shouldForceShowExternalIcon = ( item ) => {
+		if ( ! isUnifiedSiteSidebarVisible ) {
+			return false;
+		}
+		return item?.parent === 'jetpack' && item?.url?.startsWith( 'https://jetpack.com' );
 	};
 
 	return (
@@ -106,7 +108,7 @@ export const MySitesSidebarUnifiedMenu = ( {
 				customIcon={ <SidebarCustomIcon icon={ icon } /> }
 				className={ ( selected || childIsSelected ) && 'sidebar__menu--selected' }
 				count={ count }
-				hideExpandableIcon={ true }
+				hideExpandableIcon
 				inlineText={ props.inlineText }
 				href={ link }
 				{ ...props }
@@ -116,15 +118,16 @@ export const MySitesSidebarUnifiedMenu = ( {
 						return;
 					}
 					const isSelected = selectedMenuItem?.url === item.url;
+
 					return (
 						<MySitesSidebarUnifiedItem
 							key={ item.title }
 							{ ...item }
 							selected={ isSelected }
 							trackClickEvent={ trackClickEvent }
-							isSubItem={ true }
+							isSubItem
 							shouldOpenExternalLinksInCurrentTab={ shouldOpenExternalLinksInCurrentTab }
-							canNavigate={ canNavigate }
+							forceShowExternalIcon={ shouldForceShowExternalIcon( item ) }
 						/>
 					);
 				} ) }
@@ -143,7 +146,6 @@ MySitesSidebarUnifiedMenu.propTypes = {
 	link: PropTypes.string,
 	sidebarCollapsed: PropTypes.bool,
 	shouldOpenExternalLinksInCurrentTab: PropTypes.bool.isRequired,
-	canNavigate: PropTypes.func.isRequired,
 	/*
 	Example of children shape:
 	[

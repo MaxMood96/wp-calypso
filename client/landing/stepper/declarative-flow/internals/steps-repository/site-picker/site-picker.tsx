@@ -15,7 +15,7 @@ import {
 import { PageBodyBottomContainer } from 'calypso/sites-dashboard/components/sites-dashboard';
 import { SitesGrid } from 'calypso/sites-dashboard/components/sites-grid';
 import { useSitesSorting } from 'calypso/state/sites/hooks/use-sites-sorting';
-import type { SiteExcerptData } from 'calypso/data/sites/site-excerpt-types';
+import type { SiteExcerptData } from '@automattic/sites';
 
 const SitesDashboardSitesList = createSitesListComponent();
 
@@ -40,7 +40,10 @@ const SitePicker = function SitePicker( props: Props ) {
 		onQueryParamChange,
 	} = props;
 	const { sitesSorting, onSitesSortingChange } = useSitesSorting();
-	const { data: allSites = [], isLoading } = useSiteExcerptsQuery( SITE_PICKER_FILTER_CONFIG );
+	const { data: allSites = [], isLoading } = useSiteExcerptsQuery(
+		SITE_PICKER_FILTER_CONFIG,
+		( site ) => ! site.is_wpcom_staging_site && ! site.is_deleted
+	);
 
 	return (
 		<div className="site-picker--container">
@@ -76,15 +79,13 @@ const SitePicker = function SitePicker( props: Props ) {
 								onSitesSortingChange={ onSitesSortingChange }
 								statuses={ statuses }
 								selectedStatus={ selectedStatus }
-								hasSitesSortingPreferenceLoaded={ true }
+								hasSitesSortingPreferenceLoaded
 							/>
 							{ paginatedSites.length > 0 || isLoading ? (
 								<>
 									<SitesGrid
 										isLoading={ isLoading }
 										sites={ paginatedSites }
-										siteSelectorMode={ true }
-										showLinkInBioBanner={ false }
 										onSiteSelectBtnClick={ onSelectSite }
 									/>
 									{ ( selectedStatus.hiddenCount > 0 || sites.length > perPage ) && (

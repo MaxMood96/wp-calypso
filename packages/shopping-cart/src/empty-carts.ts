@@ -19,7 +19,7 @@ export function getEmptyResponseCart(): ResponseCart {
 		allowed_payment_methods: [],
 		coupon: '',
 		is_coupon_applied: false,
-		coupon_discounts_integer: [],
+		has_auto_renew_coupon_been_automatically_applied: false,
 		locale: 'en-us',
 		tax: { location: {}, display_taxes: false },
 		is_signup: false,
@@ -32,6 +32,7 @@ export function getEmptyResponseCartProduct(): ResponseCartProduct {
 	return {
 		time_added_to_cart: Date.now(),
 		product_name: 'Replace me',
+		product_name_en: 'Replace me',
 		product_slug: 'replace-me',
 		currency: 'USD',
 		extra: {},
@@ -42,10 +43,10 @@ export function getEmptyResponseCartProduct(): ResponseCartProduct {
 		current_quantity: null,
 		item_original_cost_integer: 0,
 		item_original_cost_for_quantity_one_integer: 0,
+		item_original_monthly_cost_integer: 0,
 		item_subtotal_integer: 0,
-		product_cost_integer: 0,
-		item_subtotal_monthly_cost_integer: 0,
 		item_original_subtotal_integer: 0,
+		is_included_for_100yearplan: false,
 		is_domain_registration: false,
 		is_bundled: false,
 		is_sale_coupon_applied: false,
@@ -57,5 +58,6 @@ export function getEmptyResponseCartProduct(): ResponseCartProduct {
 		product_type: 'test',
 		included_domain_purchase_amount: 0,
 		product_variants: [],
+		cost_overrides: [],
 	};
 }

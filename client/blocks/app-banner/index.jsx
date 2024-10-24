@@ -1,6 +1,7 @@
 import { Button, Card } from '@automattic/components';
 import { compose } from '@wordpress/compose';
-import classNames from 'classnames';
+import { getQueryArg } from '@wordpress/url';
+import clsx from 'clsx';
 import { localize, withRtl } from 'i18n-calypso';
 import { get } from 'lodash';
 import PropTypes from 'prop-types';
@@ -64,14 +65,25 @@ export class AppBanner extends Component {
 	constructor( props ) {
 		super( props );
 
+		let isDraftPostModalShown = false;
+		try {
+			if (
+				typeof window !== 'undefined' &&
+				window.sessionStorage?.getItem( 'wpcom_signup_complete_show_draft_post_modal' )
+			) {
+				isDraftPostModalShown = true;
+			}
+		} catch ( e ) {}
+
+		let isLaunchpadEnabled = false;
 		if (
 			typeof window !== 'undefined' &&
-			window.sessionStorage.getItem( 'wpcom_signup_complete_show_draft_post_modal' )
+			getQueryArg( window.location.href, 'showLaunchpad' ) === 'true'
 		) {
-			this.state = { isDraftPostModalShown: true };
-		} else {
-			this.state = { isDraftPostModalShown: false };
+			isLaunchpadEnabled = true;
 		}
+
+		this.state = { isDraftPostModalShown, isLaunchpadEnabled };
 	}
 
 	stopBubblingEvents = ( event ) => {
@@ -153,9 +165,9 @@ export class AppBanner extends Component {
 		const { title, copy, icon } = getAppBannerData( translate, currentSection, isRtl );
 
 		return (
-			<div className={ classNames( 'app-banner-overlay' ) } ref={ this.preventNotificationsClose }>
+			<div className={ clsx( 'app-banner-overlay' ) } ref={ this.preventNotificationsClose }>
 				<Card
-					className={ classNames( 'app-banner', 'is-compact', currentSection ) }
+					className={ clsx( 'app-banner', 'is-compact', currentSection ) }
 					ref={ this.preventNotificationsClose }
 				>
 					<TrackComponentView
@@ -194,7 +206,11 @@ export class AppBanner extends Component {
 	};
 
 	render() {
-		if ( ! this.props.shouldDisplayAppBanner || this.state.isDraftPostModalShown ) {
+		if (
+			! this.props.shouldDisplayAppBanner ||
+			this.state.isDraftPostModalShown ||
+			this.state.isLaunchpadEnabled
+		) {
 			return null;
 		}
 
@@ -203,6 +219,7 @@ export class AppBanner extends Component {
 }
 
 export function getiOSDeepLink( currentRoute, currentSection ) {
+	// eslint-disable-next-line wpcalypso/i18n-unlocalized-url
 	const baseURI = 'https://apps.wordpress.com/get?campaign=calypso-open-in-app';
 	const fragment = buildDeepLinkFragment( currentRoute, currentSection );
 
@@ -211,7 +228,6 @@ export function getiOSDeepLink( currentRoute, currentSection ) {
 /**
  * Returns the universal link that then gets used to send the user to the correct editor.
  * If the app is installed otherwise they will end up on the new site creaton flow after creating an account.
- *
  * @param {string} currentRoute
  * @returns string
  */

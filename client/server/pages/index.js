@@ -2,12 +2,14 @@ import { execSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { parseTrackingPrefs } from '@automattic/calypso-analytics';
 import config from '@automattic/calypso-config';
 import {
 	filterLanguageRevisions,
 	isTranslatedIncompletely,
 	isDefaultLocale,
 	getLanguageSlugs,
+	localizeUrl,
 } from '@automattic/i18n-utils';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
@@ -20,16 +22,16 @@ import superagent from 'superagent'; // Don't have Node.js fetch lib yet.
 import wooDnaConfig from 'calypso/jetpack-connect/woo-dna-config';
 import { STEPPER_SECTION_DEFINITION } from 'calypso/landing/stepper/section';
 import { SUBSCRIPTIONS_SECTION_DEFINITION } from 'calypso/landing/subscriptions/section';
-import { shouldSeeCookieBanner, parseTrackingPrefs } from 'calypso/lib/analytics/utils';
+import isA8CForAgencies from 'calypso/lib/a8c-for-agencies/is-a8c-for-agencies';
+import { shouldSeeCookieBanner } from 'calypso/lib/analytics/utils';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
-import { isWooOAuth2Client } from 'calypso/lib/oauth2-clients';
 import { login } from 'calypso/lib/paths';
 import loginRouter, { LOGIN_SECTION_DEFINITION } from 'calypso/login';
 import sections from 'calypso/sections';
 import isSectionEnabled from 'calypso/sections-filter';
 import { serverRouter, getCacheKey } from 'calypso/server/isomorphic-routing';
 import analytics from 'calypso/server/lib/analytics';
-import isWpMobileApp from 'calypso/server/lib/is-wp-mobile-app';
+import { isWpMobileApp, isWcMobileApp } from 'calypso/server/lib/is-mobile-app';
 import performanceMark from 'calypso/server/lib/performance-mark/index';
 import {
 	serverRender,
@@ -44,7 +46,8 @@ import getBootstrappedUser from 'calypso/server/user-bootstrap';
 import { createReduxStore } from 'calypso/state';
 import { LOCALE_SET } from 'calypso/state/action-types';
 import { setCurrentUser } from 'calypso/state/current-user/actions';
-import { setDocumentHeadLink } from 'calypso/state/document-head/actions';
+import { setDocumentHeadLink, setDocumentHeadMeta } from 'calypso/state/document-head/actions';
+import { getDocumentHeadMeta } from 'calypso/state/document-head/selectors';
 import initialReducer from 'calypso/state/reducer';
 import { setStore } from 'calypso/state/redux-store';
 import { deserialize } from 'calypso/state/utils';
@@ -96,7 +99,7 @@ function setupLoggedInContext( req, res, next ) {
 	next();
 }
 
-function getDefaultContext( request, response, entrypoint = 'entry-main', sectionName ) {
+function getDefaultContext( request, response, entrypoint = 'entry-main' ) {
 	performanceMark( request.context, 'getDefaultContext' );
 
 	const geoIPCountryCode = request.headers[ 'x-geoip-country-code' ];
@@ -142,18 +145,17 @@ function getDefaultContext( request, response, entrypoint = 'entry-main', sectio
 	setStore( reduxStore, getCachedState );
 	performanceMark( request.context, 'create basic options', true );
 
-	const devEnvironments = [ 'development', 'jetpack-cloud-development' ];
+	const devEnvironments = [
+		'development',
+		'jetpack-cloud-development',
+		'a8c-for-agencies-development',
+	];
 	const isDebug = devEnvironments.includes( calypsoEnv ) || request.query.debug !== undefined;
-
-	const oauthClientId = request.query.oauth2_client_id || request.query.client_id;
-	const isWCComConnect =
-		( 'login' === sectionName || 'signup' === sectionName ) &&
-		request.query[ 'wccom-from' ] &&
-		isWooOAuth2Client( { id: parseInt( oauthClientId ) } );
 
 	const reactQueryDevtoolsHelper = config.isEnabled( 'dev/react-query-devtools' );
 	const authHelper = config.isEnabled( 'dev/auth-helper' );
 	const accountSettingsHelper = config.isEnabled( 'dev/account-settings-helper' );
+	const storeSandboxHelper = config.isEnabled( 'dev/store-sandbox-helper' );
 	// preferences helper requires a Redux store, which doesn't exist in Gutenboarding
 	const preferencesHelper =
 		config.isEnabled( 'dev/preferences-helper' ) && entrypoint !== 'entry-gutenboarding';
@@ -175,7 +177,6 @@ function getDefaultContext( request, response, entrypoint = 'entry-main', sectio
 		env: calypsoEnv,
 		sanitize: sanitize,
 		requestFrom: request.query.from,
-		isWCComConnect,
 		isWooDna: wooDnaConfig( request.query ).isWooDnaFlow(),
 		badge: false,
 		lang: config( 'i18n_default_locale_slug' ),
@@ -185,6 +186,7 @@ function getDefaultContext( request, response, entrypoint = 'entry-main', sectio
 		accountSettingsHelper,
 		authHelper,
 		preferencesHelper,
+		storeSandboxHelper,
 		featuresHelper,
 		devDocsURL: '/devdocs',
 		store: reduxStore,
@@ -201,6 +203,7 @@ function getDefaultContext( request, response, entrypoint = 'entry-main', sectio
 		// use ipv4 address when is ipv4 mapped address
 		clientIp: request.ip ? request.ip.replace( '::ffff:', '' ) : request.ip,
 		isWpMobileApp: isWpMobileApp( request.useragent.source ),
+		isWcMobileApp: isWcMobileApp( request.useragent.source ),
 		isDebug,
 	};
 
@@ -240,6 +243,18 @@ function getDefaultContext( request, response, entrypoint = 'entry-main', sectio
 
 	if ( calypsoEnv === 'jetpack-cloud-development' ) {
 		context.badge = 'jetpack-cloud-dev';
+		context.feedbackURL = 'https://github.com/Automattic/wp-calypso/issues/';
+		context.branchName = getCurrentBranchName();
+		context.commitChecksum = getCurrentCommitShortChecksum();
+	}
+
+	if ( calypsoEnv === 'a8c-for-agencies-stage' ) {
+		context.badge = 'a8c-for-agencies-staging';
+		context.feedbackURL = 'https://github.com/Automattic/wp-calypso/issues/';
+	}
+
+	if ( calypsoEnv === 'a8c-for-agencies-development' ) {
+		context.badge = 'a8c-for-agencies-dev';
 		context.feedbackURL = 'https://github.com/Automattic/wp-calypso/issues/';
 		context.branchName = getCurrentBranchName();
 		context.commitChecksum = getCurrentCommitShortChecksum();
@@ -392,10 +407,7 @@ function setUpLoggedInRoute( req, res, next ) {
 					const searchParam = req.query.s || req.query.q;
 					if ( searchParam ) {
 						res.redirect(
-							'https://' +
-								req.context.lang +
-								'.search.wordpress.com/?q=' +
-								encodeURIComponent( searchParam )
+							'https://wordpress.com/read/search?q=' + encodeURIComponent( searchParam )
 						);
 						return;
 					}
@@ -455,7 +467,6 @@ function setUpLoggedInRoute( req, res, next ) {
 
 /**
  * Sets up a Content Security Policy header
- *
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
  * @param {Object} req Express request object
  * @param {Object} res Express response object
@@ -494,10 +505,18 @@ function setUpCSP( req, res, next ) {
 			'https://appleid.cdn-apple.com',
 			`'nonce-${ req.context.inlineScriptNonce }'`,
 			'www.google-analytics.com',
+			'use.typekit.net',
 			...inlineScripts.map( ( hash ) => `'${ hash }'` ),
 		],
 		'base-uri': [ "'none'" ],
-		'style-src': [ "'self'", '*.wp.com', 'https://fonts.googleapis.com' ],
+		'style-src': [
+			"'self'",
+			'*.wp.com',
+			'https://fonts.googleapis.com',
+			'use.typekit.net',
+			// per https://helpx.adobe.com/ca/fonts/using/content-security-policy.html
+			"'unsafe-inline'",
+		],
 		'form-action': [ "'self'" ],
 		'object-src': [ "'none'" ],
 		'img-src': [
@@ -510,6 +529,7 @@ function setUpCSP( req, res, next ) {
 			'https://amplifypixel.outbrain.com',
 			'https://img.youtube.com',
 			'localhost:8888',
+			'p.typekit.net',
 		],
 		'frame-src': [
 			"'self'",
@@ -521,6 +541,7 @@ function setUpCSP( req, res, next ) {
 			"'self'",
 			'*.wp.com',
 			'https://fonts.gstatic.com',
+			'use.typekit.net',
 			'data:', // should remove 'data:' ASAP
 		],
 		'media-src': [ "'self'" ],
@@ -584,6 +605,12 @@ const setUpSectionContext = ( section, entrypoint ) => ( req, res, next ) => {
 	if ( Array.isArray( section.links ) ) {
 		section.links.forEach( ( link ) => req.context.store.dispatch( setDocumentHeadLink( link ) ) );
 	}
+
+	if ( Array.isArray( section.meta ) ) {
+		// Append section specific meta tags.
+		const meta = getDocumentHeadMeta( req.context.store.getState() ).concat( section.meta );
+		req.context.store.dispatch( setDocumentHeadMeta( meta ) );
+	}
 	next();
 };
 
@@ -627,7 +654,6 @@ const renderServerError =
 
 /**
  * Checks if the passed URL has the same origin as the request
- *
  * @param {express.Request} req Request
  * @param {string} url URL
  * @returns {boolean} True if origins are the same
@@ -648,7 +674,6 @@ function validateRedirect( req, url ) {
 
 /**
  * Defines wordpress.com (Calypso blue) routes only
- *
  * @param {express.Application} app Express application
  */
 function wpcomPages( app ) {
@@ -688,24 +713,9 @@ function wpcomPages( app ) {
 		res.redirect( redirectUrl );
 	} );
 
-	app.get( '/discover', function ( req, res, next ) {
-		if ( ! req.context.isLoggedIn ) {
-			res.redirect( config( 'discover_logged_out_redirect_url' ) );
-		} else {
-			next();
-		}
-	} );
+	app.get( `/:locale([a-z]{2,3}|[a-z]{2}-[a-z]{2})?/plans`, function ( req, res, next ) {
+		const locale = req.params?.locale ?? config( 'i18n_default_locale_slug' );
 
-	// redirect logged-out searches to en.search.wordpress.com
-	app.get( '/read/search', function ( req, res, next ) {
-		if ( ! req.context.isLoggedIn && calypsoEnv !== 'development' ) {
-			res.redirect( 'https://en.search.wordpress.com/?q=' + encodeURIComponent( req.query.q ) );
-		} else {
-			next();
-		}
-	} );
-
-	app.get( '/plans', function ( req, res, next ) {
 		if ( ! req.context.isLoggedIn ) {
 			const queryFor = req.query?.for;
 			const ref = req.query?.ref;
@@ -715,12 +725,18 @@ function wpcomPages( app ) {
 					'https://wordpress.com/wp-login.php?redirect_to=https%3A%2F%2Fwordpress.com%2Fplans'
 				);
 			} else {
-				const pricingPageUrl = ref
-					? `https://wordpress.com/pricing/?ref=${ ref }`
-					: 'https://wordpress.com/pricing/';
+				const pricingPage = 'https://wordpress.com/pricing/';
+				const refQuery = ref ? `?ref=${ ref }` : '';
+				const pricingPageUrl = localizeUrl( `${ pricingPage }${ refQuery }`, locale );
 				res.redirect( pricingPageUrl );
 			}
 		} else {
+			if ( locale && locale !== config( 'i18n_default_locale_slug' ) ) {
+				const queryParams = new URLSearchParams( req.query );
+				const queryString = queryParams.size ? '?' + queryParams.toString() : '';
+				res.redirect( `/plans${ queryString }` );
+				return;
+			}
 			next();
 		}
 	} );
@@ -830,13 +846,64 @@ function wpcomPages( app ) {
 	} );
 
 	app.get( [ '/subscriptions', '/subscriptions/*' ], function ( req, res, next ) {
-		if ( req.cookies.subkey || req.context.isLoggedIn || calypsoEnv !== 'production' ) {
-			// If the user is logged in, or has a subkey cookie, they are authorized to view the page
+		if ( ( req.cookies.subkey || calypsoEnv !== 'production' ) && ! req.context.isLoggedIn ) {
+			// If the user is not logged in but has a subkey cookie, they are authorized to view old portal
 			return next();
 		}
 
-		// Otherwise, show them email subscriptions external landing page
-		res.redirect( 'https://wordpress.com/email-subscriptions' );
+		// For users not logged in, redirect to the email login link page.
+		if ( ! req.context.isLoggedIn ) {
+			return res.redirect( 'https://wordpress.com/email-subscriptions' );
+		}
+
+		const basePath = 'https://wordpress.com/read/subscriptions';
+
+		// If user enters /subscriptions/sites(.*),
+		// redirect to /read/subscriptions.
+		if ( req.path.match( '/subscriptions/sites' ) ) {
+			return res.redirect( basePath );
+		}
+
+		// If user enters /site/*,
+		// redirect to /read/site/subscription/*.
+		const siteFragment = req.path.match( /site\/(.*)/i );
+		if ( siteFragment && siteFragment[ 1 ] ) {
+			return res.redirect( 'https://wordpress.com/read/site/subscription/' + siteFragment[ 1 ] );
+		}
+
+		// If user enters /subscriptions/comments(.*),
+		// redirect to /read/subscriptions/comments.
+		if ( req.path.match( '/subscriptions/comments' ) ) {
+			return res.redirect( basePath + '/comments' );
+		}
+
+		// If user enters /subscriptions/pending(.*),
+		// redirect to /read/subscriptions/pending.
+		if ( req.path.match( '/subscriptions/pending' ) ) {
+			return res.redirect( basePath + '/pending' );
+		}
+
+		// If user enters /subscriptions/settings,
+		// redirect to /me/notifications/subscriptions?referrer=management.
+		if ( req.path.match( '/subscriptions/settings' ) ) {
+			return res.redirect(
+				'https://wordpress.com/me/notifications/subscriptions?referrer=management'
+			);
+		}
+
+		return res.redirect( basePath );
+	} );
+
+	// Redirects from the /start/domain-transfer flow to the new /setup/domain-transfer.
+	app.get( [ '/start/domain-transfer', '/start/domain-transfer/*' ], function ( req, res ) {
+		const redirectUrl = '/setup/domain-transfer';
+		res.redirect( 301, redirectUrl );
+	} );
+
+	// Redirects from /help/courses to https://wordpress.com/learn/courses.
+	app.get( '/help/courses', function ( req, res ) {
+		const redirectUrl = 'https://wordpress.com/learn/courses';
+		res.redirect( 301, redirectUrl );
 	} );
 }
 
@@ -852,7 +919,7 @@ export default function pages() {
 	app.use( setupLoggedInContext );
 	app.use( middlewareUnsupportedBrowser() );
 
-	if ( ! isJetpackCloud() ) {
+	if ( ! ( isJetpackCloud() || isA8CForAgencies() ) ) {
 		wpcomPages( app );
 	}
 

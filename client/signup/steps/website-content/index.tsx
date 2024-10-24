@@ -1,10 +1,9 @@
-import { Button, Dialog } from '@automattic/components';
+import page from '@automattic/calypso-router';
+import { Button, ConfettiAnimation, Dialog } from '@automattic/components';
 import styled from '@emotion/styled';
 import debugFactory from 'debug';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import { useEffect, useState, ChangeEvent, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import errorIllustration from 'calypso/assets/images/customer-home/disconnected.svg';
 import { LoadingEllipsis } from 'calypso/components/loading-ellipsis';
 import AccordionForm from 'calypso/signup/accordion-form/accordion-form';
@@ -14,7 +13,9 @@ import {
 	useTranslatedPageTitles,
 } from 'calypso/signup/difm/translation-hooks';
 import StepWrapper from 'calypso/signup/step-wrapper';
+import { useSelector, useDispatch } from 'calypso/state';
 import { errorNotice, successNotice } from 'calypso/state/notices/actions';
+import getInitialQueryArguments from 'calypso/state/selectors/get-initial-query-arguments';
 import { saveSignupStep } from 'calypso/state/signup/progress/actions';
 import {
 	changesSaved,
@@ -56,6 +57,17 @@ const DialogButton = styled( Button )`
 	--color-accent-60: #0e64a5;
 	.gridicon {
 		margin-left: 10px;
+	}
+`;
+
+const LinkButton = styled( Button )`
+	text-decoration: underline;
+	cursor: pointer;
+
+	.formatted-header__subtitle
+		button&[type='button'].button.is-borderless.is-primary.is-transparent:focus {
+		border-color: transparent;
+		box-shadow: none;
 	}
 `;
 
@@ -113,7 +125,7 @@ function WebsiteContentStep( {
 		? BBE_STORE_WEBSITE_CONTENT_FILLING_STEP
 		: BBE_WEBSITE_CONTENT_FILLING_STEP;
 
-	const { isLoading: isSaving, mutateAsync } = useSaveWebsiteContentMutation(
+	const { isPending: isSaving, mutateAsync } = useSaveWebsiteContentMutation(
 		siteId,
 		websiteContent
 	);
@@ -177,6 +189,8 @@ function WebsiteContentStep( {
 	);
 	const generatedSections = generatedSectionsCallback();
 
+	const prefersReducedMotion = window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+
 	const dialogButtons = [
 		<DialogButton onClick={ () => setIsConfirmDialogOpen( false ) }>
 			{ translate( 'Cancel' ) }
@@ -188,6 +202,7 @@ function WebsiteContentStep( {
 
 	return (
 		<>
+			<ConfettiAnimation trigger={ ! prefersReducedMotion } />
 			<Dialog
 				isVisible={ isConfirmDialogOpen }
 				onClose={ () => setIsConfirmDialogOpen( false ) }
@@ -197,7 +212,10 @@ function WebsiteContentStep( {
 					<h1>{ translate( 'Are you ready to submit your content?' ) }</h1>
 					<p>
 						{ translate(
-							'Click the Submit button if you have finished adding content. We will build your new website and then email you within 4 business days with details about your new site.'
+							"If you have reviewed our content guidelines and added your final content to the form, click “Submit” to send us your content. We'll then build your new site and email you the details within %d business days.",
+							{
+								args: [ 4 ],
+							}
 						) }
 					</p>
 				</DialogContent>
@@ -242,19 +260,39 @@ export default function WrapperWebsiteContent(
 		};
 	} & WebsiteContentStepProps
 ) {
+	const { skippedCheckout } = useSelector( getInitialQueryArguments ) ?? {};
 	const { flowName, stepName, positionInFlow, queryObject } = props;
 	const translate = useTranslate();
 	const siteId = useSelector( ( state ) => getSiteId( state, queryObject.siteSlug as string ) );
 
 	const { isLoading, isError, data } = useGetWebsiteContentQuery( queryObject.siteSlug );
 
+	const [ isContentGuidelinesDialogOpen, setIsContentGuidelinesDialogOpen ] = useState( true );
+
 	const headerText = translate( 'Website Content' );
+
+	const subHeaderTextTranslateArgs = {
+		components: {
+			br: <br />,
+			Link: (
+				<LinkButton
+					borderless
+					primary
+					transparent
+					onClick={ () => setIsContentGuidelinesDialogOpen( true ) }
+				/>
+			),
+		},
+	};
+
 	const subHeaderText = data?.isStoreFlow
 		? translate(
-				'Provide content for your website build. You can add products later with the WordPress editor.'
+				'Provide content for your website build. You can add products later with the WordPress editor.{{br}}{{/br}}{{br}}{{/br}}{{Link}}View Content Guidelines{{/Link}}',
+				subHeaderTextTranslateArgs
 		  )
 		: translate(
-				'Provide content for your website build. You will be able to edit all content later using the WordPress editor.'
+				'Provide content for your website build. You will be able to edit all content later using the WordPress editor.{{br}}{{/br}}{{br}}{{/br}}{{Link}}View Content Guidelines{{/Link}}',
+				subHeaderTextTranslateArgs
 		  );
 
 	useEffect( () => {
@@ -263,6 +301,13 @@ export default function WrapperWebsiteContent(
 			page( `/home/${ queryObject.siteSlug }` );
 		}
 	}, [ data, queryObject.siteSlug ] );
+
+	useEffect( () => {
+		if ( skippedCheckout === '1' ) {
+			debug( 'User did not make a DIFM purchase, redirecting to home' );
+			page( `/home/${ queryObject.siteSlug }` );
+		}
+	}, [ skippedCheckout, queryObject.siteSlug ] );
 
 	if ( isLoading ) {
 		return <Loader />;
@@ -289,23 +334,60 @@ export default function WrapperWebsiteContent(
 	}
 
 	return (
-		<StepWrapper
-			headerText={ headerText }
-			subHeaderText={ subHeaderText }
-			fallbackHeaderText={ headerText }
-			fallbackSubHeaderText={ subHeaderText }
-			flowName={ flowName }
-			stepName={ stepName }
-			positionInFlow={ positionInFlow }
-			stepContent={
-				<WebsiteContentStep { ...props } websiteContentServerState={ data } siteId={ siteId } />
-			}
-			goToNextStep={ false }
-			hideFormattedHeader={ false }
-			hideBack={ false }
-			align="left"
-			isHorizontalLayout={ true }
-			isWideLayout={ true }
-		/>
+		<>
+			<Dialog
+				isVisible={ isContentGuidelinesDialogOpen }
+				onClose={ () => setIsContentGuidelinesDialogOpen( false ) }
+				buttons={ [
+					<DialogButton primary onClick={ () => setIsContentGuidelinesDialogOpen( false ) }>
+						{ translate( 'Acknowledge & Continue' ) }
+					</DialogButton>,
+				] }
+			>
+				<DialogContent>
+					<h1>{ translate( 'We look forward to building your site!' ) }</h1>
+					<p>{ translate( 'Please review the following content submission guidelines:' ) }</p>
+					<ul>
+						<li>
+							{ translate(
+								'Do not request content from existing pages, external websites or files, as migrations are not included. '
+							) }
+						</li>
+						<li>
+							{ translate(
+								'Submit the final content within 14 days; otherwise, we will use AI-generated text and stock images to build your site.'
+							) }
+						</li>
+						<li>
+							{ translate( 'Limit page text to under 5000 characters for optimal presentation.' ) }
+						</li>
+						<li>
+							{ translate(
+								'Revisions are not included; however, you can edit all content later using the WordPress editor.'
+							) }
+						</li>
+					</ul>
+				</DialogContent>
+			</Dialog>
+
+			<StepWrapper
+				headerText={ headerText }
+				subHeaderText={ subHeaderText }
+				fallbackHeaderText={ headerText }
+				fallbackSubHeaderText={ subHeaderText }
+				flowName={ flowName }
+				stepName={ stepName }
+				positionInFlow={ positionInFlow }
+				stepContent={
+					<WebsiteContentStep { ...props } websiteContentServerState={ data } siteId={ siteId } />
+				}
+				goToNextStep={ false }
+				hideFormattedHeader={ false }
+				hideBack={ false }
+				align="left"
+				isHorizontalLayout
+				isWideLayout
+			/>
+		</>
 	);
 }

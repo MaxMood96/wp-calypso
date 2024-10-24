@@ -1,16 +1,26 @@
-import { FormInputValidation } from '@automattic/components';
+import config from '@automattic/calypso-config';
+import page from '@automattic/calypso-router';
+import { FormInputValidation, FormLabel } from '@automattic/components';
+import { Spinner } from '@wordpress/components';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import { useState } from 'react';
 import FormsButton from 'calypso/components/forms/form-button';
-import FormLabel from 'calypso/components/forms/form-label';
 import FormTextInput from 'calypso/components/forms/form-text-input';
 import { login } from 'calypso/lib/paths';
-
-const LostPasswordForm = ( { redirectToAfterLoginUrl, oauth2ClientId, locale } ) => {
+import { useDispatch } from 'calypso/state';
+import { sendEmailLogin } from 'calypso/state/auth/actions';
+const LostPasswordForm = ( {
+	redirectToAfterLoginUrl,
+	oauth2ClientId,
+	locale,
+	from,
+	isWooPasswordlessJPC,
+} ) => {
 	const translate = useTranslate();
 	const [ email, setEmail ] = useState( '' );
 	const [ error, setError ] = useState( null );
+	const [ isBusy, setBusy ] = useState( false );
+	const dispatch = useDispatch();
 
 	const validateEmail = () => {
 		if ( email.length === 0 || email.includes( '@' ) ) {
@@ -18,6 +28,19 @@ const LostPasswordForm = ( { redirectToAfterLoginUrl, oauth2ClientId, locale } )
 		} else {
 			setError( translate( 'This email address is not valid. It must include a single @' ) );
 		}
+	};
+
+	const getAuthAccountTypeRequest = async ( emailAddress ) => {
+		const resp = await window.fetch(
+			`https://public-api.wordpress.com/rest/v1.1/users/${ emailAddress }/auth-options`,
+			{
+				method: 'GET',
+			}
+		);
+		if ( resp.status < 200 || resp.status >= 300 ) {
+			throw resp;
+		}
+		return await resp.json();
 	};
 
 	const lostPasswordRequest = async () => {
@@ -40,8 +63,38 @@ const LostPasswordForm = ( { redirectToAfterLoginUrl, oauth2ClientId, locale } )
 	const onSubmit = async ( event ) => {
 		event.preventDefault();
 
+		if (
+			config.isEnabled( 'woocommerce/core-profiler-passwordless-auth' ) &&
+			isWooPasswordlessJPC
+		) {
+			const accountType = await getAuthAccountTypeRequest( email );
+			if ( accountType?.passwordless === true ) {
+				await dispatch(
+					sendEmailLogin( email, {
+						redirectTo: redirectToAfterLoginUrl,
+						loginFormFlow: true,
+						showGlobalNotices: true,
+						flow: 'jetpack',
+					} )
+				);
+				page(
+					login( {
+						isJetpack: true,
+						// If no notification is sent, the user is using the authenticator for 2FA by default
+						twoFactorAuthType: 'link',
+						locale: locale,
+						from: from,
+						emailAddress: email,
+					} )
+				);
+				return;
+			}
+		}
+
 		try {
+			setBusy( true );
 			const result = await lostPasswordRequest();
+			setBusy( false );
 			if ( result.includes( 'Unable to reset password' ) ) {
 				return setError(
 					translate( "I'm sorry, but we weren't able to find a user with that login information." )
@@ -55,9 +108,12 @@ const LostPasswordForm = ( { redirectToAfterLoginUrl, oauth2ClientId, locale } )
 					redirectTo: redirectToAfterLoginUrl,
 					emailAddress: email,
 					lostpasswordFlow: true,
+					action: isWooPasswordlessJPC ? 'jetpack' : null,
+					from,
 				} )
 			);
 		} catch ( _httpError ) {
+			setBusy( false );
 			setError(
 				translate( 'There was an error sending the password reset email. Please try again.' )
 			);
@@ -90,8 +146,8 @@ const LostPasswordForm = ( { redirectToAfterLoginUrl, oauth2ClientId, locale } )
 				{ showError && <FormInputValidation isError text={ error } /> }
 			</div>
 			<div className="login__form-action">
-				<FormsButton primary type="submit" disabled={ email.length === 0 || showError }>
-					{ translate( 'Reset my password' ) }
+				<FormsButton primary type="submit" disabled={ email.length === 0 || showError || isBusy }>
+					{ isBusy ? <Spinner /> : translate( 'Reset my password' ) }
 				</FormsButton>
 			</div>
 		</form>

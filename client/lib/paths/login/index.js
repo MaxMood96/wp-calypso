@@ -39,6 +39,10 @@ export function login( {
 	isPartnerSignup = undefined,
 	action = undefined,
 	lostpasswordFlow = undefined,
+	usernameOnly = undefined,
+	gravatarFrom = undefined,
+	gravatarFlow = undefined,
+	pluginName = undefined,
 } = {} ) {
 	let url = '/log-in';
 
@@ -104,6 +108,22 @@ export function login( {
 
 	if ( lostpasswordFlow ) {
 		url = addQueryArgs( { lostpassword_flow: true }, url );
+	}
+
+	if ( usernameOnly ) {
+		url = addQueryArgs( { username_only: true }, url );
+	}
+
+	if ( gravatarFrom ) {
+		url = addQueryArgs( { gravatar_from: gravatarFrom }, url );
+	}
+
+	if ( gravatarFlow ) {
+		url = addQueryArgs( { gravatar_flow: '1' }, url );
+	}
+
+	if ( pluginName ) {
+		url = addQueryArgs( { plugin_name: pluginName }, url );
 	}
 
 	return url;

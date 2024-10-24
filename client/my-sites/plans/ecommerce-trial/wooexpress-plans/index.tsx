@@ -2,23 +2,21 @@ import {
 	PLAN_FREE,
 	PLAN_WOOEXPRESS_MEDIUM,
 	PLAN_WOOEXPRESS_MEDIUM_MONTHLY,
-	PLAN_WOOEXPRESS_PLUS,
-	PLAN_WOOEXPRESS_SMALL,
-	PLAN_WOOEXPRESS_SMALL_MONTHLY,
 	getPlanPath,
-	getPlans,
 	isWooExpressPlan,
 } from '@automattic/calypso-products';
+import page from '@automattic/calypso-router';
+import { Button } from '@automattic/components';
+import { Plans } from '@automattic/data-stores';
 import { useIsEnglishLocale } from '@automattic/i18n-utils';
 import { hasTranslation } from '@wordpress/i18n';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import { useCallback, useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import AsyncLoad from 'calypso/components/async-load';
-import { getECommerceTrialCheckoutUrl } from 'calypso/lib/ecommerce-trial/get-ecommerce-trial-checkout-url';
+import { getPlanCartItem } from 'calypso/lib/cart-values/cart-items';
+import { getTrialCheckoutUrl } from 'calypso/lib/trials/get-trial-checkout-url';
+import PlansFeaturesMain from 'calypso/my-sites/plans-features-main';
 import PlanIntervalSelector from 'calypso/my-sites/plans-features-main/components/plan-interval-selector';
-import { getPlanRawPrice } from 'calypso/state/plans/selectors';
+import useCheckPlanAvailabilityForPurchase from 'calypso/my-sites/plans-features-main/hooks/use-check-plan-availability-for-purchase';
 import type { MinimalRequestCartProduct } from '@automattic/shopping-cart';
 
 import './style.scss';
@@ -28,7 +26,7 @@ type SegmentedOptionProps = {
 	onClick?: () => void;
 };
 interface WooExpressPlansProps {
-	siteId: number | string;
+	siteId: number | null;
 	siteSlug: string;
 	interval?: 'monthly' | 'yearly';
 	monthlyControlProps: SegmentedOptionProps;
@@ -50,16 +48,19 @@ export function WooExpressPlans( props: WooExpressPlansProps ) {
 	const translate = useTranslate();
 	const isEnglishLocale = useIsEnglishLocale();
 
-	const mediumPlanAnnual = getPlans()[ PLAN_WOOEXPRESS_MEDIUM ];
-	const mediumPlanMonthly = getPlans()[ PLAN_WOOEXPRESS_MEDIUM_MONTHLY ];
-	const mediumPlanPrices = useSelector( ( state ) => ( {
-		annualPlanMonthlyPrice: getPlanRawPrice( state, mediumPlanAnnual.getProductId(), true ) || 0,
-		monthlyPlanPrice: getPlanRawPrice( state, mediumPlanMonthly.getProductId() ) || 0,
-	} ) );
+	const pricingMeta = Plans.usePricingMetaForGridPlans( {
+		planSlugs: [ PLAN_WOOEXPRESS_MEDIUM, PLAN_WOOEXPRESS_MEDIUM_MONTHLY ],
+		siteId,
+		coupon: undefined,
+		useCheckPlanAvailabilityForPurchase,
+		storageAddOns: null,
+	} );
 
-	const percentageSavings = Math.floor(
-		( 1 - mediumPlanPrices.annualPlanMonthlyPrice / mediumPlanPrices.monthlyPlanPrice ) * 100
-	);
+	const annualPlanMonthlyPrice =
+		pricingMeta?.[ PLAN_WOOEXPRESS_MEDIUM ]?.originalPrice?.monthly ?? 0;
+	const monthlyPlanPrice =
+		pricingMeta?.[ PLAN_WOOEXPRESS_MEDIUM_MONTHLY ]?.originalPrice?.full ?? 0;
+	const percentageSavings = Math.floor( ( 1 - annualPlanMonthlyPrice / monthlyPlanPrice ) * 100 );
 
 	const planIntervals = useMemo( () => {
 		return [
@@ -97,34 +98,22 @@ export function WooExpressPlans( props: WooExpressPlansProps ) {
 		isEnglishLocale,
 	] );
 
-	const smallPlan = interval === 'yearly' ? PLAN_WOOEXPRESS_SMALL : PLAN_WOOEXPRESS_SMALL_MONTHLY;
-	const mediumPlan =
-		interval === 'yearly' ? PLAN_WOOEXPRESS_MEDIUM : PLAN_WOOEXPRESS_MEDIUM_MONTHLY;
-
 	const onUpgradeClick = useCallback(
-		( cartItem: MinimalRequestCartProduct | null ) => {
-			const upgradePlanSlug = cartItem?.product_slug ?? PLAN_FREE;
+		( cartItems?: MinimalRequestCartProduct[] | null ) => {
+			const upgradePlanSlug = getPlanCartItem( cartItems )?.product_slug ?? PLAN_FREE;
 
 			triggerTracksEvent?.( upgradePlanSlug );
 
 			const planPath = getPlanPath( upgradePlanSlug ) ?? '';
 
 			const checkoutUrl = isWooExpressPlan( upgradePlanSlug )
-				? getECommerceTrialCheckoutUrl( { productSlug: planPath, siteSlug } )
+				? getTrialCheckoutUrl( { productSlug: planPath, siteSlug } )
 				: `/checkout/${ siteSlug }/${ planPath }`;
 
 			page( checkoutUrl );
 		},
 		[ siteSlug, triggerTracksEvent ]
 	);
-
-	const plansTableProps = {
-		plans: [ smallPlan, mediumPlan, PLAN_WOOEXPRESS_PLUS ],
-		hidePlansFeatureComparison: false,
-		hideUnavailableFeatures: true,
-		siteId,
-		onUpgradeClick,
-	};
 
 	return (
 		<>
@@ -133,13 +122,35 @@ export function WooExpressPlans( props: WooExpressPlansProps ) {
 					<PlanIntervalSelector
 						className="wooexpress-plans__interval-toggle price-toggle"
 						intervals={ planIntervals }
-						isPlansInsideStepper={ false }
-						use2023PricingGridStyles={ true }
+						use2023PricingGridStyles
 					/>
 				</div>
 			) }
 			<div className="wooexpress-plans__grid is-2023-pricing-grid">
-				<AsyncLoad require="calypso/my-sites/plan-features-2023-grid" { ...plansTableProps } />
+				<PlansFeaturesMain
+					siteId={ siteId }
+					onUpgradeClick={ onUpgradeClick }
+					intervalType={ interval }
+					hidePlanTypeSelector
+					hideUnavailableFeatures
+					intent="plans-woocommerce"
+				/>
+			</div>
+
+			<div className="enterprise-ecommerce__banner">
+				<div className="enterprise-ecommerce__content">
+					<h3 className="enterprise-ecommerce__title">{ translate( 'Enterprise ecommerce' ) }</h3>
+					<div className="enterprise-ecommerce__subtitle">
+						{ translate(
+							'Learn how Woo can support the unique needs of high-volume stores through dedicated support, discounts, and more.'
+						) }
+					</div>
+					<div className="enterprise-ecommerce__cta">
+						<Button href="https://woocommerce.com/enterprise-ecommerce/?utm_source=wooexpress&utm_campaign=plans_grid">
+							{ translate( 'Learn more' ) }
+						</Button>
+					</div>
+				</div>
 			</div>
 		</>
 	);

@@ -1,4 +1,5 @@
 import { Button } from '@automattic/components';
+import { localizeUrl } from '@automattic/i18n-utils';
 import { localize } from 'i18n-calypso';
 import { flowRight } from 'lodash';
 import PropTypes from 'prop-types';
@@ -9,19 +10,23 @@ import IllustrationStats from 'calypso/assets/images/stats/illustration-stats.sv
 import QueryPostStats from 'calypso/components/data/query-post-stats';
 import QueryPosts from 'calypso/components/data/query-posts';
 import EmptyContent from 'calypso/components/empty-content';
-import FixedNavigationHeader from 'calypso/components/fixed-navigation-header';
 import JetpackColophon from 'calypso/components/jetpack-colophon';
 import Main from 'calypso/components/main';
+import NavigationHeader from 'calypso/components/navigation-header';
 import WebPreview from 'calypso/components/web-preview';
-import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { decodeEntities, stripHTML } from 'calypso/lib/formatting';
 import { getSitePost, getPostPreviewUrl } from 'calypso/state/posts/selectors';
+import { countPostLikes } from 'calypso/state/posts/selectors/count-post-likes';
 import { getSiteSlug, isJetpackSite, isSitePreviewable } from 'calypso/state/sites/selectors';
+import getEnvStatsFeatureSupportChecks from 'calypso/state/sites/selectors/get-env-stats-feature-supports';
 import { getPostStat, isRequestingPostStats } from 'calypso/state/stats/posts/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
+import StatsModuleUTM from '../features/modules/stats-utm';
+import { StatsGlobalValuesContext } from '../pages/providers/global-provider';
 import PostDetailHighlightsSection from '../post-detail-highlights-section';
 import PostDetailTableSection from '../post-detail-table-section';
 import StatsPlaceholder from '../stats-module/placeholder';
+import PageViewTracker from '../stats-page-view-tracker';
 import PostSummary from '../stats-post-summary';
 
 class StatsPostDetail extends Component {
@@ -104,32 +109,31 @@ class StatsPostDetail extends Component {
 	}
 
 	getPost() {
-		const { isPostHomepage, post, postFallback } = this.props;
+		const { isPostHomepage, post, postFallback, countLikes } = this.props;
 
 		const postBase = {
 			title: this.getTitle(),
 			type: isPostHomepage ? 'page' : 'post',
+			like_count: countLikes || 0,
 		};
 
 		// Check if post is valid.
-		if ( typeof post === 'object' && post?.title.length ) {
+		if ( typeof post === 'object' && post?.title?.length ) {
 			return {
 				...postBase,
 				date: post?.date,
 				post_thumbnail: post?.post_thumbnail,
-				like_count: post?.like_count,
 				comment_count: post?.discussion?.comment_count,
 				type: post?.type,
 			};
 		}
 
 		// Check if postFallback is valid.
-		if ( typeof postFallback === 'object' && postFallback?.post_title.length ) {
+		if ( typeof postFallback === 'object' && postFallback?.post_title?.length ) {
 			return {
 				...postBase,
 				date: postFallback?.post_date_gmt,
 				post_thumbnail: null,
-				like_count: null,
 				comment_count: parseInt( postFallback?.comment_count, 10 ),
 				type: postFallback?.post_type,
 			};
@@ -149,6 +153,7 @@ class StatsPostDetail extends Component {
 			siteSlug,
 			showViewLink,
 			previewUrl,
+			supportsUTMStats,
 		} = this.props;
 
 		const isLoading = isRequestingStats && ! countViews;
@@ -178,15 +183,13 @@ class StatsPostDetail extends Component {
 				{ siteId && <QueryPostStats siteId={ siteId } postId={ postId } /> }
 
 				<div className="stats has-fixed-nav">
-					<FixedNavigationHeader
-						navigationItems={ this.getNavigationItemsWithTitle( this.getTitle() ) }
-					>
+					<NavigationHeader navigationItems={ this.getNavigationItemsWithTitle( this.getTitle() ) }>
 						{ showViewLink && (
 							<Button onClick={ this.openPreview }>
 								<span>{ actionLabel }</span>
 							</Button>
 						) }
-					</FixedNavigationHeader>
+					</NavigationHeader>
 
 					<PostDetailHighlightsSection siteId={ siteId } postId={ postId } post={ passedPost } />
 
@@ -197,7 +200,9 @@ class StatsPostDetail extends Component {
 							title={ noViewsLabel }
 							line={ translate( 'Learn some tips to attract more visitors' ) }
 							action={ translate( 'Get more traffic!' ) }
-							actionURL="https://wordpress.com/support/getting-more-views-and-traffic/"
+							actionURL={ localizeUrl(
+								'https://wordpress.com/support/getting-more-views-and-traffic/'
+							) }
 							actionTarget="blank"
 							illustration={ IllustrationStats }
 							illustrationWidth={ 150 }
@@ -210,6 +215,20 @@ class StatsPostDetail extends Component {
 							<PostDetailTableSection siteId={ siteId } postId={ postId } />
 						</>
 					) }
+
+					<StatsGlobalValuesContext.Consumer>
+						{ ( isInternal ) =>
+							( supportsUTMStats || isInternal ) && (
+								<div className="stats-module-utm__post-detail">
+									<StatsModuleUTM
+										siteId={ siteId }
+										postId={ postId }
+										query={ { num: -1, max: 0 } }
+									/>
+								</div>
+							)
+						}
+					</StatsGlobalValuesContext.Consumer>
 
 					<JetpackColophon />
 				</div>
@@ -233,9 +252,12 @@ const connectComponent = connect( ( state, { postId } ) => {
 	const isJetpack = isJetpackSite( state, siteId );
 	const isPreviewable = isSitePreviewable( state, siteId );
 	const isPostHomepage = postId === 0;
+	const countLikes = countPostLikes( state, siteId, postId ) || 0;
+	const { supportsUTMStats } = getEnvStatsFeatureSupportChecks( state, siteId );
 
 	return {
 		post: getSitePost( state, siteId, postId ),
+		countLikes,
 		// NOTE: Post object from the stats response does not conform to the data structure returned by getSitePost!
 		postFallback: getPostStat( state, siteId, postId, 'post' ),
 		isPostHomepage,
@@ -245,6 +267,7 @@ const connectComponent = connect( ( state, { postId } ) => {
 		showViewLink: ! isJetpack && ! isPostHomepage && isPreviewable,
 		previewUrl: getPostPreviewUrl( state, siteId, postId ),
 		siteId,
+		supportsUTMStats,
 	};
 } );
 

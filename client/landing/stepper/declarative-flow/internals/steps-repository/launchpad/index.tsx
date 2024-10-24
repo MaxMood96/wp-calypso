@@ -4,15 +4,16 @@ import { useSelect, useDispatch as useWPDispatch } from '@wordpress/data';
 import { useEffect } from '@wordpress/element';
 import { getQueryArg } from '@wordpress/url';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector, useDispatch } from 'react-redux';
 import DocumentHead from 'calypso/components/data/document-head';
 import FormattedHeader from 'calypso/components/formatted-header';
 import { NavigationControls } from 'calypso/landing/stepper/declarative-flow/internals/types';
-import { useRecordSignupComplete } from 'calypso/landing/stepper/hooks/use-record-signup-complete';
 import { useSite } from 'calypso/landing/stepper/hooks/use-site';
+import { useSiteIdParam } from 'calypso/landing/stepper/hooks/use-site-id-param';
 import { useSiteSlugParam } from 'calypso/landing/stepper/hooks/use-site-slug-param';
 import { SITE_STORE } from 'calypso/landing/stepper/stores';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
+import { urlToSlug } from 'calypso/lib/url';
+import { useSelector, useDispatch } from 'calypso/state';
 import { isUserLoggedIn } from 'calypso/state/current-user/selectors';
 import { successNotice } from 'calypso/state/notices/actions';
 import { useQuery } from '../../../../hooks/use-query';
@@ -25,23 +26,25 @@ import './style.scss';
 
 type LaunchpadProps = {
 	navigation: NavigationControls;
-	flow: string | null;
+	flow: string;
 };
 
 const Launchpad: Step = ( { navigation, flow }: LaunchpadProps ) => {
 	const translate = useTranslate();
 	const almostReadyToLaunchText = translate( 'Almost ready to launch' );
-	const siteSlug = useSiteSlugParam();
 	const verifiedParam = useQuery().get( 'verified' );
 	const site = useSite();
+	const siteIdParam = useSiteIdParam();
+	const siteSlugParam = useSiteSlugParam();
+	const siteSlug = urlToSlug( site?.URL ?? '' ) || siteSlugParam || '';
+	const launchpadKey = String( siteIdParam || site?.ID || siteSlugParam || '' );
 	const siteIntentOption = site?.options?.site_intent;
 	const isSiteLaunched = site?.launch_status === 'launched' || false;
 	const {
 		isError: launchpadFetchError,
 		data: { launchpad_screen: launchpadScreenOption, checklist: launchpadChecklist } = {},
-	} = useLaunchpad( siteSlug, siteIntentOption );
+	} = useLaunchpad( launchpadKey, siteIntentOption );
 
-	const recordSignupComplete = useRecordSignupComplete( flow );
 	const dispatch = useDispatch();
 	const { saveSiteSettings } = useWPDispatch( SITE_STORE );
 	const isLoggedIn = useSelector( isUserLoggedIn );
@@ -51,7 +54,7 @@ const Launchpad: Step = ( { navigation, flow }: LaunchpadProps ) => {
 		[]
 	);
 
-	if ( ! siteSlug || fetchingSiteError?.error || launchpadFetchError ) {
+	if ( ( ! siteSlugParam && ! siteIdParam ) || fetchingSiteError?.error || launchpadFetchError ) {
 		window.location.replace( '/home' );
 	}
 
@@ -87,12 +90,10 @@ const Launchpad: Step = ( { navigation, flow }: LaunchpadProps ) => {
 		}
 	}, [ verifiedParam, translate, dispatch ] );
 
-	useEffect( () => {
-		if ( siteSlug && site && localStorage.getItem( 'launchpad_siteSlug' ) !== siteSlug ) {
-			recordSignupComplete();
-			localStorage.setItem( 'launchpad_siteSlug', siteSlug );
-		}
-	}, [ recordSignupComplete, siteSlug, site ] );
+	if ( launchpadScreenOption === 'skipped' ) {
+		window.location.assign( `/home/${ siteSlug }` );
+		return;
+	}
 
 	return (
 		<>
@@ -100,12 +101,13 @@ const Launchpad: Step = ( { navigation, flow }: LaunchpadProps ) => {
 			<StepContainer
 				stepName="launchpad"
 				goNext={ navigation.goNext }
-				isWideLayout={ true }
-				skipLabelText={ translate( 'Skip to dashboard' ) }
-				skipButtonAlign="bottom"
-				hideBack={ true }
+				isFullLayout
+				skipLabelText={ translate( 'Skip for now' ) }
+				skipButtonAlign="top"
+				hideBack
 				stepContent={
 					<StepContent
+						launchpadKey={ launchpadKey }
 						siteSlug={ siteSlug }
 						submit={ navigation.submit }
 						goNext={ navigation.goNext }

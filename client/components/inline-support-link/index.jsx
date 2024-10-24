@@ -1,21 +1,18 @@
 import { Gridicon } from '@automattic/components';
+import { HelpCenter } from '@automattic/data-stores';
 import { localizeUrl } from '@automattic/i18n-utils';
-import classnames from 'classnames';
+import { dispatch as dataStoreDispatch } from '@wordpress/data';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
 import ExternalLink from 'calypso/components/external-link';
-import { withRouteModal } from 'calypso/lib/route-modal';
-import {
-	bumpStat,
-	composeAnalytics,
-	recordTracksEvent,
-	withAnalytics,
-} from 'calypso/state/analytics/actions';
-import { openSupportArticleDialog } from 'calypso/state/inline-support-article/actions';
+import { bumpStat, composeAnalytics, recordTracksEvent } from 'calypso/state/analytics/actions';
 
 import './style.scss';
+
+const HELP_CENTER_STORE = HelpCenter.register();
 
 class InlineSupportLink extends Component {
 	state = {
@@ -35,7 +32,6 @@ class InlineSupportLink extends Component {
 		tracksOptions: PropTypes.object,
 		statsGroup: PropTypes.string,
 		statsName: PropTypes.string,
-		routeModalData: PropTypes.object,
 		showSupportModal: PropTypes.bool,
 		noWrap: PropTypes.bool,
 	};
@@ -53,7 +49,7 @@ class InlineSupportLink extends Component {
 	componentDidMount() {
 		if ( this.props.supportContext && ! this.props.supportPostId && ! this.props.supportLink ) {
 			// Lazy load the supportPostId and supportLink by key if not provided.
-			import( './context-links' ).then( ( module ) => {
+			asyncRequire( './context-links' ).then( ( module ) => {
 				const contextLinks = module.default;
 				const supportDataFromContext = contextLinks[ this.props.supportContext ];
 				if ( ! supportDataFromContext ) {
@@ -64,16 +60,12 @@ class InlineSupportLink extends Component {
 		}
 	}
 
-	onSupportLinkClick( event, supportPostId, url ) {
+	onSupportLinkClick( event, supportPostId, url, blogId ) {
 		const { showSupportModal, openDialog } = this.props;
-
 		if ( ! showSupportModal ) {
 			return;
 		}
-
-		const openDialogReturn = openDialog( event, supportPostId, url );
-		this.props.routeModalData.openModal( supportPostId );
-		return openDialogReturn;
+		openDialog( event, supportPostId, url, blogId );
 	}
 
 	render() {
@@ -81,9 +73,11 @@ class InlineSupportLink extends Component {
 			this.props;
 
 		let { supportPostId, supportLink } = this.props;
+		let blogId; // support.wordpress is the default blog used for support links
 		if ( this.state.supportDataFromContext ) {
 			supportPostId = this.state.supportDataFromContext.post_id;
 			supportLink = this.state.supportDataFromContext.link;
+			blogId = this.state.supportDataFromContext.blog_id;
 		}
 
 		if ( ! supportPostId && ! supportLink ) {
@@ -116,9 +110,9 @@ class InlineSupportLink extends Component {
 
 		return (
 			<LinkComponent
-				className={ classnames( 'inline-support-link', className ) }
+				className={ clsx( 'inline-support-link', className ) }
 				href={ url }
-				onClick={ ( event ) => this.onSupportLinkClick( event, supportPostId, url ) }
+				onClick={ ( event ) => this.onSupportLinkClick( event, supportPostId, url, blogId ) }
 				target="_blank"
 				rel="noopener noreferrer"
 				title={ linkTitle }
@@ -133,7 +127,7 @@ class InlineSupportLink extends Component {
 const mapDispatchToProps = ( dispatch, ownProps ) => {
 	const { tracksEvent, tracksOptions, statsGroup, statsName, supportContext } = ownProps;
 	return {
-		openDialog: ( event, supportPostId, supportLink ) => {
+		openDialog: ( event, supportPostId, supportLink, blogId ) => {
 			if ( ! supportPostId ) {
 				return;
 			}
@@ -149,24 +143,16 @@ const mapDispatchToProps = ( dispatch, ownProps ) => {
 				...( statsGroup && statsName ? [ bumpStat( statsGroup, statsName ) ] : [] ),
 			];
 			if ( analyticsEvents.length > 0 ) {
-				return dispatch(
-					withAnalytics(
-						composeAnalytics( ...analyticsEvents ),
-						openSupportArticleDialog( { postId: supportPostId, postUrl: supportLink } )
-					)
-				);
+				dispatch( composeAnalytics( ...analyticsEvents ) );
 			}
-			return dispatch(
-				openSupportArticleDialog( {
-					postId: supportPostId,
-					postUrl: supportLink,
-				} )
+
+			dataStoreDispatch( HELP_CENTER_STORE ).setShowSupportDoc(
+				supportLink,
+				supportPostId,
+				blogId
 			);
 		},
 	};
 };
 
-export default connect(
-	null,
-	mapDispatchToProps
-)( localize( withRouteModal( 'support-article' )( InlineSupportLink ) ) );
+export default connect( null, mapDispatchToProps )( localize( InlineSupportLink ) );

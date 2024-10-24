@@ -1,5 +1,5 @@
 import { useDebugValue } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector } from 'calypso/state';
 import { isUserLoggedIn } from 'calypso/state/current-user/selectors';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 import getCartKey from './get-cart-key';
@@ -17,9 +17,12 @@ export default function useCartKey(): ReturnType< typeof getCartKey > {
 		( !! jetpackPurchaseToken || !! jetpackPurchaseNonce );
 	const isAkismetSitelessCheckout =
 		currentUrlPath.includes( '/checkout/akismet' ) && isLoggedOutCart;
+	const isMarketplaceSitelessCheckout =
+		currentUrlPath.includes( '/checkout/marketplace' ) && isLoggedOutCart;
 	const isNoSiteCart =
 		isJetpackCheckout ||
 		isAkismetSitelessCheckout ||
+		isMarketplaceSitelessCheckout ||
 		( ! isLoggedOutCart &&
 			currentUrlPath.includes( '/checkout/no-site' ) &&
 			'no-user' === searchParams.get( 'cart' ) );

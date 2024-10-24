@@ -1,17 +1,16 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslate } from 'i18n-calypso';
-import { useDispatch } from 'react-redux';
-import { wpcomJetpackLicensing as wpcomJpl } from 'calypso/lib/wp';
-import { errorNotice } from 'calypso/state/notices/actions';
+import { useQuery } from '@tanstack/react-query';
+import isA8CForAgencies from 'calypso/lib/a8c-for-agencies/is-a8c-for-agencies';
+import wpcom, { wpcomJetpackLicensing as wpcomJpl } from 'calypso/lib/wp';
 import type {
 	AgencyDashboardFilter,
 	DashboardSortInterface,
-	Site,
 } from 'calypso/jetpack-cloud/sections/agency-dashboard/sites-overview/types';
+
+const client = isA8CForAgencies() ? wpcom : wpcomJpl;
 
 const agencyDashboardFilterToQueryObject = ( filter: AgencyDashboardFilter ) => {
 	return {
-		...filter.issueTypes?.reduce(
+		...filter?.issueTypes?.reduce(
 			( previousValue, currentValue ) => ( {
 				...previousValue,
 				[ currentValue ]: true,
@@ -19,67 +18,95 @@ const agencyDashboardFilterToQueryObject = ( filter: AgencyDashboardFilter ) => 
 			{}
 		),
 		...( filter.showOnlyFavorites && { show_only_favorites: true } ),
+		...( filter.isNotMultisite && { not_multisite: true } ),
+		...( filter?.showOnlyFavorites && { show_only_favorites: true } ),
+		...( filter?.showOnlyDevelopmentSites && { show_only_dev_sites: true } ),
 	};
 };
 
-const agencyDashboardSortToQueryObject = ( sort: DashboardSortInterface ) => {
+const agencyDashboardSortToQueryObject = ( sort?: DashboardSortInterface ) => {
+	if ( ! sort ) {
+		return;
+	}
+
 	return {
-		...( sort.field && { sort_field: sort.field } ),
-		...( sort.direction && { sort_direction: sort.direction } ),
+		...( sort?.field && { sort_field: sort.field } ),
+		...( sort?.direction && { sort_direction: sort.direction } ),
 	};
 };
 
-const useFetchDashboardSites = (
-	isPartnerOAuthTokenLoaded: boolean,
-	searchQuery: string,
-	currentPage: number,
-	filter: AgencyDashboardFilter,
-	sort: DashboardSortInterface
-) => {
-	const translate = useTranslate();
-	const dispatch = useDispatch();
-	const queryClient = useQueryClient();
+export interface FetchDashboardSitesArgsInterface {
+	isPartnerOAuthTokenLoaded: boolean;
+	searchQuery: string | undefined;
+	currentPage: number;
+	filter: AgencyDashboardFilter;
+	sort?: DashboardSortInterface;
+	perPage?: number;
+	agencyId?: number;
+}
+
+const useFetchDashboardSites = ( {
+	isPartnerOAuthTokenLoaded,
+	searchQuery,
+	currentPage,
+	filter,
+	sort,
+	perPage,
+	agencyId,
+}: FetchDashboardSitesArgsInterface ) => {
+	let queryKey = [
+		'jetpack-agency-dashboard-sites',
+		searchQuery,
+		currentPage,
+		filter,
+		sort,
+		perPage,
+		...( agencyId ? [ agencyId ] : [] ),
+	];
+
+	// If perPage is not provided, we want to remove perPage from the query_key as existing tests don't pass otherwise.
+	if ( ! perPage ) {
+		queryKey = [
+			'jetpack-agency-dashboard-sites',
+			searchQuery,
+			currentPage,
+			filter,
+			sort,
+			...( agencyId ? [ agencyId ] : [] ),
+		];
+	}
+
+	const isAgencyOrPartnerAuthEnabled = isPartnerOAuthTokenLoaded || !! agencyId;
+
 	return useQuery( {
-		queryKey: [ 'jetpack-agency-dashboard-sites', searchQuery, currentPage, filter, sort ],
+		// Disable eslint rule since TS isn't grasping that agencyId is being optionally added to the array
+		// eslint-disable-next-line @tanstack/query/exhaustive-deps
+		queryKey,
 		queryFn: () =>
-			wpcomJpl.req.get(
+			client.req.get(
 				{
 					path: '/jetpack-agency/sites',
 					apiNamespace: 'wpcom/v2',
 				},
 				{
-					...( searchQuery && { query: searchQuery } ),
-					...( currentPage && { page: currentPage } ),
+					...( searchQuery ? { query: searchQuery } : {} ),
+					...( currentPage ? { page: currentPage } : {} ),
 					...agencyDashboardFilterToQueryObject( filter ),
 					...agencyDashboardSortToQueryObject( sort ),
+					per_page: perPage,
+					...( agencyId ? { agency_id: agencyId } : {} ),
 				}
 			),
 		select: ( data ) => {
 			return {
-				sites: data.sites.map( ( site: Site ) => {
-					// Since the "sites" API includes the "is_connected" property in the cache of the query set by
-					// the "useFetchTestConnection" hook, we are setting it here again since the "sites" API gets called
-					// more often than the "/test-connection" API which will flush the cache set by the
-					// "useFetchTestConnection" hook
-					const data: { connected: boolean } | undefined = queryClient.getQueryData( [
-						'jetpack-agency-test-connection',
-						site.blog_id,
-					] );
-					return {
-						...site,
-						is_connected: data?.hasOwnProperty( 'connected' ) ? data.connected : true,
-					};
-				} ),
+				sites: data.sites,
 				total: data.total,
 				perPage: data.per_page,
+				totalDevelopmentSites: data.total_dev_sites,
 				totalFavorites: data.total_favorites,
 			};
 		},
-		onError: () =>
-			dispatch(
-				errorNotice( translate( 'Failed to retrieve your sites. Please try again later.' ) )
-			),
-		enabled: isPartnerOAuthTokenLoaded,
+		enabled: isAgencyOrPartnerAuthEnabled,
 	} );
 };
 

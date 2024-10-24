@@ -1,8 +1,8 @@
 import { useI18n } from '@wordpress/react-i18n';
-import classnames from 'classnames';
-import { useSelector } from 'react-redux';
+import clsx from 'clsx';
 import { TranslateResult } from 'calypso/../packages/i18n-calypso/types';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
+import { useSelector } from 'calypso/state';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 
 import './style.scss';
@@ -19,14 +19,14 @@ export default function PluginsResultsHeader( {
 	subtitle: TranslateResult;
 	browseAllLink?: string;
 	resultCount?: string;
-	className: string;
+	className?: string;
 	listName?: string;
 } ) {
 	const { __ } = useI18n();
 	const selectedSite = useSelector( getSelectedSite );
 
 	return (
-		<div className={ classnames( 'plugins-results-header', className ) }>
+		<div className={ clsx( 'plugins-results-header', className ) }>
 			{ ( title || subtitle ) && (
 				<div className="plugins-results-header__titles">
 					{ title && <div className="plugins-results-header__title">{ title }</div> }

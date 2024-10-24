@@ -1,20 +1,22 @@
 import { recordTracksEvent } from '@automattic/calypso-analytics';
+import { PLAN_PREMIUM, getPlan, isFreePlan, isPersonalPlan } from '@automattic/calypso-products';
+import { DotPager } from '@automattic/components';
 import { translate } from 'i18n-calypso';
 import { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import rocketImage from 'calypso/assets/images/customer-home/illustration--rocket.svg';
 import YoastLogo from 'calypso/assets/images/icons/yoast-logo.svg';
+import GoogleAnalyticsLogo from 'calypso/assets/images/illustrations/google-analytics-logo.svg';
 import writePost from 'calypso/assets/images/onboarding/site-options.svg';
 import BlazeLogo from 'calypso/components/blaze-logo';
-import DotPager from 'calypso/components/dot-pager';
 import { useHasNeverPublishedPost } from 'calypso/data/stats/use-has-never-published-post';
 import { PromoteWidgetStatus, usePromoteWidget } from 'calypso/lib/promote-post';
 import isAtomicSite from 'calypso/state/selectors/is-site-automated-transfer';
-import { isJetpackSite } from 'calypso/state/sites/selectors';
+import { getCurrentPlan } from 'calypso/state/sites/plans/selectors';
+import { getSiteOption, isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 import MiniCarouselBlock from './mini-carousel-block';
 import { isBlockDismissed } from './selectors';
-
 import './style.scss';
 
 const EVENT_TRAFFIC_BLAZE_PROMO_VIEW = 'calypso_stats_traffic_blaze_banner_view';
@@ -29,9 +31,12 @@ const EVENT_PRIVATE_SITE_BANNER_DISMISS = 'calypso_stats_private_site_banner_dis
 const EVENT_NO_CONTENT_BANNER_VIEW = 'calypso_stats_no_content_banner_view';
 const EVENT_NO_CONTENT_BANNER_CLICK = 'calypso_stats_no_content_banner_click';
 const EVENT_NO_CONTENT_BANNER_DISMISS = 'calypso_stats_no_content_banner_dismiss';
+const EVENT_GOOGLE_ANALYTICS_BANNER_VIEW = 'calypso_stats_google_analytics_banner_view';
+const EVENT_GOOGLE_ANALYTICS_BANNER_CLICK = 'calypso_stats_google_analytics_banner_click';
+const EVENT_GOOGLE_ANALYTICS_BANNER_DISMISS = 'calypso_stats_google_analytics_banner_dismiss';
 
 const MiniCarousel = ( { slug, isSitePrivate } ) => {
-	const selectedSiteId = useSelector( ( state ) => getSelectedSiteId( state ) );
+	const selectedSiteId = useSelector( getSelectedSiteId );
 
 	const { data: hasNeverPublishedPost, isLoading: isHasNeverPublishedPostLoading } =
 		useHasNeverPublishedPost( selectedSiteId ?? null, true, {
@@ -41,6 +46,13 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 	const jetpackNonAtomic = useSelector(
 		( state ) => isJetpackSite( state, selectedSiteId ) && ! isAtomicSite( state, selectedSiteId )
 	);
+	const isSimpleClassic = useSelector( ( state ) =>
+		getSiteOption( state, selectedSiteId, 'is_wpcom_simple' )
+	);
+
+	const currentPlanSlug = useSelector( ( state ) =>
+		getCurrentPlan( state, selectedSiteId )
+	)?.productSlug;
 
 	// Keep a replica of the pager index state.
 	// TODO: Figure out an approach that doesn't require replicating state value from DotPager.
@@ -66,7 +78,14 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 
 	// Yoast promo is disabled for Odyssey & self-hosted & non-traffic pages.
 	const showYoastPromo =
-		! useSelector( isBlockDismissed( EVENT_YOAST_PROMO_DISMISS ) ) && ! jetpackNonAtomic;
+		! useSelector( isBlockDismissed( EVENT_YOAST_PROMO_DISMISS ) ) &&
+		! jetpackNonAtomic &&
+		! isSimpleClassic;
+
+	const showGoogleAnalyticsPromo =
+		! useSelector( isBlockDismissed( EVENT_GOOGLE_ANALYTICS_BANNER_DISMISS ) ) &&
+		! jetpackNonAtomic &&
+		( isFreePlan( currentPlanSlug ) || isPersonalPlan( currentPlanSlug ) );
 
 	const viewEvents = useMemo( () => {
 		const events = [];
@@ -74,8 +93,21 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 		showWriteAPostBanner && events.push( EVENT_NO_CONTENT_BANNER_VIEW );
 		showBlazePromo && events.push( EVENT_TRAFFIC_BLAZE_PROMO_VIEW );
 		showYoastPromo && events.push( EVENT_YOAST_PROMO_VIEW );
+		showGoogleAnalyticsPromo && events.push( EVENT_GOOGLE_ANALYTICS_BANNER_VIEW );
 		return events;
-	}, [ isSitePrivate, showWriteAPostBanner, showBlazePromo, showYoastPromo ] );
+	}, [
+		isSitePrivate,
+		showWriteAPostBanner,
+		showBlazePromo,
+		showYoastPromo,
+		showGoogleAnalyticsPromo,
+	] );
+
+	// In case of Odyssey Stats, ensure that we return the absolute URL for redirect.
+	const getCalypsoUrl = ( href ) => {
+		const baseUrl = window?.location?.hostname === slug ? 'https://wordpress.com' : '';
+		return baseUrl + href;
+	};
 
 	// Handle view events upon initial mount and upon paging DotPager.
 	useEffect( () => {
@@ -104,7 +136,7 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 					'Changing your site from private to public helps people find you and get more visitors. Don’t worry, you can keep working on your site.'
 				) }
 				ctaText={ translate( 'Launch your site' ) }
-				href={ `/settings/general/${ slug }` }
+				href={ getCalypsoUrl( `/settings/general/${ slug }` ) }
 				key="launch-your-site"
 			/>
 		);
@@ -121,7 +153,7 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 					'Sites with content get more visitors. We’ve found that adding some personality and introducing yourself is a great start to click with your audience.'
 				) }
 				ctaText={ translate( 'Write a post' ) }
-				href={ `/post/${ slug }` }
+				href={ getCalypsoUrl( `/post/${ slug }` ) }
 				key="write-a-post"
 			/>
 		);
@@ -138,7 +170,7 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 					'Grow your audience by promoting your content. Reach millions of users across Tumblr and WordPress.com'
 				) }
 				ctaText={ translate( 'Create campaign' ) }
-				href={ `/advertising/${ slug || '' }` }
+				href={ getCalypsoUrl( `/advertising/${ slug || '' }` ) }
 				key="blaze"
 			/>
 		);
@@ -155,8 +187,32 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 					'Purchase Yoast SEO Premium to ensure that more people find your incredible content.'
 				) }
 				ctaText={ translate( 'Get Yoast' ) }
-				href={ `/plugins/wordpress-seo-premium/${ slug || '' }` }
+				href={ getCalypsoUrl( `/plugins/wordpress-seo-premium/${ slug || '' }` ) }
 				key="yoast"
+			/>
+		);
+	}
+
+	if ( showGoogleAnalyticsPromo ) {
+		const premiumPlanName = getPlan( PLAN_PREMIUM )?.getTitle() ?? '';
+		blocks.push(
+			<MiniCarouselBlock
+				clickEvent={ EVENT_GOOGLE_ANALYTICS_BANNER_CLICK }
+				dismissEvent={ EVENT_GOOGLE_ANALYTICS_BANNER_DISMISS }
+				image={ <img src={ GoogleAnalyticsLogo } alt="" width={ 45 } height={ 45 } /> }
+				headerText={ translate( 'Connect your site to Google Analytics' ) }
+				contentText={ translate(
+					'Linking Google Analytics to your account is effortless with our %(premiumPlanName)s plan – no coding required. Gain valuable insights in seconds.',
+					{
+						args: { premiumPlanName },
+					}
+				) }
+				ctaText={
+					// Translators: %(plan) is the name of a plan, e.g. "Explorer" or "Premium"
+					translate( 'Get %(plan)s', { args: { plan: premiumPlanName } } )
+				}
+				href={ getCalypsoUrl( `/checkout/premium/${ slug || '' }` ) }
+				key="google-analytics"
 			/>
 		);
 	}
@@ -166,7 +222,12 @@ const MiniCarousel = ( { slug, isSitePrivate } ) => {
 	}
 
 	return (
-		<DotPager className="mini-carousel" hasDynamicHeight onPageSelected={ pagerDidSelectPage }>
+		<DotPager
+			className="mini-carousel"
+			hasDynamicHeight={ false }
+			onPageSelected={ pagerDidSelectPage }
+			rotateTime={ 5000 }
+		>
 			{ blocks }
 		</DotPager>
 	);

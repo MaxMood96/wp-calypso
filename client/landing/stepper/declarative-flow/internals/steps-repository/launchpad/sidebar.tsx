@@ -1,34 +1,42 @@
-import { Gridicon, CircularProgressBar } from '@automattic/components';
-import { OnboardSelect, useLaunchpad } from '@automattic/data-stores';
-import { Checklist } from '@automattic/launchpad';
+import { PLAN_PREMIUM } from '@automattic/calypso-products';
+import { Badge, CircularProgressBar, Gridicon, Tooltip } from '@automattic/components';
+import {
+	OnboardSelect,
+	sortLaunchpadTasksByCompletionStatus,
+	useLaunchpad,
+} from '@automattic/data-stores';
+import { LaunchpadInternal, type Task } from '@automattic/launchpad';
 import { isBlogOnboardingFlow } from '@automattic/onboarding';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSelect } from '@wordpress/data';
 import { useRef, useState } from '@wordpress/element';
-import { Icon, copy } from '@wordpress/icons';
+import { copy, Icon } from '@wordpress/icons';
+import { getQueryArg } from '@wordpress/url';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
-import { StepNavigationLink } from 'calypso/../packages/onboarding/src';
-import Badge from 'calypso/components/badge';
+import { useMemo } from 'react';
+import QueryMembershipsSettings from 'calypso/components/data/query-memberships-settings';
 import ClipboardButton from 'calypso/components/forms/clipboard-button';
-import Tooltip from 'calypso/components/tooltip';
-import { NavigationControls } from 'calypso/landing/stepper/declarative-flow/internals/types';
+import { type NavigationControls } from 'calypso/landing/stepper/declarative-flow/internals/types';
 import { useSite } from 'calypso/landing/stepper/hooks/use-site';
 import { ONBOARD_STORE } from 'calypso/landing/stepper/stores';
-import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
-import { ResponseDomain } from 'calypso/lib/domains/types';
+import { type ResponseDomain } from 'calypso/lib/domains/types';
+import RecurringPaymentsPlanAddEditModal from 'calypso/my-sites/earn/components/add-edit-plan-modal';
+import { TYPE_TIER } from 'calypso/my-sites/earn/memberships/constants';
+import { useSelector } from 'calypso/state';
 import { isCurrentUserEmailVerified } from 'calypso/state/current-user/selectors';
-import { usePremiumGlobalStyles } from 'calypso/state/sites/hooks/use-premium-global-styles';
-import { getEnhancedTasks } from './task-helper';
+import { getConnectUrlForSiteId } from 'calypso/state/memberships/settings/selectors';
+import { useSiteGlobalStylesStatus } from 'calypso/state/sites/hooks/use-site-global-styles-status';
+import { getEnhancedTasks } from './task-definitions';
 import { getLaunchpadTranslations } from './translations';
-import { Task } from './types';
 
 type SidebarProps = {
 	sidebarDomain: ResponseDomain;
+	launchpadKey: string;
 	siteSlug: string | null;
 	submit: NavigationControls[ 'submit' ];
 	goNext: NavigationControls[ 'goNext' ];
 	goToStep?: NavigationControls[ 'goToStep' ];
-	flow: string | null;
+	flow: string;
 };
 
 function getUrlInfo( url: string ) {
@@ -42,27 +50,42 @@ function getUrlInfo( url: string ) {
 	return [ siteName, topLevelDomain ];
 }
 
-const Sidebar = ( { sidebarDomain, siteSlug, submit, goNext, goToStep, flow }: SidebarProps ) => {
+const Sidebar = ( {
+	sidebarDomain,
+	launchpadKey,
+	siteSlug,
+	submit,
+	goToStep,
+	flow,
+}: SidebarProps ) => {
 	let siteName = '';
 	let topLevelDomain = '';
 	let showClipboardButton = false;
 	let isDomainSSLProcessing: boolean | null = false;
 	const translate = useTranslate();
 	const site = useSite();
-	const siteIntentOption = site?.options?.site_intent;
+	const siteIntentOption = site?.options?.site_intent ?? null;
+	const checklistSlug = siteIntentOption;
 	const clipboardButtonEl = useRef< HTMLButtonElement >( null );
 	const [ clipboardCopied, setClipboardCopied ] = useState( false );
-
-	const { globalStylesInUse, shouldLimitGlobalStyles } = usePremiumGlobalStyles( site?.ID );
+	const [ showPlansModal, setShowPlansModal ] = useState( false );
+	const queryClient = useQueryClient();
+	const hasSkippedCheckout = Boolean( getQueryArg( window.location.href, 'skippedCheckout' ) );
+	const { globalStylesInUse, shouldLimitGlobalStyles } = useSiteGlobalStylesStatus( site?.ID );
 
 	const {
 		data: { checklist_statuses: checklistStatuses, checklist: launchpadChecklist },
-		isFetchedAfterMount,
-	} = useLaunchpad( siteSlug, siteIntentOption );
+	} = useLaunchpad( launchpadKey, siteIntentOption, {
+		onSuccess: sortLaunchpadTasksByCompletionStatus,
+	} );
 
 	const selectedDomain = useSelect(
 		( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getSelectedDomain(),
 		[]
+	);
+
+	const stripeConnectUrl = useSelector( ( state ) =>
+		getConnectUrlForSiteId( state, site?.ID ?? 0 )
 	);
 
 	const showDomain =
@@ -71,40 +94,85 @@ const Sidebar = ( { sidebarDomain, siteSlug, submit, goNext, goToStep, flow }: S
 
 	const isEmailVerified = useSelector( isCurrentUserEmailVerified );
 
-	const { title, launchTitle, subtitle } = getLaunchpadTranslations( flow );
+	const { title, launchTitle, subtitle } = getLaunchpadTranslations( flow, hasSkippedCheckout );
 
-	const { getPlanCartItem } = useSelect(
+	const { planCartItem, domainCartItem, productCartItems } = useSelect(
 		( select ) => ( {
-			getPlanCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getPlanCartItem,
+			planCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getPlanCartItem(),
+			domainCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getDomainCartItem(),
+			productCartItems: ( select( ONBOARD_STORE ) as OnboardSelect ).getProductCartItems(),
 		} ),
 		[]
 	);
 
-	const enhancedTasks: Task[] | null =
-		site &&
-		getEnhancedTasks(
-			launchpadChecklist,
+	const displayGlobalStylesWarning = globalStylesInUse && shouldLimitGlobalStyles;
+
+	const enhancedTasks: Task[] | null = useMemo( () => {
+		if ( ! site ) {
+			return null;
+		}
+
+		return getEnhancedTasks( {
+			tasks: launchpadChecklist,
 			siteSlug,
 			site,
 			submit,
-			globalStylesInUse && shouldLimitGlobalStyles,
+			displayGlobalStylesWarning,
+			globalStylesMinimumPlan: PLAN_PREMIUM,
+			setShowPlansModal,
+			queryClient,
 			goToStep,
 			flow,
 			isEmailVerified,
 			checklistStatuses,
-			getPlanCartItem()?.product_slug ?? null
-		);
+			planCartItem,
+			domainCartItem,
+			productCartItems,
+			stripeConnectUrl,
+			hasSkippedCheckout,
+		} );
+	}, [
+		site,
+		launchpadChecklist,
+		siteSlug,
+		submit,
+		displayGlobalStylesWarning,
+		setShowPlansModal,
+		queryClient,
+		goToStep,
+		flow,
+		isEmailVerified,
+		checklistStatuses,
+		planCartItem,
+		domainCartItem,
+		productCartItems,
+		stripeConnectUrl,
+	] );
 
 	const currentTask = enhancedTasks?.filter( ( task ) => task.completed ).length;
 	const launchTask = enhancedTasks?.find( ( task ) => task.isLaunchTask === true );
 
 	const showLaunchTitle = launchTask && ! launchTask.disabled;
-	const domainUpgradeBadgeUrl = ! site?.plan?.is_free
-		? `/domains/manage/${ siteSlug }`
-		: `/domains/add/${ siteSlug }?domainAndPlanPackage=true`;
-	const showDomainUpgradeBadge =
-		sidebarDomain?.isWPCOMDomain &&
-		! enhancedTasks?.find( ( task ) => task.id === 'domain_upsell' );
+
+	function getDomainUpgradeBadgeUrl() {
+		if ( isBlogOnboardingFlow( siteIntentOption ) ) {
+			return `/setup/${ siteIntentOption }/domains?siteSlug=${ selectedDomain?.domain_name }&domainAndPlanPackage=true`;
+		}
+		return ! site?.plan?.is_free
+			? `/domains/manage/${ siteSlug }`
+			: `/domains/add/${ siteSlug }?domainAndPlanPackage=true`;
+	}
+
+	function showDomainUpgradeBadge() {
+		if ( isBlogOnboardingFlow( siteIntentOption ) ) {
+			return selectedDomain?.is_free;
+		}
+
+		return (
+			sidebarDomain?.isWPCOMDomain &&
+			! enhancedTasks?.find( ( task ) => task.id === 'domain_upsell' )
+		);
+	}
 
 	if ( sidebarDomain ) {
 		const { domain, isPrimary, isWPCOMDomain, sslStatus } = sidebarDomain;
@@ -130,15 +198,20 @@ const Sidebar = ( { sidebarDomain, siteSlug, submit, goNext, goToStep, flow }: S
 		);
 	}
 
+	// If there is no site yet then we set 1 as numberOfSteps so the CircularProgressBar gets rendered in
+	// an empty state. If site is here then we default to the previous behaviour: show it if enhancedTasks.length > 0.
+	const numberOfSteps = site === null ? 1 : enhancedTasks?.length || null;
 	return (
-		<div className="launchpad__sidebar">
+		<>
+			{ site && <QueryMembershipsSettings siteId={ site.ID } source="launchpad" /> }
 			<div className="launchpad__sidebar-content-container">
 				<div className="launchpad__progress-bar-container">
 					<CircularProgressBar
 						size={ 40 }
 						enableDesktopScaling
-						currentStep={ currentTask || null }
-						numberOfSteps={ enhancedTasks?.length || null }
+						currentStep={ currentTask || 0 }
+						numberOfSteps={ numberOfSteps }
+						showProgressText={ site !== null }
 					/>
 				</div>
 				{ /* eslint-disable-next-line wpcalypso/jsx-classname-namespace*/ }
@@ -175,8 +248,8 @@ const Sidebar = ( { sidebarDomain, siteSlug, submit, goNext, goToStep, flow }: S
 								</>
 							) }
 						</div>
-						{ showDomainUpgradeBadge && (
-							<a href={ domainUpgradeBadgeUrl }>
+						{ showDomainUpgradeBadge() && (
+							<a href={ getDomainUpgradeBadgeUrl() }>
 								<Badge className="launchpad__domain-upgrade-badge" type="info-blue">
 									{ translate( 'Customize' ) }
 								</Badge>
@@ -197,20 +270,34 @@ const Sidebar = ( { sidebarDomain, siteSlug, submit, goNext, goToStep, flow }: S
 						</p>
 					</div>
 				) }
-				{ isFetchedAfterMount ? <Checklist tasks={ enhancedTasks } /> : <Checklist.Placeholder /> }
-			</div>
-			<div className="launchpad__sidebar-admin-link">
-				<StepNavigationLink
-					direction="forward"
-					handleClick={ () => {
-						recordTracksEvent( 'calypso_launchpad_go_to_admin_clicked', { flow: flow } );
-						goNext?.();
-					} }
-					label={ translate( 'Skip to dashboard' ) }
-					borderless={ true }
+				<LaunchpadInternal
+					flow={ flow }
+					site={ site }
+					siteSlug={ launchpadKey }
+					checklistSlug={ checklistSlug }
+					taskFilter={ () => enhancedTasks || [] }
+					launchpadContext="onboarding"
+					makeLastTaskPrimaryAction
 				/>
+				{ showPlansModal && site?.ID && (
+					<RecurringPaymentsPlanAddEditModal
+						closeDialog={ () => setShowPlansModal( false ) }
+						product={ {
+							price: 5,
+							subscribe_as_site_subscriber: true,
+							title: translate( 'Paid newsletter' ),
+							type: TYPE_TIER,
+						} }
+						annualProduct={ {
+							price: 5 * 12,
+							subscribe_as_site_subscriber: true,
+							title: `${ translate( 'Paid newsletter' ) } ${ translate( '(yearly)' ) }`,
+						} }
+						siteId={ site.ID }
+					/>
+				) }
 			</div>
-		</div>
+		</>
 	);
 };
 

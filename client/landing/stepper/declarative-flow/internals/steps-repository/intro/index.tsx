@@ -1,10 +1,14 @@
+import config from '@automattic/calypso-config';
+import { TIMELESS_PLAN_BUSINESS, TIMELESS_PLAN_PREMIUM } from '@automattic/data-stores/src/plans';
 import { useLocale } from '@automattic/i18n-utils';
 import {
-	NEWSLETTER_FLOW,
 	ECOMMERCE_FLOW,
-	VIDEOPRESS_FLOW,
 	FREE_FLOW,
+	NEWSLETTER_FLOW,
+	SENSEI_FLOW,
+	VIDEOPRESS_FLOW,
 	isLinkInBioFlow,
+	isVideoPressTVFlow,
 } from '@automattic/onboarding';
 import { useSelect } from '@wordpress/data';
 import { createInterpolateElement, useMemo } from '@wordpress/element';
@@ -19,7 +23,6 @@ import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
 import IntroStep, { IntroContent } from './intro';
 import VideoPressIntroModalContent from './videopress-intro-modal-content';
 import type { Step } from '../../types';
-
 import './styles.scss';
 
 const useIntroContent = ( flowName: string | null ): IntroContent => {
@@ -36,12 +39,13 @@ const useIntroContent = ( flowName: string | null ): IntroContent => {
 	} );
 
 	if ( VIDEOPRESS_FLOW === flowName ) {
+		const isTrialEnabled = config.isEnabled( 'videomaker-trial' );
 		let defaultSupportedPlan = supportedPlans.find( ( plan ) => {
-			return plan.periodAgnosticSlug === 'premium';
+			return plan.periodAgnosticSlug === TIMELESS_PLAN_PREMIUM;
 		} );
 		if ( ! defaultSupportedPlan ) {
 			defaultSupportedPlan = supportedPlans.find( ( plan ) => {
-				return plan.periodAgnosticSlug === 'business';
+				return plan.periodAgnosticSlug === TIMELESS_PLAN_BUSINESS;
 			} );
 		}
 
@@ -52,13 +56,21 @@ const useIntroContent = ( flowName: string | null ): IntroContent => {
 			);
 
 			if ( planProductObject ) {
-				// eslint-disable-next-line @wordpress/valid-sprintf
-				videoPressGetStartedText = sprintf(
-					/* translators: Price displayed on VideoPress intro page. First %s is monthly price, second is annual price */
-					__( 'Starts at %s per month, %s billed annually' ),
-					planProductObject.price,
-					planProductObject.annualPrice
-				);
+				videoPressGetStartedText = isTrialEnabled
+					? // eslint-disable-next-line @wordpress/valid-sprintf
+					  sprintf(
+							/* translators: Price displayed on VideoPress intro page. First %s is monthly price, second is annual price */
+							__( 'After trial, plans start as low as %s per month, %s billed annually' ),
+							planProductObject.price,
+							planProductObject.annualPrice
+					  )
+					: // eslint-disable-next-line @wordpress/valid-sprintf
+					  sprintf(
+							/* translators: Price displayed on VideoPress intro page. First %s is monthly price, second is annual price */
+							__( 'Starts at %s per month, %s billed annually' ),
+							planProductObject.price,
+							planProductObject.annualPrice
+					  );
 			}
 		}
 	}
@@ -85,25 +97,58 @@ const useIntroContent = ( flowName: string | null ): IntroContent => {
 
 		if ( flowName === NEWSLETTER_FLOW ) {
 			return {
-				title: __( 'The newsletter. Elevated.' ),
+				title: __( 'Write. Grow. Earn. This is Newsletter.' ),
 				text: __(
-					'Everything you need to reach and grow an audience, with the power and permanence of WordPress.com.'
+					'Unlimited subscribers. Everything you need to grow your audience. And the permanence of WordPress.com.'
 				),
-				buttonText: __( 'Launch your newsletter' ),
+				buttonText: __( 'Launch my newsletter' ),
+			};
+		}
+
+		if ( flowName === SENSEI_FLOW ) {
+			return {
+				title: createInterpolateElement(
+					__( 'You are minutes away from<br />being ready to launch your<br />first course.' ),
+					{ br: <br /> }
+				),
+				buttonText: __( 'Get started' ),
+				secondaryButtonText: __( 'Learn more' ),
 			};
 		}
 
 		if ( flowName === VIDEOPRESS_FLOW ) {
+			const isTrialEnabled = config.isEnabled( 'videomaker-trial' );
 			return {
 				title: createInterpolateElement(
 					__( 'A home for all your videos.<br />Play. Roll. Share.' ),
 					{ br: <br /> }
 				),
 				secondaryText: videoPressGetStartedText,
-				buttonText: __( 'Get started' ),
+				buttonText: isTrialEnabled ? __( 'Start a free trial' ) : __( 'Get started' ),
 				modal: {
 					buttonText: __( 'Learn more' ),
 					onClick: () => recordTracksEvent( 'calypso_videopress_signup_learn_more_button_clicked' ),
+					content: VideoPressIntroModalContent,
+				},
+			};
+		}
+
+		if ( isVideoPressTVFlow( flowName ) ) {
+			return {
+				title: createInterpolateElement(
+					__( 'An ad-free, home for all your videos.<br />Play. Roll. Share.' ),
+					{ br: <br /> }
+				),
+				secondaryText: sprintf(
+					/* translators: Days of trial displayed on VideoPress intro page. First %s is days of trial. */
+					__( 'Start your %s-day free trial' ),
+					30
+				),
+				buttonText: __( 'Get started' ),
+				modal: {
+					buttonText: __( 'Learn more' ),
+					onClick: () =>
+						recordTracksEvent( 'calypso_videopress_tv_signup_learn_more_button_clicked' ),
 					content: VideoPressIntroModalContent,
 				},
 			};
@@ -142,12 +187,13 @@ const Intro: Step = function Intro( { navigation, flow } ) {
 			stepName="intro"
 			goBack={ goBack }
 			isHorizontalLayout={ false }
-			isWideLayout={ true }
+			isWideLayout
 			isLargeSkipLayout={ false }
 			stepContent={ <IntroStep introContent={ introContent } onSubmit={ handleSubmit } /> }
 			recordTracksEvent={ recordTracksEvent }
-			showHeaderJetpackPowered={ flow === NEWSLETTER_FLOW }
+			showJetpackPowered={ flow === NEWSLETTER_FLOW }
 			showHeaderWooCommercePowered={ flow === ECOMMERCE_FLOW }
+			showSenseiPowered={ flow === SENSEI_FLOW }
 			showVideoPressPowered={ isVideoPressFlow }
 		/>
 	);

@@ -77,7 +77,7 @@ describe( DataHelper.createSuiteTitle( 'Sidebar: Domain upsell' ), function () {
 	} );
 
 	it( `Click button to upgrade to WordPress.com ${ planName }`, async function () {
-		await plansPage.selectPlan( 'Premium' );
+		await plansPage.selectPlan( planName );
 	} );
 
 	it( `WordPress.com ${ planName } is added to cart`, async function () {

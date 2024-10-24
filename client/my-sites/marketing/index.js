@@ -1,4 +1,4 @@
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { makeLayout, render as clientRender } from 'calypso/controller';
 import { navigation, siteSelection, sites } from 'calypso/my-sites/controller';
 import {
@@ -16,13 +16,11 @@ import {
 
 export default function () {
 	page( '/marketing/do-it-for-me*', function redirectToDIFMLandingPage() {
-		window.location.replace( 'https://wordpress.com/built-by/' );
+		window.location.replace( 'https://wordpress.com/website-design-service/' );
 	} );
 
 	page( '/marketing/ultimate-traffic-guide*', function redirectToWPCoursesPage() {
-		window.location.replace(
-			'https://wpcourses.com/course/intro-to-search-engine-optimization-seo/'
-		);
+		window.location.replace( 'https://wordpress.com/learn/courses/intro-to-seo/' );
 	} );
 
 	const paths = [

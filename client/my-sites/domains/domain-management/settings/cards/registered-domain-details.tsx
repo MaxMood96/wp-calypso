@@ -3,12 +3,12 @@
 import { Button } from '@automattic/components';
 import formatCurrency from '@automattic/format-currency';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
 import { useLocalizedMoment } from 'calypso/components/localized-moment';
 import { getRenewalPrice, isExpiring } from 'calypso/lib/purchases';
 import AutoRenewToggle from 'calypso/me/purchases/manage-purchase/auto-renew-toggle';
 import RenewButton from 'calypso/my-sites/domains/domain-management/edit/card/renew-button';
 import { getManagePurchaseUrlFor } from 'calypso/my-sites/purchases/paths';
+import { useSelector } from 'calypso/state';
 import { getProductBySlug } from 'calypso/state/products-list/selectors';
 import type { DetailsCardProps } from './types';
 
@@ -52,6 +52,7 @@ const RegisteredDomainDetails = ( {
 		return (
 			! domain.currentUserIsOwner ||
 			( ! isLoadingPurchase && ! purchase ) ||
+			( ! domain.isRenewable && ! domain.isRedeemable ) ||
 			domain.aftermarketAuction
 		);
 	};
@@ -95,7 +96,7 @@ const RegisteredDomainDetails = ( {
 					planName={ selectedSite.plan?.product_name_short }
 					siteDomain={ selectedSite.domain }
 					purchase={ purchase }
-					withTextStatus={ true }
+					withTextStatus
 					toggleSource="registered-domain-status"
 				/>
 				{ autoRenewAdditionalText && (
@@ -109,9 +110,10 @@ const RegisteredDomainDetails = ( {
 		return (
 			! domain.subscriptionId ||
 			domain.isPendingRenewal ||
+			domain.pendingRegistrationAtRegistry ||
 			domain.pendingRegistration ||
 			! domain.currentUserCanManage ||
-			( domain.expired && ! domain.isRenewable && ! domain.isRedeemable ) ||
+			( ! domain.isRenewable && ! domain.isRedeemable ) ||
 			( ! isLoadingPurchase && ! purchase ) ||
 			domain.aftermarketAuction
 		);
@@ -128,11 +130,6 @@ const RegisteredDomainDetails = ( {
 				selectedSite={ selectedSite }
 				subscriptionId={ parseInt( domain.subscriptionId ?? '', 10 ) }
 				tracksProps={ { source: 'registered-domain-status', domain_status: 'active' } }
-				customLabel={
-					! domain.expired || domain.isRenewable
-						? translate( 'Renew now' )
-						: translate( 'Redeem now' )
-				}
 				disabled={ isLoadingPurchase }
 			/>
 		);
@@ -153,7 +150,7 @@ const RegisteredDomainDetails = ( {
 		<div className="details-card">
 			<div className="details-card__section dates">{ renderDates() }</div>
 			<div className="details-card__section">{ renderAutoRenewToggle() }</div>
-			<div className="details-card__section">
+			<div className="details-card__section details-card__section-actions">
 				{ renderRenewButton() }
 				{ renderPaymentDetailsButton() }
 			</div>

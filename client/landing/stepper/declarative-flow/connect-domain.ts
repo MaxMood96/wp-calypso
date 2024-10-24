@@ -1,19 +1,20 @@
-import { useLocale } from '@automattic/i18n-utils';
 import { CONNECT_DOMAIN_FLOW } from '@automattic/onboarding';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { translate } from 'i18n-calypso';
 import { useEffect } from 'react';
+import { useFlowLocale } from 'calypso/landing/stepper/hooks/use-flow-locale';
 import { domainMapping } from 'calypso/lib/cart-values/cart-items';
-import wpcom from 'calypso/lib/wp';
+import { triggerGuidesForStep } from 'calypso/lib/guides/trigger-guides-for-step';
 import {
 	clearSignupDestinationCookie,
 	setSignupCompleteSlug,
 	persistSignupDestination,
 	setSignupCompleteFlowName,
 } from 'calypso/signup/storageUtils';
+import { STEPPER_TRACKS_EVENT_STEP_NAV_SUBMIT } from '../constants';
 import { useDomainParams } from '../hooks/use-domain-params';
 import { USER_STORE, ONBOARD_STORE } from '../stores';
-import { recordSubmitStep } from './internals/analytics/record-submit-step';
+import { useLoginUrl } from '../utils/path';
 import { redirect } from './internals/steps-repository/import/util';
 import {
 	AssertConditionResult,
@@ -23,15 +24,33 @@ import {
 } from './internals/types';
 import type { UserSelect } from '@automattic/data-stores';
 
+const CONNECT_DOMAIN_STEPS = [
+	{
+		slug: 'plans',
+		asyncComponent: () => import( './internals/steps-repository/plans' ),
+	},
+	{
+		slug: 'createSite',
+		asyncComponent: () => import( './internals/steps-repository/create-site' ),
+	},
+	{
+		slug: 'processing',
+		asyncComponent: () => import( './internals/steps-repository/processing-step' ),
+	},
+];
+
 const connectDomain: Flow = {
 	name: CONNECT_DOMAIN_FLOW,
 	get title() {
 		return translate( 'Connect your domain' );
 	},
+	isSignupFlow: false,
 	useAssertConditions: () => {
 		const { domain, provider } = useDomainParams();
 		const flowName = CONNECT_DOMAIN_FLOW;
-		const locale = useLocale();
+
+		const locale = useFlowLocale();
+
 		let result: AssertConditionResult = { state: AssertConditionState.SUCCESS };
 		const userIsLoggedIn = useSelect(
 			( select ) => ( select( USER_STORE ) as UserSelect ).isCurrentUserLoggedIn(),
@@ -39,23 +58,32 @@ const connectDomain: Flow = {
 		);
 
 		if ( ! domain ) {
-			redirect( ` /setup/${ CONNECT_DOMAIN_FLOW }` ); //TODO
+			redirect( '/start' );
 			result = {
 				state: AssertConditionState.FAILURE,
 				message: 'connect-domain requires a domain query parameter',
 			};
 		}
 
-		const redirectTo = encodeURIComponent(
-			`/setup/${ flowName }/plans?domain=${ domain }&provider=${ provider }}`
-		);
-		const logInUrl =
-			locale && locale !== 'en'
-				? `/start/account/user/${ locale }?variationName=${ flowName }&pageTitle=Connect%20your%20Domain&redirect_to=${ redirectTo }`
-				: `/start/account/user?variationName=${ flowName }&pageTitle=Connect%20your%20Domain&redirect_to=${ redirectTo }`;
+		const logInUrl = useLoginUrl( {
+			variationName: flowName,
+			redirectTo: `/setup/${ flowName }/plans?domain=${ domain }&provider=${ provider }}`,
+			pageTitle: 'Connect your Domain',
+			locale,
+		} );
+
+		// Despite sending a CHECKING state, this function gets called again with the
+		// /setup/blog/blogger-intent route which has no locale in the path so we need to
+		// redirect off of the first render.
+		// This effects both /setup/blog/<locale> starting points and /setup/blog/blogger-intent/<locale> urls.
+		// The double call also hapens on urls without locale.
+		useEffect( () => {
+			if ( ! userIsLoggedIn ) {
+				redirect( logInUrl );
+			}
+		}, [] );
 
 		if ( ! userIsLoggedIn ) {
-			window.location.assign( logInUrl );
 			return {
 				state: AssertConditionState.FAILURE,
 			};
@@ -76,46 +104,31 @@ const connectDomain: Flow = {
 		}, [] );
 	},
 	useSteps() {
-		return [
-			{ slug: 'plans', asyncComponent: () => import( './internals/steps-repository/plans' ) },
-			{
-				slug: 'siteCreationStep',
-				asyncComponent: () => import( './internals/steps-repository/site-creation-step' ),
+		return CONNECT_DOMAIN_STEPS;
+	},
+	useTracksEventProps() {
+		const { domain, provider } = useDomainParams();
+
+		return {
+			[ STEPPER_TRACKS_EVENT_STEP_NAV_SUBMIT ]: {
+				domain,
+				provider,
 			},
-			{
-				slug: 'processing',
-				asyncComponent: () => import( './internals/steps-repository/processing-step' ),
-			},
-		];
+		};
 	},
 	useStepNavigation( _currentStepSlug, navigate ) {
 		const flowName = this.name;
-		const { domain, provider } = useDomainParams();
+		const { domain } = useDomainParams();
 
-		// trigger guides on step movement, we don't care about failures or response
-		wpcom.req.post(
-			'guides/trigger',
-			{
-				apiNamespace: 'wpcom/v2/',
-			},
-			{
-				flow: flowName,
-				step: _currentStepSlug,
-			}
-		);
+		triggerGuidesForStep( flowName, _currentStepSlug );
 
 		const submit = ( providedDependencies: ProvidedDependencies = {} ) => {
-			recordSubmitStep( providedDependencies, '', flowName, _currentStepSlug, undefined, {
-				provider,
-				domain,
-			} );
-
 			switch ( _currentStepSlug ) {
 				case 'plans':
 					clearSignupDestinationCookie();
-					return navigate( 'siteCreationStep' );
+					return navigate( 'createSite' );
 
-				case 'siteCreationStep':
+				case 'createSite':
 					return navigate( 'processing' );
 
 				case 'processing': {

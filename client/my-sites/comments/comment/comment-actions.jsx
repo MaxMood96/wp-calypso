@@ -1,5 +1,5 @@
 import { Button, Gridicon } from '@automattic/components';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import { get, includes, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
@@ -7,6 +7,7 @@ import { Component } from 'react';
 import { connect } from 'react-redux';
 import scrollTo from 'calypso/lib/scroll-to';
 import { getMinimumComment } from 'calypso/my-sites/comments/comment/utils';
+import { requestAdminMenu } from 'calypso/state/admin-menu/actions';
 import {
 	bumpStat,
 	composeAnalytics,
@@ -81,6 +82,9 @@ export class CommentActions extends Component {
 		}
 
 		this.showNotice( status );
+
+		// Refresh the admin menu on update of status to ensure count shown is not stale.
+		this.props.refreshAdminMenu();
 	};
 
 	setTrash = () => this.setStatus( 'trash' );
@@ -165,7 +169,7 @@ export class CommentActions extends Component {
 				{ this.hasAction( 'approve' ) && (
 					<Button
 						borderless
-						className={ classNames( 'comment__action comment__action-approve', {
+						className={ clsx( 'comment__action comment__action-approve', {
 							'is-approved': commentIsApproved,
 						} ) }
 						onClick={ this.toggleApproved }
@@ -219,7 +223,7 @@ export class CommentActions extends Component {
 				{ this.hasAction( 'like' ) && (
 					<Button
 						borderless
-						className={ classNames( 'comment__action comment__action-like', {
+						className={ clsx( 'comment__action comment__action-like', {
 							'is-liked': commentIsLiked,
 						} ) }
 						onClick={ this.toggleLike }
@@ -324,6 +328,7 @@ const mapDispatchToProps = ( dispatch, { siteId, postId, commentId, commentsList
 				unlikeComment( siteId, postId, commentId )
 			)
 		),
+	refreshAdminMenu: () => dispatch( requestAdminMenu( siteId ) ),
 } );
 
 export default connect( mapStateToProps, mapDispatchToProps )( localize( CommentActions ) );

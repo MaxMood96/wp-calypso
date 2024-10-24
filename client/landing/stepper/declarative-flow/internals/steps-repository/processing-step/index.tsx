@@ -2,9 +2,14 @@ import {
 	StepContainer,
 	isNewsletterOrLinkInBioFlow,
 	isFreeFlow,
+	isNewSiteMigrationFlow,
 	isUpdateDesignFlow,
 	ECOMMERCE_FLOW,
 	isWooExpressFlow,
+	isTransferringHostedSiteCreationFlow,
+	HUNDRED_YEAR_DOMAIN_FLOW,
+	HUNDRED_YEAR_PLAN_FLOW,
+	isAnyHostingFlow,
 } from '@automattic/onboarding';
 import { useSelect } from '@wordpress/data';
 import { useI18n } from '@wordpress/react-i18n';
@@ -12,13 +17,17 @@ import { useEffect, useState } from 'react';
 import DocumentHead from 'calypso/components/data/document-head';
 import { LoadingBar } from 'calypso/components/loading-bar';
 import { LoadingEllipsis } from 'calypso/components/loading-ellipsis';
+import availableFlows from 'calypso/landing/stepper/declarative-flow/registered-flows';
+import { useRecordSignupComplete } from 'calypso/landing/stepper/hooks/use-record-signup-complete';
 import { ONBOARD_STORE } from 'calypso/landing/stepper/stores';
+import { recordSignupProcessingScreen } from 'calypso/lib/analytics/signup';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
 import { useInterval } from 'calypso/lib/interval';
+import getWccomFrom from 'calypso/state/selectors/get-wccom-from';
 import useCaptureFlowException from '../../../../hooks/use-capture-flow-exception';
 import { ProcessingResult } from './constants';
 import { useProcessingLoadingMessages } from './hooks/use-processing-loading-messages';
-import { useVideoPressLoadingMessages } from './hooks/use-videopress-loading-messages';
+import HundredYearPlanFlowProcessingScreen from './hundred-year-plan-flow-processing-screen';
 import TailoredFlowPreCheckoutScreen from './tailored-flow-precheckout-screen';
 import type { StepProps } from '../../types';
 import type { OnboardSelect } from '@automattic/data-stores';
@@ -33,18 +42,21 @@ const ProcessingStep: React.FC< ProcessingStepProps > = function ( props ) {
 	const { flow } = props;
 
 	const { __ } = useI18n();
-	const videoPressLoadingMessages = useVideoPressLoadingMessages();
-	const defaultLoadingMessages = useProcessingLoadingMessages( flow );
-	const loadingMessages =
-		'videopress' === flow ? videoPressLoadingMessages : defaultLoadingMessages;
+	const loadingMessages = useProcessingLoadingMessages( flow );
 
 	const [ currentMessageIndex, setCurrentMessageIndex ] = useState( 0 );
 	const [ hasActionSuccessfullyRun, setHasActionSuccessfullyRun ] = useState( false );
+	const [ hasEmptyActionRun, setHasEmptyActionRun ] = useState( false );
 	const [ destinationState, setDestinationState ] = useState( {} );
 
-	useInterval( () => {
-		setCurrentMessageIndex( ( s ) => ( s + 1 ) % loadingMessages.length );
-	}, loadingMessages[ currentMessageIndex ]?.duration );
+	const recordSignupComplete = useRecordSignupComplete( flow );
+
+	useInterval(
+		() => {
+			setCurrentMessageIndex( ( s ) => ( s + 1 ) % loadingMessages.length );
+		},
+		loadingMessages[ currentMessageIndex ]?.duration
+	);
 
 	const action = useSelect(
 		( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getPendingAction(),
@@ -56,10 +68,6 @@ const ProcessingStep: React.FC< ProcessingStepProps > = function ( props ) {
 	);
 	const progressTitle = useSelect(
 		( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getProgressTitle(),
-		[]
-	);
-	const stepProgress = useSelect(
-		( select ) => ( select( ONBOARD_STORE ) as OnboardSelect ).getStepProgress(),
 		[]
 	);
 
@@ -88,20 +96,50 @@ const ProcessingStep: React.FC< ProcessingStepProps > = function ( props ) {
 					submit?.( {}, ProcessingResult.FAILURE );
 				}
 			} else {
-				submit?.( {}, ProcessingResult.NO_ACTION );
+				setHasEmptyActionRun( true );
 			}
 		} )();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ action ] );
 
-	// When the hasActionSuccessfullyRun flag turns on, run submit().
+	// As for hasActionSuccessfullyRun, in this case we submit the no action result.
+	useEffect( () => {
+		if ( hasEmptyActionRun ) {
+			submit?.( {}, ProcessingResult.NO_ACTION );
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ hasEmptyActionRun ] );
+
+	// When the hasActionSuccessfullyRun flag turns on, run submit() and fire the sign-up completion event.
 	useEffect( () => {
 		if ( hasActionSuccessfullyRun ) {
+			// We should only trigger signup completion for signup flows, so check if we have one.
+			if ( availableFlows[ flow ] ) {
+				availableFlows[ flow ]().then( ( flowExport ) => {
+					if ( flowExport.default.isSignupFlow ) {
+						recordSignupComplete( { ...destinationState } );
+					}
+				} );
+			}
+
+			if ( isNewSiteMigrationFlow( flow ) ) {
+				submit?.( { ...destinationState, ...props.data }, ProcessingResult.SUCCESS );
+				return;
+			}
+
+			const { previousStep = '' } = props.data || {};
+
+			recordSignupProcessingScreen( flow, previousStep, {
+				is_in_hosting_flow: isAnyHostingFlow( flow ),
+				wccom_from: getWccomFrom( destinationState ),
+			} );
+
+			// Default processing handler.
 			submit?.( destinationState, ProcessingResult.SUCCESS );
 		}
 		// A change in submit() doesn't cause this effect to rerun.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [ hasActionSuccessfullyRun ] );
+	}, [ hasActionSuccessfullyRun, recordSignupComplete, flow ] );
 
 	const getSubtitle = () => {
 		return props.subtitle || loadingMessages[ currentMessageIndex ]?.subtitle;
@@ -120,20 +158,26 @@ const ProcessingStep: React.FC< ProcessingStepProps > = function ( props ) {
 		return <TailoredFlowPreCheckoutScreen flowName={ flowName } />;
 	}
 
+	if ( [ HUNDRED_YEAR_PLAN_FLOW, HUNDRED_YEAR_DOMAIN_FLOW ].includes( flowName ) ) {
+		return <HundredYearPlanFlowProcessingScreen />;
+	}
+
 	const subtitle = getSubtitle();
 
 	return (
 		<>
 			<DocumentHead title={ __( 'Processing' ) } />
 			<StepContainer
-				shouldHideNavButtons={ true }
-				hideFormattedHeader={ true }
+				shouldHideNavButtons
+				hideFormattedHeader
 				stepName="processing-step"
 				stepContent={
 					<>
 						<div className="processing-step">
 							<h1 className="processing-step__progress-step">{ getCurrentMessage() }</h1>
-							{ progress >= 0 || isWooExpressFlow( flow ) ? (
+							{ progress >= 0 ||
+							isWooExpressFlow( flow ) ||
+							isTransferringHostedSiteCreationFlow( flow ) ? (
 								<LoadingBar
 									progress={ progress }
 									className="processing-step__content woocommerce-install__content"
@@ -145,7 +189,6 @@ const ProcessingStep: React.FC< ProcessingStepProps > = function ( props ) {
 						</div>
 					</>
 				}
-				stepProgress={ stepProgress }
 				recordTracksEvent={ recordTracksEvent }
 				showJetpackPowered={ isJetpackPowered }
 				showFooterWooCommercePowered={ isWooCommercePowered }

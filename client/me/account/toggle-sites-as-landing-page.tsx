@@ -1,16 +1,11 @@
-import { ToggleControl as OriginalToggleControl } from '@wordpress/components';
+import { useHasEnTranslation } from '@automattic/i18n-utils';
+import { ToggleControl } from '@wordpress/components';
 import { useTranslate } from 'i18n-calypso';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import { successNotice } from 'calypso/state/notices/actions';
 import { savePreference } from 'calypso/state/preferences/actions';
 import { getPreference, isSavingPreference } from 'calypso/state/preferences/selectors';
-
-const ToggleControl = OriginalToggleControl as React.ComponentType<
-	OriginalToggleControl.Props & {
-		disabled?: boolean;
-	}
->;
 
 function ToggleSitesAsLandingPage() {
 	const translate = useTranslate();
@@ -18,7 +13,7 @@ function ToggleSitesAsLandingPage() {
 	const useSitesAsLandingPage = useSelector(
 		( state ) => getPreference( state, 'sites-landing-page' )?.useSitesAsLandingPage
 	);
-	const isSaving = useSelector( ( state ) => isSavingPreference( state ) );
+	const isSaving = useSelector( isSavingPreference );
 
 	async function handleToggle( isChecked: boolean ) {
 		const preference = { useSitesAsLandingPage: isChecked, updatedAt: Date.now() };
@@ -38,13 +33,22 @@ function ToggleSitesAsLandingPage() {
 		);
 	}
 
+	const oldCopy = translate( 'Show me all my sites when logging in to WordPress.com' );
+	const updatedCopy = translate(
+		'Display all my sites instead of just my primary site when I visit WordPress.com.'
+	);
+
+	const hasTranslationForNewCopy = useHasEnTranslation()(
+		'Display all my sites instead of just my primary site when I visit WordPress.com.'
+	);
+
 	return (
 		<div>
 			<ToggleControl
 				checked={ !! useSitesAsLandingPage }
 				onChange={ handleToggle }
 				disabled={ isSaving }
-				label={ translate( 'Show me all my sites when logging in to WordPress.com' ) }
+				label={ hasTranslationForNewCopy ? updatedCopy : oldCopy }
 			/>
 		</div>
 	);

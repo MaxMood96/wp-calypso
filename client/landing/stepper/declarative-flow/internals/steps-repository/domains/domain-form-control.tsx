@@ -1,8 +1,14 @@
-import { DOMAIN_UPSELL_FLOW, LINK_IN_BIO_TLD_FLOW } from '@automattic/onboarding';
+import {
+	DOMAIN_UPSELL_FLOW,
+	HUNDRED_YEAR_DOMAIN_FLOW,
+	HUNDRED_YEAR_PLAN_FLOW,
+	isDomainUpsellFlow,
+	LINK_IN_BIO_TLD_FLOW,
+	isSiteAssemblerFlow,
+} from '@automattic/onboarding';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { isEmpty } from 'lodash';
 import { useState } from 'react';
-import { useSelector } from 'react-redux';
 import QueryProductsList from 'calypso/components/data/query-products-list';
 import { useMyDomainInputMode as inputMode } from 'calypso/components/domains/connect-domain-step/constants';
 import RegisterDomainStep from 'calypso/components/domains/register-domain-step';
@@ -17,6 +23,7 @@ import {
 	getSignupCompleteFlowName,
 	wasSignupCheckoutPageUnloaded,
 } from 'calypso/signup/storageUtils';
+import { useSelector } from 'calypso/state';
 import { getAvailableProductsList } from 'calypso/state/products-list/selectors';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 import { useQuery } from '../../../../hooks/use-query';
@@ -32,6 +39,8 @@ interface DomainFormControlProps {
 	onSkip: ( _googleAppsCartItem?: any, shouldHideFreePlan?: boolean ) => void;
 	onUseYourDomainClick: () => void;
 	showUseYourDomain: boolean;
+	isCartPendingUpdate: boolean;
+	isCartPendingUpdateDomain: DomainSuggestion | undefined;
 }
 
 export function DomainFormControl( {
@@ -43,13 +52,11 @@ export function DomainFormControl( {
 	onSkip,
 	onUseYourDomainClick,
 	showUseYourDomain,
+	isCartPendingUpdate,
+	isCartPendingUpdateDomain,
 }: DomainFormControlProps ) {
-	const { selectedSite, productsList } = useSelector( ( state ) => {
-		return {
-			selectedSite: getSelectedSite( state ),
-			productsList: getAvailableProductsList( state ),
-		};
-	} );
+	const selectedSite = useSelector( getSelectedSite );
+	const productsList = useSelector( getAvailableProductsList );
 
 	const { domainForm, siteTitle } = useSelect(
 		( select ) => ( {
@@ -93,6 +100,14 @@ export function DomainFormControl( {
 		includeWordPressDotCom = false;
 	}
 
+	if ( flow === HUNDRED_YEAR_PLAN_FLOW ) {
+		includeWordPressDotCom = false;
+	}
+
+	if ( flow === HUNDRED_YEAR_DOMAIN_FLOW ) {
+		includeWordPressDotCom = false;
+	}
+
 	const domainsWithPlansOnly = true;
 	const isPlanSelectionAvailableLaterInFlow = true;
 	const domainSearchInQuery = useQuery().get( 'new' ); // following the convention of /start/domains
@@ -108,6 +123,10 @@ export function DomainFormControl( {
 	};
 
 	const getSideContent = () => {
+		if ( HUNDRED_YEAR_PLAN_FLOW === flow ) {
+			return null;
+		}
+
 		const useYourDomain = (
 			<div className="domains__domain-side-content">
 				<ReskinSideExplainer onClick={ handleUseYourDomainClick } type="use-your-domain" />
@@ -163,11 +182,6 @@ export function DomainFormControl( {
 			return true;
 		}
 
-		// 'blog' flow, starting with blog themes
-		if ( flow === 'blog' ) {
-			return true;
-		}
-
 		return typeof domainForm?.lastQuery === 'string' && domainForm?.lastQuery.includes( '.blog' );
 	};
 
@@ -196,7 +210,7 @@ export function DomainFormControl( {
 			return false;
 		}
 
-		return [ DOMAIN_UPSELL_FLOW ].includes( flow );
+		return isDomainUpsellFlow( flow ) || isSiteAssemblerFlow( flow );
 	};
 
 	const renderDomainForm = () => {
@@ -219,8 +233,6 @@ export function DomainFormControl( {
 				// filter before counting length
 				initialState.loadingResults =
 					getDomainSuggestionSearch( getFixedDomainSearch( initialQuery ) ).length >= 2;
-				// when it's provided via the query arg, follow the convention of /start/domains to show it
-				initialState.hideInitialQuery = ! domainSearchInQuery;
 			}
 		}
 
@@ -231,6 +243,8 @@ export function DomainFormControl( {
 		return (
 			<CalypsoShoppingCartProvider>
 				<RegisterDomainStep
+					isCartPendingUpdate={ isCartPendingUpdate }
+					isCartPendingUpdateDomain={ isCartPendingUpdateDomain }
 					analyticsSection={ analyticsSection }
 					basePath={ path }
 					deemphasiseTlds={ flow === 'ecommerce' ? [ 'blog' ] : [] }
@@ -240,7 +254,7 @@ export function DomainFormControl( {
 					includeWordPressDotCom={ includeWordPressDotCom ?? true }
 					initialState={ initialState }
 					isPlanSelectionAvailableInFlow={ isPlanSelectionAvailableLaterInFlow }
-					isReskinned={ true }
+					isReskinned
 					reskinSideContent={ getSideContent() }
 					isSignupStep
 					key="domainForm"

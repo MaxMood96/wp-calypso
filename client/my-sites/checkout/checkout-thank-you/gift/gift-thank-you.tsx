@@ -86,7 +86,7 @@ export default function GiftThankYou( { site }: { site: number | string } ) {
 				<ThankYou
 					containerClassName="gift-thank-you__container"
 					sections={ sections }
-					showSupportSection={ true }
+					showSupportSection
 					thankYouImage={ {
 						alt: '',
 						src: successImage,
@@ -94,7 +94,7 @@ export default function GiftThankYou( { site }: { site: number | string } ) {
 						width: '63px',
 					} }
 					thankYouTitle={ translate( 'All done! Thank you for supporting %(siteName)s.', {
-						args: { siteName },
+						args: { siteName: siteName ?? translate( 'this website' ) },
 					} ) }
 					thankYouHeaderBody={
 						<div className="gift-thank-you__header-body">

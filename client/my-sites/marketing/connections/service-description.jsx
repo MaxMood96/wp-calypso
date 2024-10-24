@@ -18,6 +18,12 @@ class SharingServiceDescription extends Component {
 
 	static defaultProps = {
 		descriptions: Object.freeze( {
+			bluesky() {
+				if ( this.props.numberOfConnections > 0 ) {
+					return this.props.translate( 'Sharing posts to your Bluesky profile.' );
+				}
+				return this.props.translate( 'Share posts to your Bluesky profile.' );
+			},
 			facebook: function () {
 				if ( this.props.numberOfConnections > 0 ) {
 					return this.props.translate(
@@ -40,8 +46,8 @@ class SharingServiceDescription extends Component {
 			instagram_business: function () {
 				if ( this.props.numberOfConnections > 0 ) {
 					return this.props.translate(
-						'Sharing photos and video reels to your Instagram account.',
-						'Sharing photos and video reels to your Instagram accounts.',
+						'Sharing photos to your Instagram account.',
+						'Sharing photos to your Instagram accounts.',
 						{
 							count: this.props.numberOfConnections,
 							comment:
@@ -53,7 +59,7 @@ class SharingServiceDescription extends Component {
 				return (
 					<>
 						{ this.props.translate(
-							'Share photos and video reels from your site to your Instagram Business account.',
+							'Share photos from your site to your Instagram Business account.',
 							{
 								comment: 'Description for Instagram Publicize when no accounts are connected',
 							}
@@ -160,7 +166,7 @@ class SharingServiceDescription extends Component {
 					} );
 				}
 
-				return this.props.translate( 'Connect to use the Instagram widget.', {
+				return this.props.translate( 'Connect to use the Latest Instagram Posts block.', {
 					comment: 'Description for Instagram when no accounts are connected',
 				} );
 			},
@@ -188,13 +194,13 @@ class SharingServiceDescription extends Component {
 			},
 			google_my_business: function () {
 				if ( this.props.numberOfConnections > 0 ) {
-					return this.props.translate( 'Connected to your Google My Business account.', {
-						comment: 'Description for Google My Business when an account is connected',
+					return this.props.translate( 'Connected to your Google Business Profile account.', {
+						comment: 'Description for Google Business Profile when an account is connected',
 					} );
 				}
 
-				return this.props.translate( 'Connect to your Google My Business account.', {
-					comment: 'Description for Google My Business when no account is connected',
+				return this.props.translate( 'Connect to your Google Business Profile account.', {
+					comment: 'Description for Google Business Profile when no account is connected',
 				} );
 			},
 			p2_slack: function () {
@@ -234,6 +240,18 @@ class SharingServiceDescription extends Component {
 				return this.props.translate( 'Share posts to your Mastodon feed.', {
 					comment: 'Description for Mastodon Publicize when no accounts are connected',
 				} );
+			},
+			nextdoor() {
+				if ( this.props.numberOfConnections > 0 ) {
+					return this.props.translate( 'Sharing posts to Nextdoor.' );
+				}
+				return this.props.translate( 'Share posts with your local community on Nextdoor.' );
+			},
+			threads() {
+				if ( this.props.numberOfConnections > 0 ) {
+					return this.props.translate( 'Sharing posts to Threads.' );
+				}
+				return this.props.translate( 'Share posts to your Threads feed.' );
 			},
 		} ),
 		numberOfConnections: 0,

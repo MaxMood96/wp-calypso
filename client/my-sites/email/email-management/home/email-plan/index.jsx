@@ -1,10 +1,10 @@
 import config from '@automattic/calypso-config';
+import page from '@automattic/calypso-router';
+import { Badge } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
 import PropTypes from 'prop-types';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useState } from 'react';
 import titleCase from 'to-title-case';
-import Badge from 'calypso/components/badge';
 import DocumentHead from 'calypso/components/data/document-head';
 import QuerySitePurchases from 'calypso/components/data/query-site-purchases';
 import HeaderCake from 'calypso/components/header-cake';
@@ -37,16 +37,18 @@ import {
 	hasEmailSubscription,
 } from 'calypso/my-sites/email/email-management/home/utils';
 import {
-	emailManagement,
-	emailManagementAddEmailForwards,
-	emailManagementAddGSuiteUsers,
-	emailManagementManageTitanAccount,
-	emailManagementManageTitanMailboxes,
-	emailManagementNewTitanAccount,
-	emailManagementPurchaseNewEmailAccount,
-	emailManagementTitanControlPanelRedirect,
+	getEmailManagementPath,
+	getAddEmailForwardsPath,
+	getAddGSuiteUsersPath,
+	getManageTitanAccountPath,
+	getManageTitanMailboxesPath,
+	getNewTitanAccountPath,
+	getPurchaseNewEmailAccountPath,
+	getTitanControlPanelRedirectPath,
 } from 'calypso/my-sites/email/paths';
 import { getManagePurchaseUrlFor } from 'calypso/my-sites/purchases/paths';
+import { useDispatch, useSelector } from 'calypso/state';
+import { successNotice } from 'calypso/state/notices/actions';
 import {
 	hasLoadedSitePurchasesFromServer,
 	isFetchingSitePurchases,
@@ -64,7 +66,7 @@ const UpgradeNavItem = ( { currentRoute, domain, selectedSiteSlug } ) => {
 
 	return (
 		<VerticalNavItem
-			path={ emailManagementPurchaseNewEmailAccount( selectedSiteSlug, domain.name, currentRoute ) }
+			path={ getPurchaseNewEmailAccountPath( selectedSiteSlug, domain.name, currentRoute ) }
 			onClick={ () => recordTracksEvent( 'calypso_upsell_email', { context: 'email-forwarding' } ) }
 		>
 			{ translate( 'Upgrade to Professional Email' ) }
@@ -83,6 +85,10 @@ UpgradeNavItem.propTypes = {
 
 function getAccount( accounts ) {
 	return accounts?.[ 0 ];
+}
+
+function getEmailForwardLimit( data ) {
+	return data?.[ 0 ]?.maximum_mailboxes || 0;
 }
 
 function getMailboxes( data ) {
@@ -104,7 +110,7 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 	const hasSubscription = hasEmailSubscription( domain );
 
 	const handleBack = () => {
-		page( emailManagement( selectedSite.slug ) );
+		page( getEmailManagementPath( selectedSite.slug ) );
 	};
 
 	const handleRenew = ( event ) => {
@@ -117,11 +123,66 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 		);
 	};
 
+	const addEmailForwardMutationActive = useAddEmailForwardMutationIsLoading();
+
+	const {
+		data: emailAccounts = [],
+		isLoading: isLoadingEmailAccounts,
+		refetch,
+	} = useGetEmailAccountsQuery( selectedSite.ID, domain.name, {
+		refetchOnMount: ! addEmailForwardMutationActive,
+		retry: false,
+	} );
+
+	// Email checkout provides the /mailbox route with a new email param, e.g. /mailboxes/example.com?new-email=example@example.com
+	const queryParams = new URLSearchParams( window.location.search );
+	const newEmail = queryParams.get( 'new-email' );
+
+	useEffect( () => {
+		if ( ! newEmail ) {
+			return;
+		}
+		dispatch(
+			successNotice(
+				translate( 'Your mailbox %(mailbox)s has been created.', { args: { mailbox: newEmail } } ),
+				{
+					duration: 8000,
+				}
+			)
+		);
+	}, [ newEmail, dispatch, translate ] );
+
+	const mailbox = newEmail ? newEmail.split( '@' )[ 0 ] : '';
+	const emailExists = emailAccounts.some( ( account ) =>
+		account.emails.some( ( email ) => mailbox === email.mailbox )
+	);
+
+	const [ emailAccountsRefetchCount, setEmailAccountsRefetchCount ] = useState( 0 );
+	const isLoading =
+		isLoadingEmailAccounts || ( newEmail && ! emailExists && emailAccountsRefetchCount < 5 );
+
+	// Email provisioning takes a few seconds to complete, if there is a newEmail
+	// Refetch email acounts every 1.5 seconds up to 5 times until we can see it
+	useEffect( () => {
+		if ( ! newEmail || emailExists || emailAccountsRefetchCount >= 5 ) {
+			return;
+		}
+
+		const refetchTimeout = setTimeout( () => {
+			refetch();
+			setEmailAccountsRefetchCount( ( prev ) => prev + 1 );
+		}, 1500 );
+
+		return () => clearTimeout( refetchTimeout );
+	}, [ newEmail, refetch, emailExists, emailAccountsRefetchCount ] );
+
+	const emailForwardsLimit = getEmailForwardLimit( emailAccounts );
+
 	function getAddMailboxProps() {
 		if ( hasGSuiteWithUs( domain ) ) {
 			return {
 				disabled: ! canAddMailboxes,
-				path: emailManagementAddGSuiteUsers(
+				path: getAddGSuiteUsersPath(
 					selectedSite.slug,
 					domain.name,
 					getProductType( getGSuiteProductSlug( domain ) ),
@@ -135,21 +196,18 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 			if ( getTitanSubscriptionId( domain ) ) {
 				return {
 					disabled: ! canAddMailboxes,
-					path: emailManagementNewTitanAccount(
-						selectedSite.slug,
-						domain.name,
-						currentRoute,
-						source
-					),
+					path: getNewTitanAccountPath( selectedSite.slug, domain.name, currentRoute, {
+						source,
+					} ),
 				};
 			}
 
 			const showExternalControlPanelLink = ! config.isEnabled( 'titan/iframe-control-panel' );
 			const controlPanelUrl = showExternalControlPanelLink
-				? emailManagementTitanControlPanelRedirect( selectedSite.slug, domain.name, currentRoute, {
+				? getTitanControlPanelRedirectPath( selectedSite.slug, domain.name, currentRoute, {
 						context: TITAN_CONTROL_PANEL_CONTEXT_CREATE_EMAIL,
 				  } )
-				: emailManagementManageTitanAccount( selectedSite.slug, domain.name, currentRoute, {
+				: getManageTitanAccountPath( selectedSite.slug, domain.name, currentRoute, {
 						context: TITAN_CONTROL_PANEL_CONTEXT_CREATE_EMAIL,
 				  } );
 
@@ -161,7 +219,7 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 
 		// All site admins are allowed to add/remove email forwards
 		return {
-			path: emailManagementAddEmailForwards( selectedSite.slug, domain.name, currentRoute ),
+			path: getAddEmailForwardsPath( selectedSite.slug, domain.name, currentRoute ),
 		};
 	}
 
@@ -195,8 +253,12 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 			? getManagePurchaseUrlFor( selectedSite.slug, purchase.id )
 			: '';
 
+		if ( ! hasSubscription || ! purchase ) {
+			return null;
+		}
+
 		return (
-			<VerticalNavItem path={ managePurchaseUrl } disabled={ ! hasSubscription || ! purchase }>
+			<VerticalNavItem path={ managePurchaseUrl }>
 				{ translate( 'View billing and payment settings' ) }
 			</VerticalNavItem>
 		);
@@ -213,12 +275,12 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 		if ( hasTitanMailWithUs( domain ) ) {
 			if ( config.isEnabled( 'titan/iframe-control-panel' ) ) {
 				return {
-					path: emailManagementManageTitanAccount( selectedSite.slug, domain.name, currentRoute ),
+					path: getManageTitanAccountPath( selectedSite.slug, domain.name, currentRoute ),
 				};
 			}
 
 			return {
-				path: emailManagementManageTitanMailboxes( selectedSite.slug, domain.name, currentRoute ),
+				path: getManageTitanMailboxesPath( selectedSite.slug, domain.name, currentRoute ),
 			};
 		}
 
@@ -242,7 +304,7 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 		);
 	}
 
-	function renderAddNewMailboxesOrRenewNavItem() {
+	function renderAddNewMailboxesOrRenewNavItem( mailboxes ) {
 		if ( hasTitanMailWithUs( domain ) || hasGSuiteWithUs( domain ) ) {
 			if ( purchase && isExpired( purchase ) ) {
 				return (
@@ -259,23 +321,18 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 			);
 		}
 
+		const isAtEmailForwardsLimit = mailboxes.length >= emailForwardsLimit;
+
 		return (
-			<VerticalNavItem { ...getAddMailboxProps() }>
-				{ translate( 'Add new email forwards' ) }
+			<VerticalNavItem { ...getAddMailboxProps() } disabled={ isAtEmailForwardsLimit }>
+				{ isAtEmailForwardsLimit
+					? translate( 'Using %1$s of %1$s email forwards', {
+							args: [ emailForwardsLimit ],
+					  } )
+					: translate( 'Add new email forwards' ) }
 			</VerticalNavItem>
 		);
 	}
-
-	const addEmailForwardMutationActive = useAddEmailForwardMutationIsLoading();
-
-	const { data: emailAccounts = [], isLoading } = useGetEmailAccountsQuery(
-		selectedSite.ID,
-		domain.name,
-		{
-			refetchOnMount: ! addEmailForwardMutationActive,
-			retry: false,
-		}
-	);
 
 	return (
 		<>
@@ -300,7 +357,7 @@ function EmailPlan( { domain, hideHeaderCake = false, selectedSite, source } ) {
 			/>
 			<div className="email-plan__actions">
 				<VerticalNav>
-					{ renderAddNewMailboxesOrRenewNavItem() }
+					{ renderAddNewMailboxesOrRenewNavItem( getMailboxes( emailAccounts ) ) }
 					<UpgradeNavItem
 						currentRoute={ currentRoute }
 						domain={ domain }

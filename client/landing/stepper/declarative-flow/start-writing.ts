@@ -1,32 +1,48 @@
-import { OnboardSelect, updateLaunchpadSettings } from '@automattic/data-stores';
-import { useLocale } from '@automattic/i18n-utils';
-import { START_WRITING_FLOW, replaceProductsInCart } from '@automattic/onboarding';
-import { MinimalRequestCartProduct } from '@automattic/shopping-cart';
-import { useSelect, useDispatch, dispatch } from '@wordpress/data';
-import { useSelector } from 'react-redux';
-import { recordSubmitStep } from 'calypso/landing/stepper/declarative-flow/internals/analytics/record-submit-step';
+import { updateLaunchpadSettings } from '@automattic/data-stores';
+import { START_WRITING_FLOW } from '@automattic/onboarding';
+import { useDispatch } from '@wordpress/data';
+import { useEffect } from '@wordpress/element';
+import { translate } from 'i18n-calypso';
+import { useLaunchpadDecider } from 'calypso/landing/stepper/declarative-flow/internals/hooks/use-launchpad-decider';
 import { redirect } from 'calypso/landing/stepper/declarative-flow/internals/steps-repository/import/util';
 import {
-	AssertConditionResult,
+	type AssertConditionResult,
 	AssertConditionState,
-	Flow,
-	ProvidedDependencies,
+	type Flow,
+	type ProvidedDependencies,
 } from 'calypso/landing/stepper/declarative-flow/internals/types';
-import { useSite } from 'calypso/landing/stepper/hooks/use-site';
-import { useSiteSlug } from 'calypso/landing/stepper/hooks/use-site-slug';
 import { SITE_STORE, ONBOARD_STORE } from 'calypso/landing/stepper/stores';
-import { freeSiteAddressType } from 'calypso/lib/domains/constants';
+import { skipLaunchpad } from 'calypso/landing/stepper/utils/skip-launchpad';
+import { useSelector } from 'calypso/state';
 import { getCurrentUserSiteCount, isUserLoggedIn } from 'calypso/state/current-user/selectors';
-import { requestSiteAddressChange } from 'calypso/state/site-address-change/actions';
+import { useExitFlow } from '../hooks/use-exit-flow';
+import { useSiteData } from '../hooks/use-site-data';
+import { stepsWithRequiredLogin } from '../utils/steps-with-required-login';
 
 const startWriting: Flow = {
 	name: START_WRITING_FLOW,
-	title: 'Blog',
+	get title() {
+		return translate( 'Start writing' );
+	},
+	isSignupFlow: true,
 	useSteps() {
-		return [
+		//TODO: Migrate to use the STEPS from the steps.ts file
+		return stepsWithRequiredLogin( [
 			{
-				slug: 'site-creation-step',
-				asyncComponent: () => import( './internals/steps-repository/site-creation-step' ),
+				slug: 'check-sites',
+				asyncComponent: () => import( './internals/steps-repository/sites-checker' ),
+			},
+			{
+				slug: 'new-or-existing-site',
+				asyncComponent: () => import( './internals/steps-repository/new-or-existing-site' ),
+			},
+			{
+				slug: 'site-picker',
+				asyncComponent: () => import( './internals/steps-repository/site-picker-list' ),
+			},
+			{
+				slug: 'create-site',
+				asyncComponent: () => import( './internals/steps-repository/create-site' ),
 			},
 			{
 				slug: 'processing',
@@ -50,40 +66,54 @@ const startWriting: Flow = {
 				asyncComponent: () => import( './internals/steps-repository/launchpad' ),
 			},
 			{
+				slug: 'site-launch',
+				asyncComponent: () => import( './internals/steps-repository/site-launch' ),
+			},
+			{
 				slug: 'celebration-step',
 				asyncComponent: () => import( './internals/steps-repository/celebration-step' ),
 			},
-		];
+		] );
 	},
 
 	useStepNavigation( currentStep, navigate ) {
-		const flowName = this.name;
-		const siteSlug = useSiteSlug();
-		const { getDomainCartItem, getPlanCartItem } = useSelect(
-			( select ) => ( {
-				getDomainCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getDomainCartItem,
-				getPlanCartItem: ( select( ONBOARD_STORE ) as OnboardSelect ).getPlanCartItem,
-			} ),
-			[]
-		);
 		const { saveSiteSettings, setIntentOnSite } = useDispatch( SITE_STORE );
 		const { setSelectedSite } = useDispatch( ONBOARD_STORE );
-		const state = useSelect(
-			( select ) => select( ONBOARD_STORE ) as OnboardSelect,
-			[]
-		).getState();
-		const site = useSite();
+		const { site, siteSlug, siteId } = useSiteData();
+		const { exitFlow } = useExitFlow();
+
+		// This flow clear the site_intent when flow is completed.
+		// We need to check if the site is launched and if so, clear the site_intent to avoid errors.
+		// See https://github.com/Automattic/dotcom-forge/issues/2886
+		const isSiteLaunched = site?.launch_status === 'launched' || false;
+		useEffect( () => {
+			if ( isSiteLaunched ) {
+				setIntentOnSite( siteSlug, '' );
+			}
+		}, [ siteSlug, setIntentOnSite, isSiteLaunched ] );
+
+		const { getPostFlowUrl, postFlowNavigator, initializeLaunchpadState } = useLaunchpadDecider( {
+			exitFlow,
+			navigate,
+		} );
 
 		async function submit( providedDependencies: ProvidedDependencies = {} ) {
-			recordSubmitStep( providedDependencies, '', flowName, currentStep );
-			const returnUrl = `/setup/start-writing/celebration-step?siteSlug=${ siteSlug }`;
-
 			switch ( currentStep ) {
-				case 'site-creation-step':
-					return navigate( 'processing' );
-				case 'processing': {
-					// If we just created a new site.
-					if ( ! providedDependencies?.blogLaunched && providedDependencies?.siteSlug ) {
+				case 'check-sites':
+					// Check for unlaunched sites
+					if ( providedDependencies?.filteredSitesCount === 0 ) {
+						// No unlaunched sites, redirect to new site creation step
+						return navigate( 'create-site' );
+					}
+					// With unlaunched sites, continue to new-or-existing-site step
+					return navigate( 'new-or-existing-site' );
+				case 'new-or-existing-site':
+					if ( 'new-site' === providedDependencies?.newExistingSiteChoice ) {
+						return navigate( 'create-site' );
+					}
+					return navigate( 'site-picker' );
+				case 'site-picker': {
+					if ( providedDependencies?.siteId && providedDependencies?.siteSlug ) {
 						setSelectedSite( providedDependencies?.siteId );
 						await Promise.all( [
 							setIntentOnSite( providedDependencies?.siteSlug, START_WRITING_FLOW ),
@@ -95,136 +125,147 @@ const startWriting: Flow = {
 						const siteOrigin = window.location.origin;
 
 						return redirect(
-							`https://${ providedDependencies?.siteSlug }/wp-admin/post-new.php?${ START_WRITING_FLOW }=true&origin=${ siteOrigin }`
+							`https://${ providedDependencies?.siteSlug }/wp-admin/post-new.php?` +
+								`${ START_WRITING_FLOW }=true&origin=${ siteOrigin }&new_prompt=true` +
+								`&postFlowUrl=${ getPostFlowUrl( {
+									flow: START_WRITING_FLOW,
+									siteId: providedDependencies?.siteId as string,
+									siteSlug: providedDependencies?.siteSlug as string,
+								} ) }`
+						);
+					}
+				}
+				case 'create-site':
+					return navigate( 'processing' );
+				case 'processing': {
+					// If we just created a new site.
+					if ( ! providedDependencies?.isLaunched && providedDependencies?.siteSlug ) {
+						setSelectedSite( providedDependencies?.siteId );
+						await Promise.all( [
+							setIntentOnSite( providedDependencies?.siteSlug, START_WRITING_FLOW ),
+							saveSiteSettings( providedDependencies?.siteId, {
+								launchpad_screen: 'full',
+							} ),
+						] );
+
+						initializeLaunchpadState( {
+							siteId: providedDependencies?.siteId as number,
+							siteSlug: providedDependencies?.siteSlug as string,
+						} );
+
+						const siteOrigin = window.location.origin;
+
+						return redirect(
+							`https://${ providedDependencies?.siteSlug }/wp-admin/post-new.php?` +
+								`${ START_WRITING_FLOW }=true&origin=${ siteOrigin }&new_prompt=true` +
+								`&postFlowUrl=${ getPostFlowUrl( {
+									flow: START_WRITING_FLOW,
+									siteId: providedDependencies?.siteId as string,
+									siteSlug: providedDependencies?.siteSlug as string,
+								} ) }`
 						);
 					}
 
-					// If the user's site has just been launched.
-					if ( providedDependencies?.blogLaunched && providedDependencies?.siteSlug ) {
-						// Remove the site_intent.
+					if ( providedDependencies?.isLaunched ) {
+						// Remove the site_intent so that it doesn't affect the editor.
 						await setIntentOnSite( providedDependencies?.siteSlug, '' );
-
-						// If the user launched their site with a plan or domain in their cart, redirect them to
-						// checkout before sending them home.
-						if ( getPlanCartItem() || getDomainCartItem() ) {
-							const encodedReturnUrl = encodeURIComponent( returnUrl );
-
-							return window.location.assign(
-								`/checkout/${ encodeURIComponent(
-									( siteSlug as string ) ?? ''
-								) }?redirect_to=${ encodedReturnUrl }`
-							);
-						}
-						return window.location.replace( returnUrl );
+						return navigate( 'celebration-step' );
 					}
-					return navigate( 'launchpad' );
+
+					if ( providedDependencies?.goToCheckout ) {
+						// Do nothing and wait for checkout redirect
+						return;
+					}
+
+					return postFlowNavigator( { siteId, siteSlug } );
 				}
 				case 'domains':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { domain_upsell_deferred: true },
 						} );
 					}
 
 					if ( providedDependencies?.freeDomain ) {
-						const freeDomainSuffix = '.wordpress.com';
-						const newDomainName = String( providedDependencies?.domainName ).replace(
-							freeDomainSuffix,
-							''
-						);
-
-						if ( providedDependencies?.domainName ) {
-							await requestSiteAddressChange(
-								site?.ID,
-								newDomainName,
-								'wordpress.com',
-								siteSlug,
-								freeSiteAddressType.BLOG,
-								true,
-								false
-							)( dispatch, state );
-						}
-
-						const currentSiteSlug = String( providedDependencies?.domainName ?? siteSlug );
-
-						await replaceProductsInCart(
-							currentSiteSlug as string,
-							[ getPlanCartItem() ].filter( Boolean ) as MinimalRequestCartProduct[]
-						);
-
-						return window.location.assign(
-							`/setup/start-writing/launchpad?siteSlug=${ currentSiteSlug }`
-						);
+						return window.location.assign( `/setup/start-writing/launchpad?siteId=${ site?.ID }` );
 					}
 
 					return navigate( 'plans' );
 				case 'use-my-domain':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { domain_upsell_deferred: true },
 						} );
 					}
 					return navigate( 'plans' );
 				case 'plans':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { plan_completed: true },
 						} );
 					}
-					if ( providedDependencies?.goToCheckout ) {
-						const items = [ getPlanCartItem(), getDomainCartItem() ].filter(
-							Boolean
-						) as MinimalRequestCartProduct[];
-
-						// Always replace items in the cart so we can remove old plan/domain items.
-						await replaceProductsInCart( siteSlug as string, items );
-					}
 					return navigate( 'launchpad' );
 				case 'setup-blog':
-					if ( siteSlug ) {
-						await updateLaunchpadSettings( siteSlug, {
+					if ( siteId ) {
+						await updateLaunchpadSettings( siteId, {
 							checklist_statuses: { setup_blog: true },
 						} );
 					}
 					return navigate( 'launchpad' );
 				case 'launchpad':
 					return navigate( 'processing' );
+				case 'site-launch':
+					return navigate( 'processing' );
+				case 'celebration-step':
+					return window.location.assign( providedDependencies.destinationUrl as string );
 			}
 		}
-		return { submit };
+
+		const goBack = async () => {
+			switch ( currentStep ) {
+				case 'domains':
+					return navigate( 'launchpad' );
+			}
+		};
+
+		const goNext = async () => {
+			switch ( currentStep ) {
+				case 'launchpad':
+					skipLaunchpad( {
+						checklistSlug: 'start-writing',
+						siteId,
+						siteSlug,
+					} );
+					return;
+			}
+		};
+
+		return { goNext, goBack, submit };
 	},
 
 	useAssertConditions(): AssertConditionResult {
 		const flowName = this.name;
 		const isLoggedIn = useSelector( isUserLoggedIn );
 		const currentUserSiteCount = useSelector( getCurrentUserSiteCount );
-		const locale = useLocale();
 		const currentPath = window.location.pathname;
-		const isSiteCreationStep =
+		const isCreateSite =
+			currentPath.endsWith( 'setup/start-writing' ) ||
 			currentPath.endsWith( 'setup/start-writing/' ) ||
-			currentPath.includes( 'setup/start-writing/site-creation-step' );
+			currentPath.includes( 'setup/start-writing/check-sites' );
 		const userAlreadyHasSites = currentUserSiteCount && currentUserSiteCount > 0;
 
-		const logInUrl =
-			locale && locale !== 'en'
-				? `/start/account/user/${ locale }?variationName=${ flowName }&pageTitle=Start%20writing&redirect_to=/setup/${ flowName }`
-				: `/start/account/user?variationName=${ flowName }&pageTitle=Start%20writing&redirect_to=/setup/${ flowName }`;
+		useEffect( () => {
+			if ( isLoggedIn && isCreateSite && ! userAlreadyHasSites ) {
+				redirect( '/setup/start-writing/create-site' );
+			}
+		}, [] );
 
 		let result: AssertConditionResult = { state: AssertConditionState.SUCCESS };
 
-		if ( ! isLoggedIn ) {
-			redirect( logInUrl );
+		if ( isLoggedIn && isCreateSite && ! userAlreadyHasSites ) {
 			result = {
 				state: AssertConditionState.CHECKING,
-				message: `${ flowName } requires a logged in user`,
-			};
-		} else if ( userAlreadyHasSites && isSiteCreationStep ) {
-			// Redirect users with existing sites out of the flow as we create a new site as the first step in this flow.
-			// This prevents a bunch of sites being created accidentally.
-			redirect( `/post?${ START_WRITING_FLOW }=true` );
-			result = {
-				state: AssertConditionState.CHECKING,
-				message: `${ flowName } requires no preexisting sites`,
+				message: `${ flowName } with no preexisting sites`,
 			};
 		}
 

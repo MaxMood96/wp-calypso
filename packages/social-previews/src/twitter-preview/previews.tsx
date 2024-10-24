@@ -14,6 +14,7 @@ export const TwitterPreviews: React.FC< TwitterPreviewsProps > = ( {
 	if ( ! tweets?.length ) {
 		return null;
 	}
+
 	return (
 		<div className="social-preview twitter-preview">
 			{ ! hidePostPreview && (
@@ -25,7 +26,7 @@ export const TwitterPreviews: React.FC< TwitterPreviewsProps > = ( {
 						}
 					</SectionHeading>
 					<p className="social-preview__section-desc">
-						{ __( 'This is what your social post will look like on Twitter:', 'social-previews' ) }
+						{ __( 'This is what your social post will look like on X:', 'social-previews' ) }
 					</p>
 					{ tweets.map( ( tweet, index ) => {
 						const isLast = index + 1 === tweets.length;
@@ -49,7 +50,7 @@ export const TwitterPreviews: React.FC< TwitterPreviewsProps > = ( {
 					</SectionHeading>
 					<p className="social-preview__section-desc">
 						{ __(
-							'This is what it will look like when someone shares the link to your WordPress post on Twitter.',
+							'This is what it will look like when someone shares the link to your WordPress post on X.',
 							'social-previews'
 						) }
 						&nbsp;
@@ -57,7 +58,7 @@ export const TwitterPreviews: React.FC< TwitterPreviewsProps > = ( {
 							{ __( 'Learn more about links', 'social-previews' ) }
 						</ExternalLink>
 					</p>
-					<TwitterLinkPreview { ...tweets[ 0 ] } />
+					<TwitterLinkPreview { ...tweets[ 0 ] } name="" profileImage="" screenName="" />
 				</section>
 			) }
 		</div>

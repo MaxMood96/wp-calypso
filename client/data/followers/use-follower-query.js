@@ -5,7 +5,6 @@ const useFollowerQuery = ( siteId, subscriberId, type ) => {
 	/**
 	 * Normalizes a follower object. Changes 'avatar' to 'avatar_URL' allowing a follower
 	 * object to be used with the Gravatar component.
-	 *
 	 * @see normalizeFollower in client/data/followers/use-followers-query.js
 	 */
 	function normalizeFollower( follower ) {
@@ -16,7 +15,7 @@ const useFollowerQuery = ( siteId, subscriberId, type ) => {
 	}
 
 	return useQuery( {
-		queryKey: [ 'subscriber', subscriberId, type ],
+		queryKey: [ 'subscriber', siteId, subscriberId, type ],
 		queryFn: () =>
 			wpcom.req.get( {
 				path: `/sites/${ siteId }/followers/${ subscriberId }?type=${ type }&http_envelope=1`,

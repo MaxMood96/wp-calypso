@@ -1,18 +1,25 @@
 /* eslint-disable wpcalypso/jsx-classname-namespace */
 
 import { recordTracksEvent } from '@automattic/calypso-analytics';
-import { Button, LoadingPlaceholder } from '@automattic/components';
-import { HelpCenterSelect, useJetpackSearchAIQuery } from '@automattic/data-stores';
+import { LoadingPlaceholder } from '@automattic/components';
+import { HelpCenterSelect } from '@automattic/data-stores';
+import { useIsEnglishLocale } from '@automattic/i18n-utils';
 import styled from '@emotion/styled';
+import { Button, ExternalLink } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { createElement, createInterpolateElement } from '@wordpress/element';
-import { sprintf } from '@wordpress/i18n';
+import { hasTranslation, sprintf } from '@wordpress/i18n';
 import { useI18n } from '@wordpress/react-i18n';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import stripTags from 'striptags';
-import './help-center-article-content.scss';
+import { useJetpackSearchAIQuery } from '../data/use-jetpack-search-ai';
 import { useTyper } from '../hooks';
 import { HELP_CENTER_STORE } from '../stores';
+import HelpCenterSearchResults from './help-center-search-results';
+import type { JetpackSearchAIResult } from '../data/use-jetpack-search-ai';
+import type { SearchResult } from '../types';
+
+import './help-center-gpt.scss';
 
 const GPTResponsePlaceholder = styled( LoadingPlaceholder )< { width?: string } >`
 	:not( :last-child ) {
@@ -31,11 +38,11 @@ const GPTResponseDisclaimer = styled.div`
 	}
 `;
 
-interface Props {
+interface LoadingPlaceholderProps {
 	loadingMessage: string;
 }
 
-const LoadingPlaceholders: React.FC< Props > = ( { loadingMessage } ) => (
+const LoadingPlaceholders: React.FC< LoadingPlaceholderProps > = ( { loadingMessage } ) => (
 	<>
 		<p className="help-center-gpt-response__loading">{ loadingMessage }</p>
 		<GPTResponsePlaceholder width="80%" />
@@ -44,8 +51,28 @@ const LoadingPlaceholders: React.FC< Props > = ( { loadingMessage } ) => (
 	</>
 );
 
-export function HelpCenterGPT() {
+interface Props {
+	onResponseReceived: ( response: JetpackSearchAIResult ) => void;
+	redirectToArticle: (
+		event: React.MouseEvent< HTMLAnchorElement, MouseEvent >,
+		result: SearchResult
+	) => void;
+}
+
+const handleContentClick = ( event: React.MouseEvent ) => {
+	// Check if the clicked element is a link
+	if ( event.target instanceof HTMLAnchorElement ) {
+		const url = event.target.getAttribute( 'href' );
+		if ( url ) {
+			event.preventDefault();
+			window.open( url, '_blank' );
+		}
+	}
+};
+
+export function HelpCenterGPT( { onResponseReceived, redirectToArticle }: Props ) {
 	const { __ } = useI18n();
+	const isEnglishLocale = useIsEnglishLocale();
 
 	const [ feedbackGiven, setFeedbackGiven ] = useState< boolean >( false );
 
@@ -69,31 +96,23 @@ export function HelpCenterGPT() {
 
 	const query = message ?? '';
 
-	// First fetch the links
-	const { data: links, isError: isLinksError } = useJetpackSearchAIQuery( {
-		siteId: '9619154',
-		query: query,
-		stopAt: 'urls',
-		enabled: true,
-	} );
-
-	// Then fetch the response
-	const { data, isError: isResponseError } = useJetpackSearchAIQuery( {
+	const { data, isError: isGPTError } = useJetpackSearchAIQuery( {
 		siteId: '9619154',
 		query: query,
 		stopAt: 'response',
-		enabled: !! links?.urls,
+		enabled: true,
 	} );
 
 	const allowedTags = [ 'a', 'p', 'ol', 'ul', 'li', 'br', 'b', 'strong', 'i', 'em' ];
-
-	const isGPTError = isLinksError || isResponseError;
 
 	useEffect( () => {
 		if ( data?.response ) {
 			recordTracksEvent( 'calypso_helpcenter_show_gpt_response', {
 				location: 'help-center',
+				answer_source: data?.source,
 			} );
+
+			onResponseReceived( data );
 		}
 	}, [ data ] );
 
@@ -109,27 +128,48 @@ export function HelpCenterGPT() {
 
 	const loadingMessage = useTyper( loadingMessages, ! data?.response, {
 		delayBetweenCharacters: 80,
-		delayBetweenWords: 1400,
+		delayBetweenPhrases: 1400,
 	} );
 
-	const doThumbsUp = () => {
-		setFeedbackGiven( true );
-		recordTracksEvent( 'calypso_helpcenter_gpt_response_thumbs_up', {
-			location: 'help-center',
-		} );
+	const doThumbsUp = ( source: string ) => {
+		return () => {
+			setFeedbackGiven( true );
+			recordTracksEvent( 'calypso_helpcenter_gpt_response_thumbs_up', {
+				location: 'help-center',
+				answer_source: source,
+			} );
+		};
 	};
 
-	const doThumbsDown = () => {
-		setFeedbackGiven( true );
-		recordTracksEvent( 'calypso_helpcenter_gpt_response_thumbs_down', {
-			location: 'help-center',
-		} );
+	const doThumbsDown = ( source: string ) => {
+		return () => {
+			setFeedbackGiven( true );
+			recordTracksEvent( 'calypso_helpcenter_gpt_response_thumbs_down', {
+				location: 'help-center',
+				answer_source: source,
+			} );
+		};
 	};
+
+	const aiResponseHeader = useMemo( () => {
+		if ( isEnglishLocale || hasTranslation( 'AI Generated Response:' ) ) {
+			return __( 'AI Generated Response:', __i18n_text_domain__ );
+		}
+
+		return __( 'Quick response:', __i18n_text_domain__ );
+	}, [ __, isEnglishLocale ] );
 
 	return (
 		<div className="help-center-gpt__container">
+			<HelpCenterSearchResults
+				onSelect={ redirectToArticle }
+				searchQuery={ message || '' }
+				openAdminInNewTab
+				placeholderLines={ 4 }
+				location="help-center-contact-form"
+			/>
 			<h1 id="help-center--contextual_help" className="help-center__section-title">
-				{ __( 'Quick response:', __i18n_text_domain__ ) }
+				{ aiResponseHeader }
 			</h1>
 			{ isGPTError && (
 				<div className="help-center-gpt-error">
@@ -146,7 +186,7 @@ export function HelpCenterGPT() {
 							<>
 								<p>
 									{ __(
-										'Our system is currently generating a possible solution for you, which typically takes about 45 seconds.',
+										'Our system is currently generating a possible solution for you, which typically takes about 30 seconds.',
 										__i18n_text_domain__
 									) }
 								</p>
@@ -169,12 +209,14 @@ export function HelpCenterGPT() {
 						{ ! data?.response && LoadingPlaceholders( { loadingMessage } ) }
 						{ data?.response && (
 							<>
+								{ /* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */ }
 								<div
 									className="help-center-gpt-response__content"
 									// eslint-disable-next-line react/no-danger
 									dangerouslySetInnerHTML={ {
 										__html: stripTags( data.response, allowedTags ),
 									} }
+									onClick={ handleContentClick }
 								/>
 								<div className="help-center-gpt-response__actions">
 									{ feedbackGiven ? (
@@ -186,13 +228,20 @@ export function HelpCenterGPT() {
 										</div>
 									) : (
 										<>
-											<Button onClick={ doThumbsUp }>&#128077;</Button>
-											<Button onClick={ doThumbsDown }>&#128078;</Button>
+											<Button onClick={ doThumbsUp( data?.source ) }>&#128077;</Button>
+											<Button onClick={ doThumbsDown( data?.source ) }>&#128078;</Button>
 										</>
 									) }
 								</div>
 								<GPTResponseDisclaimer>
-									{ __( "Generated by WordPress.com's Support AI", __i18n_text_domain__ ) }
+									{ __(
+										"Generated by WordPress.com's Support AI. AI-generated responses may contain inaccurate information.",
+										__i18n_text_domain__
+									) }
+									<ExternalLink href="https://automattic.com/ai-guidelines">
+										{ ' ' }
+										{ __( 'Learn more.', __i18n_text_domain__ ) }
+									</ExternalLink>
 								</GPTResponseDisclaimer>
 								<div className="help-center-gpt-response__continue">
 									<p>

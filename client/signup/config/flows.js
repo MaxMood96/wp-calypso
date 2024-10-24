@@ -1,15 +1,34 @@
-import { isEnabled } from '@automattic/calypso-config';
-import { BLANK_CANVAS_DESIGN } from '@automattic/design-picker';
-import { isSiteAssemblerFlow } from '@automattic/onboarding';
-import { isDesktop } from '@automattic/viewport';
+import config from '@automattic/calypso-config';
+import { getPlan, TYPE_ECOMMERCE, TYPE_BUSINESS } from '@automattic/calypso-products/';
+import {
+	PREMIUM_THEME,
+	DOT_ORG_THEME,
+	BUNDLED_THEME,
+	MARKETPLACE_THEME,
+	isAssemblerSupported,
+} from '@automattic/design-picker';
+import { isOnboardingGuidedFlow, isSiteAssemblerFlow } from '@automattic/onboarding';
+import { isURL } from '@wordpress/url';
 import { get, includes, reject } from 'lodash';
-import detectHistoryNavigation from 'calypso/lib/detect-history-navigation';
+import { getPlanCartItem } from 'calypso/lib/cart-values/cart-items';
 import { getQueryArgs } from 'calypso/lib/query-args';
 import { addQueryArgs } from 'calypso/lib/url';
 import { generateFlows } from 'calypso/signup/config/flows-pure';
 import stepConfig from './steps';
 
-function getCheckoutUrl( dependencies, localeSlug, flowName ) {
+function constructBackUrlFromPath( path ) {
+	if ( config( 'env' ) !== 'production' ) {
+		const protocol = config( 'protocol' ) ?? 'https';
+		const port = config( 'port' ) ? ':' + config( 'port' ) : '';
+		const hostName = config( 'hostname' );
+
+		return `${ protocol }://${ hostName }${ port }${ path }`;
+	}
+
+	return `https://${ config( 'hostname' ) }${ path }`;
+}
+
+function getCheckoutUrl( dependencies, localeSlug, flowName, destination ) {
 	let checkoutURL = `/checkout/${ dependencies.siteSlug }`;
 
 	// Append the locale slug for the userless checkout page.
@@ -17,33 +36,35 @@ function getCheckoutUrl( dependencies, localeSlug, flowName ) {
 		checkoutURL += `/${ localeSlug }`;
 	}
 
+	const isDomainOnly = [ 'domain', 'domain-for-gravatar' ].includes( flowName );
+
+	// checkoutBackUrl is required to be a complete URL, and will be further sanitized within the checkout package.
+	// Due to historical reason, `destination` can be either a path or a complete URL.
+	// Thus, if it is determined as not an URL, we assume it as a path here. We can surely make it more comprehensive,
+	// but the required effort and computation cost might outweigh the gain.
+	//
+	// TODO:
+	// the domain only flow has special rule. Ideally they should also be configurable in flows-pure.
+	const checkoutBackUrl = isURL( destination )
+		? destination
+		: constructBackUrlFromPath( isDomainOnly ? `/start/${ flowName }/domain-only` : destination );
+
 	return addQueryArgs(
 		{
 			signup: 1,
 			ref: getQueryArgs()?.ref,
-			...( [ 'domain' ].includes( flowName ) && { isDomainOnly: 1 } ),
+			...( dependencies.coupon && { coupon: dependencies.coupon } ),
+			...( isDomainOnly && { isDomainOnly: 1 } ),
+			checkoutBackUrl: addQueryArgs( { skippedCheckout: 1 }, checkoutBackUrl ),
 		},
 		checkoutURL
 	);
 }
 
 function dependenciesContainCartItem( dependencies ) {
-	return dependencies.cartItem || dependencies.domainItem;
-}
-
-function getSiteDestination( dependencies ) {
-	let protocol = 'https';
-
-	/**
-	 * It is possible that non-wordpress.com sites are not HTTPS ready.
-	 *
-	 * Redirect them
-	 */
-	if ( ! dependencies.siteSlug.match( /wordpress\.[a-z]+$/i ) ) {
-		protocol = 'http';
-	}
-
-	return protocol + '://' + dependencies.siteSlug;
+	// @TODO: cartItem is now deprecated. Remove dependencies.cartItem and
+	// dependencies.domainItem once all steps and flows have been updated to use cartItems
+	return dependencies.cartItem || dependencies.domainItem || dependencies.cartItems;
 }
 
 function getRedirectDestination( dependencies ) {
@@ -63,11 +84,11 @@ function getRedirectDestination( dependencies ) {
 	return '/';
 }
 
-function getSignupDestination( { domainItem, siteId, siteSlug, refParameter } ) {
+function getSignupDestination( { domainItem, siteId, siteSlug, refParameter, flowName, ...rest } ) {
 	if ( 'no-site' === siteSlug ) {
 		return '/home';
 	}
-	let queryParam = { siteSlug };
+	let queryParam = { siteSlug, siteId };
 	if ( domainItem ) {
 		// If the user is purchasing a domain then the site's primary url might change from
 		// `siteSlug` to something else during the checkout process, which means the
@@ -75,6 +96,16 @@ function getSignupDestination( { domainItem, siteId, siteSlug, refParameter } ) 
 		// case we use the ID because we know it won't change depending on whether the user
 		// successfully completes the checkout process or not.
 		queryParam = { siteId };
+	}
+
+	// For guided flow, in the variant where the goals are answered in the first step, redirect to the site-setup-wg (without goals).
+	// NOTE: we may need a better way to detect the variant where goals are answered in the first step.
+	// The `segmentationSurveyAnswers` are persisted and can affect the following visits of the flow.
+	if (
+		isOnboardingGuidedFlow( flowName ) &&
+		rest.segmentationSurveyAnswers?.[ 'what-are-your-goals' ]
+	) {
+		return addQueryArgs( queryParam, '/setup/site-setup-wg' );
 	}
 
 	// Add referral param to query args
@@ -96,7 +127,9 @@ function getDomainSignupFlowDestination( { domainItem, cartItem, siteId, designT
 		return `/checkout/thank-you/${ siteSlug }`;
 	}
 
-	return getThankYouNoSiteDestination();
+	// `getThankYouPageUrl` appends a receipt ID to this slug even if it doesn't contain the
+	// `:receipt_id` placeholder
+	return '/checkout/thank-you/no-site';
 }
 
 function getEmailSignupFlowDestination( { siteId, siteSlug } ) {
@@ -106,27 +139,42 @@ function getEmailSignupFlowDestination( { siteId, siteSlug } ) {
 	);
 }
 
-function getThankYouNoSiteDestination() {
-	return `/checkout/thank-you/no-site`;
-}
-
-function getChecklistThemeDestination( { flowName, siteSlug, themeParameter } ) {
-	if ( isSiteAssemblerFlow( flowName ) && themeParameter === BLANK_CANVAS_DESIGN.slug ) {
-		// Go to the site assembler flow if viewport width >= 960px as the layout doesn't support small
-		// screen for now
-		if ( isDesktop() ) {
+function getChecklistThemeDestination( {
+	flowName,
+	siteSlug,
+	themeParameter,
+	headerPatternId,
+	footerPatternId,
+	sectionPatternIds,
+	screen,
+	screenParameter,
+} ) {
+	if ( isSiteAssemblerFlow( flowName ) ) {
+		// Check whether to go to the assembler. If not, go to the site editor directly
+		if ( isAssemblerSupported() ) {
 			return addQueryArgs(
 				{
 					theme: themeParameter,
 					siteSlug: siteSlug,
 					isNewSite: true,
+					header_pattern_id: headerPatternId,
+					footer_pattern_id: footerPatternId,
+					pattern_ids: sectionPatternIds,
+					screen,
+					screen_parameter: screenParameter,
 				},
 				`/setup/with-theme-assembler`
 			);
 		}
 
-		return `/site-editor/${ siteSlug }`;
+		const params = new URLSearchParams( {
+			canvas: 'edit',
+			assembler: '1',
+		} );
+
+		return `/site-editor/${ siteSlug }?${ params }`;
 	}
+
 	return `/home/${ siteSlug }`;
 }
 
@@ -135,22 +183,36 @@ function getWithThemeDestination( {
 	themeParameter,
 	styleVariation,
 	themeType,
-	cartItem,
+	cartItems,
 } ) {
 	if (
-		! cartItem &&
-		[ 'dot-org', 'premium', 'externally-managed', 'woocommerce' ].includes( themeType )
+		! cartItems &&
+		[ DOT_ORG_THEME, PREMIUM_THEME, MARKETPLACE_THEME, BUNDLED_THEME ].includes( themeType )
 	) {
 		return `/setup/site-setup/designSetup?siteSlug=${ siteSlug }`;
 	}
 
-	if ( 'dot-org' === themeType ) {
+	if ( DOT_ORG_THEME === themeType ) {
 		return `/marketplace/theme/${ themeParameter }/install/${ siteSlug }`;
 	}
 
-	const style = styleVariation ? `&style=${ styleVariation }` : '';
+	const style = styleVariation ? `&styleVariation=${ styleVariation }` : '';
+
+	if ( [ MARKETPLACE_THEME, PREMIUM_THEME, BUNDLED_THEME ].includes( themeType ) ) {
+		return `/marketplace/thank-you/${ siteSlug }?onboarding=&themes=${ themeParameter }${ style }`;
+	}
 
 	return `/setup/site-setup/designSetup?siteSlug=${ siteSlug }&theme=${ themeParameter }${ style }`;
+}
+
+function getWithPluginDestination( { siteSlug, pluginParameter, pluginBillingPeriod } ) {
+	// send to the thank you page when find a billing period (marketplace)
+	if ( pluginBillingPeriod ) {
+		return `/marketplace/thank-you/${ siteSlug }?plugins=${ pluginParameter }`;
+	}
+
+	// otherwise send to installation page
+	return `/marketplace/plugin/${ pluginParameter }/install/${ siteSlug }`;
 }
 
 function getEditorDestination( dependencies ) {
@@ -189,18 +251,72 @@ function getDIFMSiteContentCollectionDestination( { siteSlug } ) {
 	return `/home/${ siteSlug }`;
 }
 
-function getHostingFlowDestination( { siteId } ) {
-	return addQueryArgs(
-		{
-			'new-site': siteId,
-			'hosting-flow': isEnabled( 'hosting-onboarding-i2' ) ? true : null,
-		},
-		'/sites'
-	);
+function getHostingFlowDestination( { stepperHostingFlow } ) {
+	return `/setup/${ stepperHostingFlow }`;
+}
+
+function getEntrepreneurFlowDestination( { redirect_to } ) {
+	return redirect_to || '/setup/entrepreneur/trialAcknowledge';
+}
+
+function getGuidedOnboardingFlowDestination( dependencies ) {
+	const { onboardingSegment, siteSlug, siteId, domainItem, cartItems, refParameter } = dependencies;
+
+	if ( ! onboardingSegment ) {
+		return getSignupDestination( dependencies );
+	}
+
+	if ( 'no-site' === siteSlug ) {
+		return '/home';
+	}
+
+	let queryParams = { siteSlug, siteId };
+
+	if ( domainItem ) {
+		queryParams = { siteId };
+	}
+
+	if ( refParameter ) {
+		queryParams.ref = refParameter;
+	}
+
+	const planSlug = getPlanCartItem( cartItems )?.product_slug;
+	const planType = getPlan( planSlug )?.type;
+
+	// Blog and Merchant setup without Entrepreneur/Ecommerce Plan
+	if (
+		( onboardingSegment === 'blogger' || onboardingSegment === 'merchant' ) &&
+		planType !== TYPE_ECOMMERCE
+	) {
+		return addQueryArgs( queryParams, `/setup/site-setup-wg/options` );
+	}
+
+	// Not Blog, Merchant, nor Developer/Agency without Entrepreneur/Ecommerce Plan
+	if (
+		onboardingSegment !== 'blogger' &&
+		onboardingSegment !== 'merchant' &&
+		onboardingSegment !== 'developer-or-agency' &&
+		planType !== TYPE_ECOMMERCE
+	) {
+		return addQueryArgs( queryParams, `/setup/site-setup-wg/design-choices` );
+	}
+
+	// Entrepreneur/Ecommerce Plan
+	if ( planType === TYPE_ECOMMERCE ) {
+		return `/checkout/thank-you/${ siteSlug }`;
+	}
+
+	// Developer or Agency with Creator/Business Plan
+	if ( onboardingSegment === 'developer-or-agency' && planType === TYPE_BUSINESS ) {
+		queryParams.initiate_transfer_context = 'guided';
+		queryParams.redirect_to = `/home/${ siteSlug }`;
+		return addQueryArgs( queryParams, '/setup/transferring-hosted-site' );
+	}
+
+	return addQueryArgs( queryParams, `/setup/site-setup-wg/design-choices` );
 }
 
 const flows = generateFlows( {
-	getSiteDestination,
 	getRedirectDestination,
 	getSignupDestination,
 	getLaunchDestination,
@@ -208,11 +324,14 @@ const flows = generateFlows( {
 	getEmailSignupFlowDestination,
 	getChecklistThemeDestination,
 	getWithThemeDestination,
+	getWithPluginDestination,
 	getEditorDestination,
 	getDestinationFromIntent,
 	getDIFMSignupDestination,
 	getDIFMSiteContentCollectionDestination,
 	getHostingFlowDestination,
+	getEntrepreneurFlowDestination,
+	getGuidedOnboardingFlowDestination,
 } );
 
 function removeUserStepFromFlow( flow ) {
@@ -238,8 +357,16 @@ function removeP2DetailsStepFromFlow( flow ) {
 }
 
 function filterDestination( destination, dependencies, flowName, localeSlug ) {
+	// Check for site slug before heading to checkout.
+	// Sometimes, previous visits to the signup flow will have cart items leftovers.
+	// In this case, redirecting to checkout would be incorrect, and it would redirect to /checkout/undefined.
+	// If a flow wants us to go to checkout, it will have `siteSlug` set.
+	if ( ! dependencies.siteSlug ) {
+		return destination;
+	}
+
 	if ( dependenciesContainCartItem( dependencies ) ) {
-		return getCheckoutUrl( dependencies, localeSlug, flowName );
+		return getCheckoutUrl( dependencies, localeSlug, flowName, destination );
 	}
 
 	return destination;
@@ -259,7 +386,6 @@ const Flows = {
 	 * Get certain flow from the flows configuration.
 	 *
 	 * The returned flow is modified according to several filters.
-	 *
 	 * @typedef {import('../types').Flow} Flow
 	 * @param {string} flowName The name of the flow to return
 	 * @param {boolean} isUserLoggedIn Whether the user is logged in
@@ -274,14 +400,10 @@ const Flows = {
 		}
 
 		if ( isUserLoggedIn ) {
-			const urlParams = new URLSearchParams( window.location.search );
-			const param = urlParams.get( 'user_completed' );
 			const isUserStepOnly = flow.steps.length === 1 && stepConfig[ flow.steps[ 0 ] ].providesToken;
 
-			// Remove the user step unless the user has just completed the step
-			// and then clicked the back button.
-			// If the user step is the only step in the whole flow, e.g. /start/account, don't remove it as well.
-			if ( ! param && ! detectHistoryNavigation.loadedViaHistory() && ! isUserStepOnly ) {
+			// Remove the user step unless it is the only step in the whole flow, e.g., `/start/account`
+			if ( ! isUserStepOnly ) {
 				flow = removeUserStepFromFlow( flow );
 			}
 		}
@@ -311,7 +433,6 @@ const Flows = {
 	 * Make `getFlow()` call to exclude the given steps.
 	 * The main usage at the moment is to serve as a quick solution to remove steps that have been pre-fulfilled
 	 * without explicit user inputs, e.g. query arguments.
-	 *
 	 * @param {string} step Name of the step to be excluded.
 	 */
 	excludeStep( step ) {

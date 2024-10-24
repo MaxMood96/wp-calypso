@@ -1,7 +1,8 @@
+import { PlanPrice } from '@automattic/components';
 import formatCurrency from '@automattic/format-currency';
 import { TranslateResult } from 'i18n-calypso';
+import { isNumber } from 'lodash';
 import InfoPopover from 'calypso/components/info-popover';
-import PlanPrice from 'calypso/my-sites/plan-price';
 import PriceAriaLabel from './price-aria-label';
 import TimeFrame from './time-frame';
 import type { Duration } from 'calypso/my-sites/plans/jetpack-plans/types';
@@ -19,6 +20,9 @@ type OwnProps = {
 	displayFrom?: boolean;
 	tooltipText?: TranslateResult | ReactNode;
 	expiryDate?: Moment;
+	displayPriceText?: TranslateResult | null;
+	customTimeFrameSavings?: ReactNode;
+	customTimeFrameBillingTerms?: ReactNode;
 };
 
 const Placeholder: React.FC< OwnProps > = ( { billingTerm, expiryDate, discountedPrice } ) => {
@@ -30,7 +34,9 @@ const Placeholder: React.FC< OwnProps > = ( { billingTerm, expiryDate, discounte
 				rawPrice={ 0.01 }
 				currencyCode="USD"
 			/>
-			{ discountedPrice && <PlanPrice discounted rawPrice={ 0.01 } currencyCode="USD" /> }
+			{ isNumber( discountedPrice ) && (
+				<PlanPrice discounted rawPrice={ 0.01 } currencyCode="USD" />
+			) }
 			<TimeFrame expiryDate={ expiryDate } billingTerm={ billingTerm } />
 		</>
 	);
@@ -95,9 +101,15 @@ const Paid: React.FC< OwnProps > = ( props ) => {
 		currencyCode,
 		displayFrom,
 		tooltipText,
+		displayPriceText,
+		customTimeFrameSavings,
+		customTimeFrameBillingTerms,
 	} = props;
-	const finalPrice = ( discountedPrice ?? originalPrice ) as number;
-	const isDiscounted = !! ( finalPrice && originalPrice && finalPrice < originalPrice );
+	const finalPrice = ( isNumber( discountedPrice ) ? discountedPrice : originalPrice ) as number;
+	const isDiscounted = !! ( isNumber( finalPrice ) && originalPrice && finalPrice < originalPrice );
+	const discountPercentage = isDiscounted
+		? Math.floor( ( ( originalPrice - finalPrice ) / originalPrice ) * 100 )
+		: 0;
 
 	// Placeholder (while prices are loading)
 	if ( ! currencyCode || ! originalPrice || pricesAreFetching ) {
@@ -114,6 +126,15 @@ const Paid: React.FC< OwnProps > = ( props ) => {
 		<OriginalPrice { ...props } finalPrice={ finalPrice } />
 	);
 
+	// If the price is varied, we'll show the cost with a preset string.
+	if ( displayPriceText ) {
+		priceComponent = (
+			<span className="display-price__varied-card-price">
+				<PlanPrice productDisplayPrice={ displayPriceText } />
+			</span>
+		);
+	}
+
 	// If the pricing has a limited discount duration, the original price is handled in the duration string
 	// In this case, we'll just show the final price and not the crossed-out price.
 	if ( discountedPriceDuration ) {
@@ -128,6 +149,7 @@ const Paid: React.FC< OwnProps > = ( props ) => {
 		<>
 			<PriceAriaLabel
 				{ ...props }
+				discountPercentage={ discountPercentage }
 				currencyCode={ currencyCode }
 				finalPrice={ finalPrice }
 				isDiscounted={ isDiscounted }
@@ -142,14 +164,24 @@ const Paid: React.FC< OwnProps > = ( props ) => {
 					{ tooltipText }
 				</InfoPopover>
 			) }
-			<span className="display-price__details" aria-hidden="true">
-				<TimeFrame
-					billingTerm={ billingTerm }
-					discountedPriceDuration={ discountedPriceDuration }
-					formattedOriginalPrice={ formattedOriginalPrice }
-					isDiscounted={ isDiscounted }
-				/>
-			</span>
+			{ ! displayPriceText && (
+				<>
+					<span className="display-price__details" aria-hidden="true">
+						{ ! customTimeFrameBillingTerms && (
+							<TimeFrame
+								billingTerm={ billingTerm }
+								discountedPriceDuration={ discountedPriceDuration }
+								discountPercentage={ discountPercentage }
+								formattedOriginalPrice={ formattedOriginalPrice }
+								isDiscounted={ isDiscounted }
+								finalPrice={ finalPrice }
+							/>
+						) }
+						{ customTimeFrameSavings && customTimeFrameSavings }
+					</span>
+					{ customTimeFrameBillingTerms && customTimeFrameBillingTerms }
+				</>
+			) }
 		</>
 	);
 };

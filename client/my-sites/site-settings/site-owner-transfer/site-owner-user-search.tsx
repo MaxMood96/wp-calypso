@@ -1,17 +1,26 @@
-import { Button, Gridicon } from '@automattic/components';
+import { Button, FormLabel, Gridicon } from '@automattic/components';
 import styled from '@emotion/styled';
-import { TextControl } from '@wordpress/components';
+import { Icon, check } from '@wordpress/icons';
 import { useTranslate } from 'i18n-calypso';
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, ChangeEvent } from 'react';
+import FormFieldset from 'calypso/components/forms/form-fieldset';
+import FormTextInput from 'calypso/components/forms/form-text-input';
+import useUsersQuery from 'calypso/data/users/use-users-query';
+import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
+import TeamMembersSiteTransfer from 'calypso/my-sites/people/team-members-site-transfer';
 import { useCheckSiteTransferEligibility } from './use-check-site-transfer-eligibility';
+import type { UsersQuery } from '@automattic/data-stores';
 
-const TextControlContainer = styled.div( {
-	marginBottom: '2em',
-	label: {
-		textTransform: 'none',
-		fontSize: '100%',
-		color: 'black',
-	},
+const Strong = styled( 'strong' )( {
+	fontWeight: 500,
+} );
+
+const FormText = styled( 'p' )( {
+	fontSize: '14px',
+} );
+
+const ButtonStyled = styled( Button )( {
+	marginBottom: '1.5em',
 } );
 
 const Error = styled.div( {
@@ -26,79 +35,129 @@ const ErrorText = styled.p( {
 	fontSize: '100%',
 } );
 
+const FieldExplanation = styled.p( {
+	color: 'var(--studio-gray-50)',
+} );
+
 const SiteOwnerTransferEligibility = ( {
 	siteId,
 	siteSlug,
-	siteOwner,
 	onNewUserOwnerSubmit,
 }: {
 	siteId: number;
 	siteSlug: string;
-	siteOwner: string;
 	onNewUserOwnerSubmit: ( user: string ) => void;
 } ) => {
 	const translate = useTranslate();
-	const [ tempSiteOwner, setTempSiteOwner ] = useState( siteOwner );
+	const [ tempSiteOwner, setTempSiteOwner ] = useState< string >( '' );
 	const [ siteTransferEligibilityError, setSiteTransferEligibilityError ] = useState( '' );
+	const usersQuery = useUsersQuery( siteId, {
+		search: `*${ tempSiteOwner }*`,
+		search_columns: [ 'display_name', 'user_login', 'user_email' ],
+		include_viewers: false,
+	} ) as unknown as UsersQuery;
+	const usersFound = ( usersQuery?.data?.users?.length ?? 0 ) > 0;
 
-	const { checkSiteTransferEligibility, isLoading: isCheckingSiteTransferEligibility } =
+	const { checkSiteTransferEligibility, isPending: isCheckingSiteTransferEligibility } =
 		useCheckSiteTransferEligibility( siteId, {
 			onMutate: () => {
 				setSiteTransferEligibilityError( '' );
 			},
 			onError: ( e ) => {
 				setSiteTransferEligibilityError( e.message );
+				recordTracksEvent( 'calypso_site_owner_transfer_eligibility_error', {
+					message: e.message,
+				} );
 			},
 			onSuccess: () => {
-				onNewUserOwnerSubmit?.( tempSiteOwner || '' );
+				if ( ! tempSiteOwner ) {
+					return;
+				}
+				onNewUserOwnerSubmit?.( tempSiteOwner );
 			},
 		} );
-
-	useEffect( () => {
-		setTempSiteOwner( siteOwner );
-	}, [ siteOwner ] );
 
 	const handleFormSubmit = ( event: FormEvent< HTMLFormElement > ) => {
 		event.preventDefault();
 		if ( ! tempSiteOwner ) {
 			return;
 		}
+
+		recordTracksEvent( 'calypso_site_owner_transfer_eligibility_submit', {
+			temp_site_owner: tempSiteOwner,
+		} );
 		checkSiteTransferEligibility( { newSiteOwner: tempSiteOwner } );
 	};
 
+	function onUserClick( userLogin: string ) {
+		onRecipientChange( userLogin );
+		checkSiteTransferEligibility( { newSiteOwner: userLogin } );
+	}
+
+	function onRecipientChange( recipient: string ) {
+		const value = recipient.trim();
+		setTempSiteOwner( value );
+	}
+	const recipientError = false;
+
 	return (
 		<form onSubmit={ handleFormSubmit }>
-			<p>
+			<FormText>
 				{ translate(
-					'Please enter the username or email address of the registered WordPress.com user that you want to transfer ownership of {{strong}}%(siteSlug)s{{/strong}} to:',
+					"Ready to transfer {{strong}}%(siteSlug)s{{/strong}} and its associated purchases? Simply enter the new owner's email or WordPress.com username below, or choose an existing user to start the transfer process.",
 					{
 						args: { siteSlug },
-						components: { strong: <strong /> },
+						components: { strong: <Strong /> },
 					}
 				) }
-			</p>
-			<TextControlContainer>
-				<TextControl
-					autoComplete="off"
-					label={ translate( 'Username or email address' ) }
+			</FormText>
+
+			<FormFieldset>
+				<FormLabel>{ translate( 'Email or WordPress.com username' ) }</FormLabel>
+				<FormTextInput
+					id="recipient"
+					name="recipient"
 					value={ tempSiteOwner }
-					onChange={ ( value ) => setTempSiteOwner( value ) }
+					isError={ recipientError }
+					placeholder="@"
+					onChange={ ( e: ChangeEvent< HTMLInputElement > ) => onRecipientChange( e.target.value ) }
 				/>
+				{ recipientError && (
+					<div className="form-validation-icon">
+						<Icon icon={ check } />
+					</div>
+				) }
 				{ siteTransferEligibilityError && (
 					<Error>
 						<Gridicon icon="notice-outline" size={ 16 } />
 						<ErrorText>{ siteTransferEligibilityError }</ErrorText>
 					</Error>
 				) }
-			</TextControlContainer>
-			<Button
+			</FormFieldset>
+			{ ! usersFound && (
+				<FieldExplanation>
+					{ translate(
+						"If the new owner isn't on WordPress.com yet, we'll guide them through a simple sign-up process."
+					) }
+				</FieldExplanation>
+			) }
+
+			{ tempSiteOwner && usersFound && (
+				<TeamMembersSiteTransfer
+					search={ tempSiteOwner }
+					usersQuery={ usersQuery }
+					onClick={ ( userLogin: string ) => onUserClick( userLogin ) }
+				/>
+			) }
+
+			<ButtonStyled
 				busy={ isCheckingSiteTransferEligibility }
 				primary
 				disabled={ ! tempSiteOwner || isCheckingSiteTransferEligibility }
 				type="submit"
 			>
-				{ translate( 'Search user and continue' ) }
-			</Button>
+				{ translate( 'Continue' ) }
+			</ButtonStyled>
 		</form>
 	);
 };

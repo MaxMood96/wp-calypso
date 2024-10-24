@@ -30,7 +30,29 @@ export enum LicenseType {
 	Partner = 'jetpack_partner_key',
 }
 
+export enum LicenseRole {
+	Parent = 'parent',
+	Child = 'child',
+	Single = 'single',
+}
+
 export interface AssignLicenceProps {
 	selectedSite?: SiteDetails | null;
 	suggestedProduct?: string;
+	quantity?: number;
+}
+
+export interface LicenseAction {
+	name: string;
+	isEnabled: boolean;
+	href?: string;
+	onClick: () => void;
+	type?: string;
+	isExternalLink?: boolean;
+	className?: string;
+}
+
+export interface SetAsPrimaryCardProps {
+	paymentMethodId: string;
+	useAsPrimaryPaymentMethod: boolean;
 }

@@ -1,4 +1,3 @@
-import { difference } from 'lodash';
 import { STATS_CHART_COUNTS_REQUEST } from 'calypso/state/action-types';
 import { registerHandlers } from 'calypso/state/data-layer/handler-registry';
 import { http } from 'calypso/state/data-layer/wpcom-http/actions';
@@ -9,7 +8,8 @@ import fromApi from './from-api';
 export const fetch = ( action ) => {
 	const { chartTab, date, period, quantity, siteId, statFields } = action;
 	const currentTabFields = chartTab === 'views' ? [ 'views', 'visitors' ] : [ chartTab ];
-	const otherTabFields = difference( statFields, currentTabFields );
+	const otherTabFields =
+		statFields?.filter( ( field ) => ! currentTabFields.includes( field ) ) ?? [];
 
 	return [
 		http(
@@ -43,7 +43,8 @@ export const fetch = ( action ) => {
 	];
 };
 
-export const onSuccess = ( { siteId, period }, data ) => receiveChartCounts( siteId, period, data );
+export const onSuccess = ( { siteId, period, date, quantity }, data ) =>
+	receiveChartCounts( siteId, date, period, quantity, data );
 
 registerHandlers( 'state/data-layer/wpcom/sites/stats/visits/index.js', {
 	[ STATS_CHART_COUNTS_REQUEST ]: [

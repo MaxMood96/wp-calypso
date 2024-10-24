@@ -14,9 +14,9 @@ export type SidebarProps = {
 };
 
 export type HeaderProps = {
-	name: string;
-	date: Date | number;
-	screenName: string;
+	name?: string;
+	date?: Date | number;
+	screenName?: string;
 };
 
 export type MediaProps = {
@@ -35,4 +35,4 @@ export type TextProps = {
 
 export type TwitterPreviewProps = SidebarProps &
 	HeaderProps &
-	Partial< MediaProps & QuoteTweetProps & TwitterCardProps & Pick< TextProps, 'text' > >;
+	Partial< QuoteTweetProps & TwitterCardProps & Pick< TextProps, 'text' > >;

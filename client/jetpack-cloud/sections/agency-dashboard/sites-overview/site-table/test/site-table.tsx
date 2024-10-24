@@ -9,7 +9,7 @@ import nock from 'nock';
 import React from 'react';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
-import { siteColumns } from '../../utils';
+import { urlToSlug } from 'calypso/lib/url/http-utils';
 import SiteTable from '../index';
 import type { SiteData } from '../../types';
 
@@ -17,6 +17,8 @@ jest.mock(
 	'calypso/jetpack-cloud/sections/agency-dashboard/sites-overview/site-backup-staging',
 	() => 'span'
 );
+
+jest.mock( 'calypso/components/data/query-reader-teams', () => 'span' );
 
 describe( '<SiteTable>', () => {
 	beforeAll( () => {
@@ -117,7 +119,41 @@ describe( '<SiteTable>', () => {
 	const props = {
 		items,
 		isLoading: false,
-		columns: siteColumns,
+		columns: [
+			{
+				key: 'site',
+				title: 'Site',
+				isSortable: true,
+			},
+			{
+				key: 'stats',
+				title: 'Stats',
+				className: 'width-fit-content',
+				isExpandable: true,
+			},
+			{
+				key: 'backup',
+				title: 'Backup',
+				className: 'fixed-site-column',
+				isExpandable: true,
+			},
+			{
+				key: 'scan',
+				title: 'Scan',
+				className: 'fixed-site-column',
+			},
+			{
+				key: 'monitor',
+				title: 'Monitor',
+				className: 'min-width-100px',
+				isExpandable: true,
+			},
+			{
+				key: 'plugin',
+				title: 'Plugins',
+				className: 'width-fit-content',
+			},
+		],
 	};
 	const initialState = {
 		partnerPortal: {
@@ -130,6 +166,7 @@ describe( '<SiteTable>', () => {
 				[ blogId ]: siteObj,
 			},
 		},
+		a8cForAgencies: { agencies: {} },
 	};
 	const mockStore = configureStore();
 	const store = mockStore( initialState );
@@ -145,16 +182,16 @@ describe( '<SiteTable>', () => {
 		);
 
 		const backupEle = getByTestId( `row-${ blogId }-backup` );
-		expect( backupEle.getAttribute( 'href' ) ).toEqual( `/backup/${ siteUrl }` );
+		expect( backupEle.getAttribute( 'href' ) ).toEqual( `/backup/${ urlToSlug( siteUrl ) }` );
 		expect( getByText( /failed/i ) ).toBeInTheDocument();
 
 		const scanEle = getByTestId( `row-${ blogId }-scan` );
-		expect( scanEle.getAttribute( 'href' ) ).toEqual( `/scan/${ siteUrl }` );
+		expect( scanEle.getAttribute( 'href' ) ).toEqual( `/scan/${ urlToSlug( siteUrl ) }` );
 		expect( getByText( `${ scanThreats } Threats` ) ).toBeInTheDocument();
 
 		const pluginEle = getByTestId( `row-${ blogId }-plugin` );
 		expect( pluginEle.getAttribute( 'href' ) ).toEqual(
-			`https://wordpress.com/plugins/updates/${ siteUrl }`
+			`${ siteObj.url_with_scheme }/wp-admin/plugins.php`
 		);
 		expect( getByText( `${ pluginUpdates.length } Available` ) ).toBeInTheDocument();
 	} );

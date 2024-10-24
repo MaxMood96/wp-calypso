@@ -1,6 +1,6 @@
 import { useCallback } from '@wordpress/element';
-import { useDispatch as useRootDispatch, useSelector } from 'react-redux';
 import { useSite } from 'calypso/landing/stepper/hooks/use-site';
+import { useDispatch as useRootDispatch, useSelector } from 'calypso/state';
 import { requestSiteChecklist } from 'calypso/state/checklist/actions';
 import getSiteChecklist from 'calypso/state/selectors/get-site-checklist';
 
@@ -10,9 +10,7 @@ import getSiteChecklist from 'calypso/state/selectors/get-site-checklist';
 export function useAtomicSiteChecklist() {
 	const dispatch = useRootDispatch();
 	const siteId = useSite()?.ID || '';
-	const { siteChecklist } = useSelector( ( state ) => ( {
-		siteChecklist: getSiteChecklist( state, Number( siteId ) ),
-	} ) );
+	const siteChecklist = useSelector( ( state ) => getSiteChecklist( state, Number( siteId ) ) );
 
 	const requestChecklist = useCallback(
 		() => dispatch( requestSiteChecklist( siteId.toString() ) ),

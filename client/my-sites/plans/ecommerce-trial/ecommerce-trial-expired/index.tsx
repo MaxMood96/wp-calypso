@@ -1,20 +1,23 @@
 import { recordTracksEvent } from '@automattic/calypso-analytics';
 import { PLAN_ECOMMERCE_TRIAL_MONTHLY } from '@automattic/calypso-products';
+import page from '@automattic/calypso-router';
 import { Button, Gridicon } from '@automattic/components';
+import { Spinner } from '@wordpress/components';
 import { useTranslate } from 'i18n-calypso';
-import { useCallback, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
-import QueryPlans from 'calypso/components/data/query-plans';
+import React, { useCallback, useMemo, useState } from 'react';
+import QuerySitePlans from 'calypso/components/data/query-site-plans';
 import QuerySitePurchases from 'calypso/components/data/query-site-purchases';
 import Main from 'calypso/components/main';
 import BodySectionCssClass from 'calypso/layout/body-section-css-class';
 import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
 import { WooExpressPlans } from 'calypso/my-sites/plans/ecommerce-trial/wooexpress-plans';
+import { useSelector } from 'calypso/state';
 import { getSitePurchases } from 'calypso/state/purchases/selectors';
 import isSiteAutomatedTransfer from 'calypso/state/selectors/is-site-automated-transfer';
-import { getSelectedSite } from 'calypso/state/ui/selectors';
-
+import { getSelectedPurchase, getSelectedSite } from 'calypso/state/ui/selectors';
 import './style.scss';
+import useOneDollarOfferTrack from '../../hooks/use-onedollar-offer-track';
+import { EntrepreneurPlan } from '../entrepreneur-plan/entrepreneur-plan';
 
 const ECommerceTrialExpired = (): JSX.Element => {
 	const translate = useTranslate();
@@ -23,12 +26,15 @@ const ECommerceTrialExpired = (): JSX.Element => {
 	const siteSlug = selectedSite?.slug ?? null;
 	const sitePurchases = useSelector( ( state ) => getSitePurchases( state, siteId ) );
 	const siteIsAtomic = useSelector( ( state ) => isSiteAutomatedTransfer( state, siteId ) );
+	const purchase = useSelector( getSelectedPurchase );
 
 	const nonECommerceTrialPurchases = useMemo(
 		() =>
 			sitePurchases.filter( ( purchase ) => purchase.productSlug !== PLAN_ECOMMERCE_TRIAL_MONTHLY ),
 		[ sitePurchases ]
 	);
+
+	useOneDollarOfferTrack( siteId, 'trialexpired' );
 
 	const [ interval, setInterval ] = useState( 'monthly' as 'monthly' | 'yearly' );
 
@@ -55,11 +61,29 @@ const ECommerceTrialExpired = (): JSX.Element => {
 		siteIsAtomic && selectedSite?.URL
 			? `${ selectedSite.URL }/wp-admin/export.php`
 			: `/export/${ siteSlug }`;
+	const settingsDeleteSiteUrl = `/settings/delete-site/${ siteSlug }`;
+
+	const onDeleteClick = useCallback(
+		( e: React.MouseEvent< HTMLButtonElement > ) => {
+			e.preventDefault();
+
+			recordTracksEvent( 'calypso_plan_trial_expired_page_delete_site', {
+				site_slug: siteSlug,
+				trial_type: 'ecommerce',
+			} );
+			page.redirect( settingsDeleteSiteUrl );
+		},
+		[ page, recordTracksEvent, settingsDeleteSiteUrl ]
+	);
+
+	const isWooExpressTrial = purchase?.isWooExpressTrial;
+	const isEntrepreneurTrial = purchase?.isWooExpressTrial === false;
 
 	return (
 		<>
-			<QueryPlans />
 			{ siteId && <QuerySitePurchases siteId={ siteId } /> }
+			{ siteId && <QuerySitePlans siteId={ siteId } /> }
+
 			<BodySectionCssClass bodyClass={ [ 'is-expired-ecommerce-trial-plan' ] } />
 			<Main wideLayout>
 				<PageViewTracker
@@ -87,22 +111,28 @@ const ECommerceTrialExpired = (): JSX.Element => {
 						) }
 					</div>
 				</div>
-				<WooExpressPlans
-					interval={ interval }
-					monthlyControlProps={ monthlyControlProps }
-					siteId={ siteId ?? 0 }
-					siteSlug={ siteSlug ?? '' }
-					triggerTracksEvent={ triggerPlansGridTracksEvent }
-					yearlyControlProps={ yearlyControlProps }
-					showIntervalToggle={ true }
-				/>
+				{ isWooExpressTrial && (
+					<WooExpressPlans
+						interval={ interval }
+						monthlyControlProps={ monthlyControlProps }
+						siteId={ siteId ?? 0 }
+						siteSlug={ siteSlug ?? '' }
+						triggerTracksEvent={ triggerPlansGridTracksEvent }
+						yearlyControlProps={ yearlyControlProps }
+						showIntervalToggle
+					/>
+				) }
+				{ isEntrepreneurTrial && <EntrepreneurPlan hideTrialIncluded /> }
+				{ ! isWooExpressTrial && ! isEntrepreneurTrial && (
+					<Spinner className="ecommerce-trial-expired__spinner" />
+				) }
 
 				<div className="ecommerce-trial-expired__footer">
 					<Button href={ exportUrl }>
 						<Gridicon icon="cloud-download" />
 						<span>{ translate( 'Export your content' ) }</span>
 					</Button>
-					<Button href={ `/settings/delete-site/${ siteSlug }` } scary>
+					<Button href={ settingsDeleteSiteUrl } onClick={ onDeleteClick } scary>
 						<Gridicon icon="trash" />
 						<span>{ translate( 'Delete your site permanently' ) }</span>
 					</Button>

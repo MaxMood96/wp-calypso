@@ -1,11 +1,11 @@
+import page from '@automattic/calypso-router';
 import { Dialog, Gridicon } from '@automattic/components';
 import { WpcomPlansUI } from '@automattic/data-stores';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { useCallback } from '@wordpress/element';
 import { useTranslate } from 'i18n-calypso';
-import page from 'page';
-import { useSelector } from 'react-redux';
-import { recordTracksEvent } from 'calypso/state/analytics/actions';
+import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
+import { useSelector } from 'calypso/state';
 import { getSiteSlug } from 'calypso/state/sites/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 import './style.scss';
@@ -52,7 +52,7 @@ const DomainUpsellDialog: React.FunctionComponent< {
 			isVisible={ isVisible }
 			buttons={ buttons }
 			onClose={ onCloseDialog }
-			shouldCloseOnEsc={ true }
+			shouldCloseOnEsc
 		>
 			<header className="domain-upsell-dialog__modal-header">
 				<button onClick={ onCloseDialog }>

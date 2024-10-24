@@ -1,27 +1,19 @@
 import { WordPressWordmark } from '@automattic/components';
 import { checkoutTheme, CheckoutModal } from '@automattic/composite-checkout';
-import { HelpCenter } from '@automattic/data-stores';
-import { HelpIcon } from '@automattic/help-center';
 import { useShoppingCart } from '@automattic/shopping-cart';
 import { ThemeProvider } from '@emotion/react';
-import {
-	useSelect as useDataStoreSelect,
-	useDispatch as useDataStoreDispatch,
-} from '@wordpress/data';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
 import { useState } from 'react';
 import AkismetLogo from 'calypso/components/akismet-logo';
 import JetpackLogo from 'calypso/components/jetpack-logo';
 import CalypsoShoppingCartProvider from 'calypso/my-sites/checkout/calypso-shopping-cart-provider';
-import useValidCheckoutBackUrl from 'calypso/my-sites/checkout/composite-checkout/hooks/use-valid-checkout-back-url';
-import { leaveCheckout } from 'calypso/my-sites/checkout/composite-checkout/lib/leave-checkout';
+import { DefaultMasterbarContact } from 'calypso/my-sites/checkout/checkout-thank-you/redesign-v2/masterbar-styled/default-contact';
+import useValidCheckoutBackUrl from 'calypso/my-sites/checkout/src/hooks/use-valid-checkout-back-url';
+import { leaveCheckout } from 'calypso/my-sites/checkout/src/lib/leave-checkout';
 import useCartKey from 'calypso/my-sites/checkout/use-cart-key';
 import Item from './item';
 import Masterbar from './masterbar';
-import type { HelpCenterSelect } from '@automattic/data-stores';
-
-const HELP_CENTER_STORE = HelpCenter.register();
 
 interface Props {
 	title: string;
@@ -29,6 +21,7 @@ interface Props {
 	previousPath?: string;
 	siteSlug?: string;
 	isLeavingAllowed?: boolean;
+	shouldClearCartWhenLeaving?: boolean;
 	loadHelpCenterIcon?: boolean;
 }
 
@@ -38,6 +31,7 @@ const CheckoutMasterbar = ( {
 	previousPath,
 	siteSlug,
 	isLeavingAllowed,
+	shouldClearCartWhenLeaving,
 	loadHelpCenterIcon,
 }: Props ) => {
 	const translate = useTranslate();
@@ -59,12 +53,6 @@ const CheckoutMasterbar = ( {
 	const cartKey = useCartKey();
 	const { responseCart, replaceProductsInCart } = useShoppingCart( cartKey );
 	const [ isModalVisible, setIsModalVisible ] = useState( false );
-	const { setShowHelpCenter } = useDataStoreDispatch( HELP_CENTER_STORE );
-
-	const isShowingHelpCenter = useDataStoreSelect(
-		( select ) => ( select( HELP_CENTER_STORE ) as HelpCenterSelect ).isHelpCenterShown(),
-		[]
-	);
 
 	const closeAndLeave = () =>
 		leaveCheckout( {
@@ -75,7 +63,7 @@ const CheckoutMasterbar = ( {
 		} );
 
 	const clickClose = () => {
-		if ( responseCart.products.length > 0 ) {
+		if ( shouldClearCartWhenLeaving && responseCart.products.length > 0 ) {
 			setIsModalVisible( true );
 			return;
 		}
@@ -97,7 +85,7 @@ const CheckoutMasterbar = ( {
 
 	return (
 		<Masterbar
-			className={ classnames( 'masterbar--is-checkout', {
+			className={ clsx( 'masterbar--is-checkout', {
 				'masterbar--is-jetpack': checkoutType === 'jetpack',
 				'masterbar--is-akismet': checkoutType === 'akismet',
 			} ) }
@@ -112,7 +100,9 @@ const CheckoutMasterbar = ( {
 						tipTarget="close"
 					/>
 				) }
-				{ checkoutType === 'wpcom' && <WordPressWordmark className="masterbar__wpcom-wordmark" /> }
+				{ checkoutType === 'wpcom' && (
+					<WordPressWordmark className="masterbar__wpcom-wordmark" color="#2c3338" />
+				) }
 				{ checkoutType === 'jetpack' && (
 					<JetpackLogo className="masterbar__jetpack-wordmark" full />
 				) }
@@ -120,17 +110,7 @@ const CheckoutMasterbar = ( {
 				<span className="masterbar__secure-checkout-text">{ translate( 'Secure checkout' ) }</span>
 			</div>
 			{ title && <Item className="masterbar__item-title">{ title }</Item> }
-			{ loadHelpCenterIcon && (
-				<Item
-					onClick={ () => setShowHelpCenter( ! isShowingHelpCenter ) }
-					className={ classnames( 'masterbar__item-help', {
-						'is-active': isShowingHelpCenter,
-					} ) }
-					icon={ <HelpIcon /> }
-				>
-					{ translate( 'Help' ) }
-				</Item>
-			) }
+			{ loadHelpCenterIcon && <DefaultMasterbarContact /> }
 			<CheckoutModal
 				title={ modalTitleText }
 				copy={ modalBodyText }

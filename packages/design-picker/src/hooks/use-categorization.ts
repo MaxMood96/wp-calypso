@@ -57,28 +57,17 @@ export function useCategorization(
 
 export function useCategorizationFromApi(
 	categoryMap: Record< string, Category >,
-	{ defaultSelection }: UseCategorizationOptions
+	{ defaultSelection, sort }: UseCategorizationOptions
 ): Categorization {
-	const { __ } = useI18n();
-
 	const categories = useMemo( () => {
 		const categoryMapKeys = Object.keys( categoryMap ) || [];
-		const hasCategories = !! categoryMapKeys.length;
-
 		const result = categoryMapKeys.map( ( slug ) => ( {
 			...categoryMap[ slug ],
 			slug,
 		} ) );
 
-		if ( hasCategories ) {
-			result.unshift( {
-				name: __( 'Show All', __i18n_text_domain__ ),
-				slug: SHOW_ALL_SLUG,
-			} );
-		}
-
-		return result;
-	}, [ categoryMap, __ ] );
+		return result.sort( sort );
+	}, [ categoryMap ] );
 
 	const [ selection, onSelect ] = useState< string | null >(
 		chooseDefaultSelection( categories, defaultSelection )
@@ -100,7 +89,6 @@ export function useCategorizationFromApi(
 /**
  *	Check that the current selection still matches one of the category slugs,
  *	and if it doesn't reset the current selection to the default selection.
- *
  *	@param categories the list of available categories
  *	@param currentSelection the slug of the current selected category
  *	@returns whether the current selection should be set to the default selection
@@ -109,14 +97,17 @@ function shouldSetToDefaultSelection(
 	categories: Category[],
 	currentSelection: string | null
 ): boolean {
-	return ! categories.find( ( { slug } ) => slug === currentSelection );
+	// For an empty list, `null` selection is the only correct one.
+	if ( categories.length === 0 && currentSelection === null ) {
+		return false;
+	}
+	return ! categories.some( ( { slug } ) => slug === currentSelection );
 }
 
 /**
  * Chooses which category is the one that should be used by default.
  * If `defaultSelection` is a valid category slug then it'll be used, otherwise it'll be whichever
  * category appears first in the list.
- *
  * @param categories the categories from which the default will be selected
  * @param defaultSelection use this category as the default selection if possible
  * @returns the default category or null if none is available

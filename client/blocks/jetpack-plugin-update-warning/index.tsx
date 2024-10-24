@@ -1,10 +1,10 @@
 import { useTranslate } from 'i18n-calypso';
 import { FC, useCallback, useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import ExternalLink from 'calypso/components/external-link';
 import Notice from 'calypso/components/notice';
 import { preventWidows } from 'calypso/lib/formatting';
 import version_compare from 'calypso/lib/version-compare';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions/record';
 import getSiteAdminUrl from 'calypso/state/sites/selectors/get-site-admin-url';
 import getSiteOption from 'calypso/state/sites/selectors/get-site-option';
@@ -17,7 +17,6 @@ interface ExternalProps {
 
 /**
  * Show a warning Notice if the current site has a Jetpack version prior to `minJetpackVersion`.
- *
  * @param {Object} props - the id of the current site
  * @param {number} props.siteId – the ID of the current site
  * @param {string} props.minJetpackVersion – the minimum accepted Jetpack version

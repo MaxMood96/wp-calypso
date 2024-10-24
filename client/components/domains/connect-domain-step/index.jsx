@@ -1,12 +1,11 @@
-import { Gridicon } from '@automattic/components';
+import page from '@automattic/calypso-router';
+import { Badge, Gridicon } from '@automattic/components';
 import { BackButton } from '@automattic/onboarding';
 import { sprintf } from '@wordpress/i18n';
 import { useI18n } from '@wordpress/react-i18n';
-import page from 'page';
 import PropTypes from 'prop-types';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { connect, useDispatch } from 'react-redux';
-import Badge from 'calypso/components/badge';
 import ConnectDomainStepSupportInfoLink from 'calypso/components/domains/connect-domain-step/connect-domain-step-support-info-link';
 import DomainTransferRecommendation from 'calypso/components/domains/domain-transfer-recommendation';
 import TwoColumnsLayout from 'calypso/components/domains/layout/two-columns-layout';
@@ -20,8 +19,10 @@ import {
 	domainManagementList,
 	domainUseMyDomain,
 	domainMappingSetup,
+	isUnderDomainManagementAll,
 } from 'calypso/my-sites/domains/paths';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
+import getCurrentRoute from 'calypso/state/selectors/get-current-route';
 import { getDomainsBySiteId, hasLoadedSiteDomains } from 'calypso/state/sites/domains/selectors';
 import { getSelectedSite } from 'calypso/state/ui/selectors';
 import ConnectDomainStepSwitchSetupInfoLink from './connect-domain-step-switch-setup-info-link';
@@ -43,6 +44,7 @@ function ConnectDomainStep( {
 	isFirstVisit,
 	queryError,
 	queryErrorDescription,
+	currentRoute,
 } ) {
 	const { __ } = useI18n();
 	const stepsDefinition = isSubdomain( domain )
@@ -59,11 +61,21 @@ function ConnectDomainStep( {
 	const [ loadingDomainSetupInfo, setLoadingDomainSetupInfo ] = useState( false );
 
 	const baseClassName = 'connect-domain-step';
-	const isStepStart = stepType.START === stepsDefinition[ pageSlug ].step;
-	const mode = stepsDefinition[ pageSlug ].mode;
-	const step = stepsDefinition[ pageSlug ].step;
-	const prevPageSlug = stepsDefinition[ pageSlug ].prev;
-	const isTwoColumnLayout = ! stepsDefinition[ pageSlug ].singleColumnLayout;
+	if ( stepsDefinition[ pageSlug ] === undefined ) {
+		// eslint-disable-next-line no-console
+		console.error(
+			'Tried to set invalid pageSlug in ConnectDomainStep',
+			pageSlug,
+			firstStep,
+			domain
+		);
+	}
+	const currentStep = stepsDefinition[ pageSlug ] || stepsDefinition[ firstStep ];
+	const isStepStart = stepType.START === currentStep.step;
+	const mode = currentStep.mode;
+	const step = currentStep.step;
+	const prevPageSlug = currentStep.prev;
+	const isTwoColumnLayout = ! currentStep.singleColumnLayout;
 
 	const statusRef = useRef( {} );
 
@@ -201,60 +213,6 @@ function ConnectDomainStep( {
 		verifyConnection( false );
 	}, [ showErrors, verifyConnection ] );
 
-	const renderBreadcrumbs = () => {
-		let items = [
-			{
-				label: __( 'Domains' ),
-				href: domainManagementList( selectedSite.slug, domain ),
-			},
-			{
-				label: __( 'Use a domain I own' ),
-				href: domainUseMyDomain( selectedSite.slug ),
-			},
-			{
-				label: __( 'Transfer or connect' ),
-				href: domainUseMyDomain( selectedSite.slug, domain ),
-			},
-			{ label: __( 'Connect' ) },
-		];
-
-		let mobileItem = {
-			label: __( 'Back to transfer or connect' ),
-			href: domainUseMyDomain( selectedSite.slug, domain ),
-			showBackArrow: true,
-		};
-
-		if ( ! isFirstVisit ) {
-			items = [
-				{
-					label: __( 'Domains' ),
-					href: domainManagementList( selectedSite.slug, domain ),
-				},
-				{
-					label: domain,
-					href: domainManagementEdit( selectedSite.slug, domain ),
-				},
-				{ label: __( 'Connect' ) },
-			];
-
-			mobileItem = {
-				label: __( 'Back' ),
-				href: domainManagementEdit( selectedSite.slug, domain ),
-				showBackArrow: true,
-			};
-		}
-
-		return <DomainHeader items={ items } mobileItem={ mobileItem } />;
-	};
-
-	const goBack = () => {
-		if ( prevPageSlug ) {
-			setPageSlug( prevPageSlug );
-		} else {
-			page( domainManagementList( selectedSite.slug ) );
-		}
-	};
-
 	const renderTitle = () => {
 		const headerText = sprintf(
 			/* translators: %s: domain name being connected (ex.: example.com) */
@@ -265,7 +223,6 @@ function ConnectDomainStep( {
 		return (
 			<div className={ baseClassName + '__title' }>
 				<FormattedHeader
-					brandFont
 					className={ baseClassName + '__page-heading' }
 					headerText={ headerText }
 					align="left"
@@ -275,6 +232,62 @@ function ConnectDomainStep( {
 				) }
 			</div>
 		);
+	};
+
+	const renderHeader = () => {
+		let items = [
+			{
+				label: isUnderDomainManagementAll( currentRoute ) ? __( 'All Domains' ) : __( 'Domains' ),
+				href: domainManagementList( selectedSite.slug, domain ),
+			},
+			{
+				label: __( 'Use a domain I own' ),
+				href: domainUseMyDomain( selectedSite.slug ),
+			},
+			{
+				label: __( 'Transfer or connect' ),
+				href: domainUseMyDomain( selectedSite.slug, { domain } ),
+			},
+			{ label: __( 'Connect' ) },
+		];
+
+		let mobileItem = {
+			label: __( 'Back to transfer or connect' ),
+			href: domainUseMyDomain( selectedSite.slug, { domain } ),
+			showBackArrow: true,
+		};
+
+		if ( ! isFirstVisit ) {
+			items = [
+				{
+					label: __( 'Domains' ),
+					href: domainManagementList( selectedSite.slug, currentRoute ),
+				},
+				{
+					label: domain,
+					href: domainManagementEdit( selectedSite.slug, domain, currentRoute ),
+				},
+				{ label: __( 'Connect' ) },
+			];
+
+			mobileItem = {
+				label: __( 'Back' ),
+				href: domainManagementEdit( selectedSite.slug, domain, currentRoute ),
+				showBackArrow: true,
+			};
+		}
+
+		return (
+			<DomainHeader items={ items } mobileItem={ mobileItem } titleOverride={ renderTitle() } />
+		);
+	};
+
+	const goBack = () => {
+		if ( prevPageSlug ) {
+			setPageSlug( prevPageSlug );
+		} else {
+			page( domainManagementList( selectedSite.slug, currentRoute ) );
+		}
 	};
 
 	const renderContent = () => {
@@ -332,8 +345,7 @@ function ConnectDomainStep( {
 	return (
 		<>
 			<BodySectionCssClass bodyClass={ [ 'connect-domain-setup__body-white' ] } />
-			{ renderBreadcrumbs() }
-			{ renderTitle() }
+			{ renderHeader() }
 			{ isTwoColumnLayout ? (
 				<TwoColumnsLayout content={ renderContent() } sidebar={ renderSidebar() } />
 			) : (
@@ -376,5 +388,6 @@ export default connect( ( state ) => {
 		domains: getDomainsBySiteId( state, siteId ),
 		hasSiteDomainsLoaded: hasLoadedSiteDomains( state, siteId ),
 		selectedSite,
+		currentRoute: getCurrentRoute( state ),
 	};
 } )( ConnectDomainStep );

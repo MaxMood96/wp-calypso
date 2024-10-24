@@ -12,8 +12,8 @@
 	}
 
 	.sites-overview__row-text {
-		margin-inline-start: 55px;
-		width: calc(100% - 55px);
+		margin-inline-start: 32px;
+		width: calc(100% - 30px);
 		font-size: 0.875rem !important;
 	}
 
@@ -115,12 +115,6 @@
 			width: auto;
 		}
 	}
-}
-
-.button .gridicon {
-	color: var(--color-neutral-80);
-	width: 24px;
-	height: 24px;
 }
 
 .select-dropdown__item-text {

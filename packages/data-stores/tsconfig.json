@@ -8,8 +8,12 @@
 	"include": [ "src" ],
 	"exclude": [ "**/test/*" ],
 	"references": [
+		{ "path": "../calypso-analytics" },
+		{ "path": "../calypso-products" },
+		{ "path": "../calypso-config" },
 		{ "path": "../i18n-utils" },
 		{ "path": "../shopping-cart" },
-		{ "path": "../format-currency" }
+		{ "path": "../format-currency" },
+		{ "path": "../js-utils" }
 	]
 }

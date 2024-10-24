@@ -5,7 +5,6 @@ import envVariables from '../../env-variables';
 import {
 	EditorComponent,
 	EditorPublishPanelComponent,
-	EditorNavSidebarComponent,
 	EditorToolbarComponent,
 	EditorSettingsSidebarComponent,
 	EditorGutenbergComponent,
@@ -16,7 +15,11 @@ import {
 	EditorWelcomeTourComponent,
 	EditorBlockToolbarComponent,
 	EditorTemplateModalComponent,
+	EditorPopoverMenuComponent,
 	TemplateCategory,
+	BlockToolbarButtonIdentifier,
+	CookieBannerComponent,
+	EditorToolbarSettingsButton,
 } from '../components';
 import { BlockInserter, OpenInlineInserter } from './shared-types';
 import type {
@@ -47,7 +50,6 @@ export class EditorPage {
 	private page: Page;
 	private editor: EditorComponent;
 	private editorPublishPanelComponent: EditorPublishPanelComponent;
-	private editorNavSidebarComponent: EditorNavSidebarComponent;
 	private editorToolbarComponent: EditorToolbarComponent;
 	private editorSettingsSidebarComponent: EditorSettingsSidebarComponent;
 	private editorGutenbergComponent: EditorGutenbergComponent;
@@ -57,6 +59,8 @@ export class EditorPage {
 	private editorWelcomeTourComponent: EditorWelcomeTourComponent;
 	private editorBlockToolbarComponent: EditorBlockToolbarComponent;
 	private editorTemplateModalComponent: EditorTemplateModalComponent;
+	private editorPopoverMenuComponent: EditorPopoverMenuComponent;
+	private cookieBannerComponent: CookieBannerComponent;
 
 	/**
 	 * Constructs an instance of the component.
@@ -72,7 +76,6 @@ export class EditorPage {
 		this.editorToolbarComponent = new EditorToolbarComponent( page, this.editor );
 		this.editorSettingsSidebarComponent = new EditorSettingsSidebarComponent( page, this.editor );
 		this.editorPublishPanelComponent = new EditorPublishPanelComponent( page, this.editor );
-		this.editorNavSidebarComponent = new EditorNavSidebarComponent( page, this.editor );
 		this.editorBlockListViewComponent = new EditorBlockListViewComponent( page, this.editor );
 		this.editorWelcomeTourComponent = new EditorWelcomeTourComponent( page, this.editor );
 		this.editorBlockToolbarComponent = new EditorBlockToolbarComponent( page, this.editor );
@@ -85,6 +88,8 @@ export class EditorPage {
 			this.editor
 		);
 		this.editorTemplateModalComponent = new EditorTemplateModalComponent( page, this.editor );
+		this.editorPopoverMenuComponent = new EditorPopoverMenuComponent( page, this.editor );
+		this.cookieBannerComponent = new CookieBannerComponent( page, this.editor );
 	}
 
 	//#region Generic and Shell Methods
@@ -95,8 +100,13 @@ export class EditorPage {
 	 * Example "new post": {@link https://wordpress.com/post}
 	 * Example "new page": {@link https://wordpress.com/page}
 	 */
-	async visit( type: 'post' | 'page' = 'post' ): Promise< Response | null > {
-		const request = await this.page.goto( getCalypsoURL( type ), { timeout: 30 * 1000 } );
+	async visit(
+		type: 'post' | 'page' = 'post',
+		{ siteSlug = '' }: { siteSlug?: string } = {}
+	): Promise< Response | null > {
+		const request = await this.page.goto( getCalypsoURL( `${ type }/${ siteSlug }` ), {
+			timeout: 30 * 1000,
+		} );
 		await this.waitUntilLoaded();
 
 		return request;
@@ -106,16 +116,56 @@ export class EditorPage {
 	 * Initialization steps to ensure the page is fully loaded.
 	 */
 	async waitUntilLoaded(): Promise< void > {
+		// When the WordPress version updates on Jetpack AT sites,
+		// `wp-beta` and`wp-previous` require a database update.
+		// @see https://github.com/Automattic/wp-calypso/issues/82412
+		const databaseUpdateMaybeRequired =
+			envVariables.ATOMIC_VARIATION === 'wp-beta' ||
+			envVariables.ATOMIC_VARIATION === 'wp-previous';
+
+		if ( databaseUpdateMaybeRequired ) {
+			const loadEditorWithDatabaseUpdate = async () => {
+				await this.acceptDatabaseUpdate();
+				await this.waitForEditorLoadedRequests( 30 * 1000 );
+			};
+			await Promise.race( [
+				loadEditorWithDatabaseUpdate(),
+				this.waitForEditorLoadedRequests( 60 * 1000 ),
+			] );
+		} else {
+			await this.waitForEditorLoadedRequests( 60 * 1000 );
+		}
+
+		// Dismiss the Welcome Tour.
+		await this.editorWelcomeTourComponent.forceDismissWelcomeTour();
+
+		// Accept the Cookie banner.
+		await this.cookieBannerComponent.acceptCookie();
+	}
+
+	/**
+	 * Waits for the editor to be fully loaded by keying off of requests.
+	 *
+	 * @param {number} timeout Timeout for waiting for the final requests.
+	 */
+	private async waitForEditorLoadedRequests( timeout: number = 60 * 1000 ): Promise< void > {
 		// In a typical loading scenario, this request is one of the last to fire.
 		// Lacking a perfect cross-site type (Simple/Atomic) way to check the loading state,
 		// it is a fairly good stand-in.
 		await Promise.all( [
-			this.page.waitForURL( /(post|page|post-new.php)/ ),
-			this.page.waitForResponse( /.*posts.*/, { timeout: 60 * 1000 } ),
+			this.page.waitForURL( /(\/post\/.+|\/page\/+|\/post-new.php)/, { timeout } ),
+			this.page.waitForResponse( /.*posts.*/, { timeout } ),
 		] );
+	}
 
-		// Dismiss the Welcome Tour.
-		await this.editorWelcomeTourComponent.forceDismissWelcomeTour();
+	/**
+	 * Accepts the WordPress version database update prompt that can happen on lagging AT sites.
+	 */
+	private async acceptDatabaseUpdate(): Promise< void > {
+		const databaseUpdateButton = this.page.getByRole( 'link', {
+			name: 'Update WordPress Database',
+		} );
+		await databaseUpdateButton.click( { timeout: 30 * 1000 } );
 	}
 
 	/**
@@ -142,12 +192,10 @@ export class EditorPage {
 	 * This method will attempt to close the following panels:
 	 * 	- Publish Panel (including pre-publish checklist)
 	 * 	- Editor Settings Panel
-	 * 	- Editor Navigation Sidebar
 	 */
 	async closeAllPanels(): Promise< void > {
 		await Promise.allSettled( [
 			this.editorPublishPanelComponent.closePanel(),
-			this.editorToolbarComponent.closeNavSidebar(),
 			this.editorToolbarComponent.closeSettings(),
 		] );
 	}
@@ -167,18 +215,28 @@ export class EditorPage {
 	 * Select a template category from the sidebar of options.
 	 *
 	 * @param {TemplateCategory} category Name of the category to select.
+	 * @param param1 Keyed object parameter.
+	 * @param {number} param1.timeout Timeout to apply.
 	 */
-	async selectTemplateCategory( category: TemplateCategory ) {
-		return await this.editorTemplateModalComponent.selectTemplateCategory( category );
+	async selectTemplateCategory(
+		category: TemplateCategory,
+		{ timeout = envVariables.TIMEOUT }: { timeout?: number } = {}
+	) {
+		return await this.editorTemplateModalComponent.selectTemplateCategory( category, timeout );
 	}
 
 	/**
 	 * Select a template from the grid of options.
 	 *
 	 * @param {string} label Label for the template (the string underneath the preview).
+	 * @param param1 Keyed object parameter.
+	 * @param {number} param1.timeout Timeout to apply.
 	 */
-	async selectTemplate( label: string ) {
-		return await this.editorTemplateModalComponent.selectTemplate( label );
+	async selectTemplate(
+		label: string,
+		{ timeout = envVariables.TIMEOUT }: { timeout?: number } = {}
+	) {
+		return await this.editorTemplateModalComponent.selectTemplate( label, timeout );
 	}
 
 	/**
@@ -246,17 +304,17 @@ export class EditorPage {
 	async addBlockFromSidebar(
 		blockName: string,
 		blockEditorSelector: string,
-		{ noSearch }: { noSearch?: boolean } = {}
+		{ noSearch, blockFallBackName }: { noSearch?: boolean; blockFallBackName?: string } = {}
 	): Promise< ElementHandle > {
 		await this.editorGutenbergComponent.resetSelectedBlock();
 		await this.editorToolbarComponent.openBlockInserter();
 		await this.addBlockFromInserter( blockName, this.editorSidebarBlockInserterComponent, {
 			noSearch: noSearch,
+			blockFallBackName: blockFallBackName,
 		} );
 
-		const blockHandle = await this.editorGutenbergComponent.getSelectedBlockElementHandle(
-			blockEditorSelector
-		);
+		const blockHandle =
+			await this.editorGutenbergComponent.getSelectedBlockElementHandle( blockEditorSelector );
 
 		// Dismiss the block inserter if viewport is larger than mobile to
 		// ensure no interference from the block inserter in subsequent actions on the editor.
@@ -305,9 +363,8 @@ export class EditorPage {
 		await openInlineInserter( await this.editor.canvas() );
 		await this.addBlockFromInserter( blockName, this.editorInlineBlockInserterComponent );
 
-		const blockHandle = await this.editorGutenbergComponent.getSelectedBlockElementHandle(
-			blockEditorSelector
-		);
+		const blockHandle =
+			await this.editorGutenbergComponent.getSelectedBlockElementHandle( blockEditorSelector );
 		// Return an ElementHandle pointing to the block for compatibility
 		// with existing specs.
 		return blockHandle;
@@ -322,12 +379,12 @@ export class EditorPage {
 	private async addBlockFromInserter(
 		blockName: string,
 		inserter: BlockInserter,
-		{ noSearch }: { noSearch?: boolean } = {}
+		{ noSearch, blockFallBackName }: { noSearch?: boolean; blockFallBackName?: string } = {}
 	): Promise< void > {
 		if ( ! noSearch ) {
 			await inserter.searchBlockInserter( blockName );
 		}
-		await inserter.selectBlockInserterResult( blockName );
+		await inserter.selectBlockInserterResult( blockName, { blockFallBackName } );
 	}
 
 	/**
@@ -415,6 +472,44 @@ export class EditorPage {
 		await this.editorBlockToolbarComponent.moveDown();
 	}
 
+	/**
+	 * Selects the matching option from the popover triggered by clicking
+	 * on a block toolbar button.
+	 *
+	 * @param {string} name Accessible name of the element.
+	 */
+	async selectFromToolbarPopover( name: string ) {
+		await this.editorPopoverMenuComponent.clickMenuButton( name );
+	}
+
+	/**
+	 * Clicks on a button with either the name or aria-label on the
+	 * editor toolbar.
+	 *
+	 * @param {BlockToolbarButtonIdentifier} name Object specifying either the
+	 * 	text label or aria-label of the button to be clicked.
+	 */
+	async clickBlockToolbarButton( name: BlockToolbarButtonIdentifier ): Promise< void > {
+		await this.editorBlockToolbarComponent.clickPrimaryButton( name );
+	}
+
+	/**
+	 * Select the parent block of the current block using the block toolbar.
+	 * This will fail and throw if the currently focused block doesn't have a parent.
+	 */
+	async selectParentBlock( expectedParentBlockName: string ): Promise< void > {
+		if ( envVariables.VIEWPORT_NAME === 'desktop' ) {
+			await this.editorBlockToolbarComponent.clickParentBlockButton( expectedParentBlockName );
+		} else {
+			await this.editorBlockToolbarComponent.clickOptionsButton();
+			await this.editorPopoverMenuComponent.clickMenuButton(
+				`Select parent block (${ expectedParentBlockName })`
+			);
+			// It stays open on modal! We have to close it again.
+			await this.editorBlockToolbarComponent.clickOptionsButton();
+		}
+	}
+
 	//#endregion
 
 	//#region Settings Sidebar
@@ -422,8 +517,8 @@ export class EditorPage {
 	/**
 	 * Opens the Settings sidebar.
 	 */
-	async openSettings(): Promise< void > {
-		await this.editorToolbarComponent.openSettings();
+	async openSettings( target: EditorToolbarSettingsButton = 'Settings' ): Promise< void > {
+		await this.editorToolbarComponent.openSettings( target );
 	}
 
 	/**
@@ -436,6 +531,24 @@ export class EditorPage {
 		} else {
 			await this.editorToolbarComponent.closeSettings();
 		}
+	}
+
+	/**
+	 * General method to expand the named section in the settings sidebar.
+	 *
+	 * @param {string} name Name of the section to expand.
+	 */
+	async expandSection( name: string ): Promise< void > {
+		await this.editorSettingsSidebarComponent.expandSection( name );
+	}
+
+	/**
+	 * Clicks on a button with matching accessible name in the Editor sidebar.
+	 *
+	 * @param {string} name Accessible name of the button.
+	 */
+	async clickSidebarButton( name: string ): Promise< void > {
+		await this.editorSettingsSidebarComponent.clickButton( name );
 	}
 
 	/**
@@ -463,7 +576,7 @@ export class EditorPage {
 			this.editorSettingsSidebarComponent.clickTab( 'Post' ),
 		] );
 
-		await this.editorSettingsSidebarComponent.expandSection( 'Summary' );
+		await this.editorSettingsSidebarComponent.expandSummary( 'Summary' );
 		await this.editorSettingsSidebarComponent.openVisibilityOptions();
 		await this.editorSettingsSidebarComponent.selectVisibility( visibility, {
 			password: password,
@@ -520,8 +633,22 @@ export class EditorPage {
 			this.editorSettingsSidebarComponent.clickTab( 'Page' ),
 			this.editorSettingsSidebarComponent.clickTab( 'Post' ),
 		] );
-		await this.editorSettingsSidebarComponent.expandSection( 'Summary' );
+		await this.editorSettingsSidebarComponent.expandSummary( 'Summary' );
 		await this.editorSettingsSidebarComponent.enterUrlSlug( slug );
+	}
+
+	/**
+	 * Enters SEO details on the Editor sidebar.
+	 *
+	 * @param param0 Keyed object parameter.
+	 * @param {string} param0.title SEO title.
+	 * @param {string} param0.description SEO description.
+	 */
+	async enterSEODetails( { title, description }: { title: string; description: string } ) {
+		await this.editorSettingsSidebarComponent.enterText( title, { label: 'SEO TITLE' } );
+		await this.editorSettingsSidebarComponent.enterText( description, {
+			label: 'SEO DESCRIPTION',
+		} );
 	}
 
 	//#endregion
@@ -564,20 +691,18 @@ export class EditorPage {
 	 * @param {boolean} visit Whether to then visit the page.
 	 * @returns {URL} Published article's URL.
 	 */
-	async publish( { visit = false }: { visit?: boolean } = {} ): Promise< URL > {
-		const publishButtonText = await this.editorToolbarComponent.getPublishButtonText();
+	async publish( {
+		visit = false,
+		timeout,
+	}: { visit?: boolean; timeout?: number } = {} ): Promise< URL > {
 		const actionsArray = [];
+		await this.editorToolbarComponent.waitForPublishButton();
 
 		// Every publish action requires at least one click on the EditorToolbarComponent.
 		actionsArray.push( this.editorToolbarComponent.clickPublish() );
 
-		// Determine whether the post/page is yet to be published or the post/page
-		// is merely being updated.
-		// If not yet published, a second click on the EditorPublishPanelComponent
-		// is added to the array of actions.
-		if ( publishButtonText.toLowerCase() !== 'update' ) {
-			actionsArray.push( this.editorPublishPanelComponent.publish() );
-		}
+		// Trigger a secondary/confirmation click if needed
+		actionsArray.push( this.editorPublishPanelComponent.publish() );
 
 		// Resolve the promises.
 		const [ response ] = await Promise.all( [
@@ -586,12 +711,14 @@ export class EditorPage {
 				this.page.waitForResponse(
 					async ( response ) =>
 						/v2\/(posts|pages)\/[\d]+/.test( response.url() ) &&
-						response.request().method() === 'POST'
+						response.request().method() === 'POST',
+					{ timeout: timeout }
 				),
 				this.page.waitForResponse(
 					async ( response ) =>
 						/.*v2\/sites\/[\d]+\/(posts|pages)\/[\d]+.*/.test( response.url() ) &&
-						response.request().method() === 'PUT'
+						response.request().method() === 'PUT',
+					{ timeout: timeout }
 				),
 			] ),
 			...actionsArray,
@@ -605,7 +732,7 @@ export class EditorPage {
 		}
 
 		if ( visit ) {
-			await this.visitPublishedPost( publishedURL );
+			await this.visitPublishedPost( publishedURL, { timeout: timeout } );
 		}
 
 		return new URL( publishedURL );
@@ -622,7 +749,7 @@ export class EditorPage {
 			this.editorSettingsSidebarComponent.clickTab( 'Post' ),
 		] );
 
-		await this.editorSettingsSidebarComponent.expandSection( 'Summary' );
+		await this.editorSettingsSidebarComponent.expandSummary( 'Summary' );
 		await this.editorSettingsSidebarComponent.openSchedule();
 		await this.editorSettingsSidebarComponent.setScheduleDetails( date );
 		await this.editorSettingsSidebarComponent.closeSchedule();
@@ -633,12 +760,25 @@ export class EditorPage {
 	 */
 	async unpublish(): Promise< void > {
 		const editorParent = await this.editor.parent();
-
 		await this.editorToolbarComponent.switchToDraft();
+
 		// @TODO: eventually refactor this out to a ConfirmationDialogComponent.
-		await editorParent.getByRole( 'button' ).getByText( 'OK' ).click();
+		// Saves the draft
+		await Promise.race( [ this.editorToolbarComponent.clickPublish(), this.confirmUnpublish() ] );
 		// @TODO: eventually refactor this out to a EditorToastNotificationComponent.
 		await editorParent.getByRole( 'button', { name: 'Dismiss this notice' } ).waitFor();
+	}
+
+	/**
+	 * Confirms the unpublish action in some views
+	 */
+	async confirmUnpublish(): Promise< void > {
+		const editorParent = await this.editor.parent();
+		const okButtonLocator = editorParent.getByRole( 'button' ).getByText( 'OK' );
+
+		if ( await okButtonLocator.count() ) {
+			okButtonLocator.click();
+		}
 	}
 
 	/**
@@ -669,7 +809,10 @@ export class EditorPage {
 	 *
 	 * @returns {Promise<void>} No return value.
 	 */
-	private async visitPublishedPost( url: string ): Promise< void > {
+	private async visitPublishedPost(
+		url: string,
+		{ timeout }: { timeout?: number } = {}
+	): Promise< void > {
 		// Some blocks, like "Click To Tweet" or "Logos" cause the post-publish
 		// panel to close immediately and leave the post in the unsaved state for
 		// some reason. Since the post state is unsaved, the warning dialog will be
@@ -681,7 +824,7 @@ export class EditorPage {
 		// this listener can be removed.
 		this.allowLeavingWithoutSaving();
 
-		await this.page.goto( url, { waitUntil: 'domcontentloaded' } );
+		await this.page.goto( url, { waitUntil: 'domcontentloaded', timeout: timeout } );
 
 		await reloadAndRetry( this.page, confirmPostShown );
 
@@ -698,7 +841,7 @@ export class EditorPage {
 		 * @param page
 		 */
 		async function confirmPostShown( page: Page ): Promise< void > {
-			await page.waitForSelector( '.entry-content', { timeout: 15 * 1000 } );
+			await page.getByRole( 'main' ).waitFor( { timeout: timeout } );
 		}
 	}
 
@@ -787,14 +930,11 @@ export class EditorPage {
 		if ( envVariables.VIEWPORT_NAME === 'mobile' ) {
 			// Mobile viewports do not use an EditorNavSidebar.
 			// Instead, the regular NavBar is used, and the
-			// `My Sites` button exits the editor.
+			// `<` button exits the editor.
 			const navbarComponent = new NavbarComponent( this.page );
-			actions.push( navbarComponent.clickMySites() );
+			actions.push( navbarComponent.clickEditorBackButton() );
 		} else {
-			actions.push(
-				this.editorToolbarComponent.openNavSidebar(),
-				this.editorNavSidebarComponent.exitEditor()
-			);
+			actions.push( this.editorToolbarComponent.closeEditor() );
 		}
 
 		// Perform the actions and resolve promises.

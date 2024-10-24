@@ -3,51 +3,31 @@ import {
 	PLAN_BUSINESS,
 	PLAN_ECOMMERCE,
 	PLAN_ECOMMERCE_TRIAL_MONTHLY,
+	getPlan,
 } from '@automattic/calypso-products';
-import { pickBy } from 'lodash';
 import { connect } from 'react-redux';
 import UpsellNudge from 'calypso/blocks/upsell-nudge';
 import QueryActiveTheme from 'calypso/components/data/query-active-theme';
 import QueryCanonicalTheme from 'calypso/components/data/query-canonical-theme';
+import { JetpackConnectionHealthBanner } from 'calypso/components/jetpack/connection-health';
 import Main from 'calypso/components/main';
 import { useRequestSiteChecklistTaskUpdate } from 'calypso/data/site-checklist';
 import { CHECKLIST_KNOWN_TASKS } from 'calypso/state/data-layer/wpcom/checklist/index.js';
+import { withJetpackConnectionProblem } from 'calypso/state/jetpack-connection-health/selectors/is-jetpack-connection-problem';
 import isAtomicSite from 'calypso/state/selectors/is-site-automated-transfer';
 import { getCurrentPlan, isRequestingSitePlans } from 'calypso/state/sites/plans/selectors';
 import { isJetpackSiteMultiSite } from 'calypso/state/sites/selectors';
 import { getActiveTheme } from 'calypso/state/themes/selectors';
-import { addTracking } from './helpers';
 import { connectOptions } from './theme-options';
 import ThemeShowcase from './theme-showcase';
-import ThemesSelection from './themes-selection';
-
-const ConnectedThemesSelection = connectOptions( ( props ) => {
-	return (
-		<ThemesSelection
-			{ ...props }
-			getOptions={ function ( theme ) {
-				return pickBy(
-					addTracking( props.options ),
-					( option ) => ! ( option.hideForTheme && option.hideForTheme( theme, props.siteId ) )
-				);
-			} }
-		/>
-	);
-} );
 
 const ConnectedSingleSiteJetpack = connectOptions( ( props ) => {
 	const {
 		currentPlan,
 		currentThemeId,
-		emptyContent,
-		filter,
-		getScreenshotOption,
 		isAtomic,
-		showWpcomThemesList,
-		search,
+		isPossibleJetpackConnectionProblem,
 		siteId,
-		vertical,
-		tier,
 		translate,
 		requestingSitePlans,
 	} = props;
@@ -61,10 +41,9 @@ const ConnectedSingleSiteJetpack = connectOptions( ( props ) => {
 					className="themes__showcase-banner"
 					event="calypso_themes_list_install_themes"
 					feature={ FEATURE_UPLOAD_THEMES }
-					plan={ PLAN_ECOMMERCE }
 					title={ translate( 'Upgrade to a plan to upload your own themes!' ) }
 					callToAction={ translate( 'Upgrade now' ) }
-					showIcon={ true }
+					showIcon
 				/>
 			);
 		}
@@ -75,11 +54,20 @@ const ConnectedSingleSiteJetpack = connectOptions( ( props ) => {
 				event="calypso_themes_list_install_themes"
 				feature={ FEATURE_UPLOAD_THEMES }
 				plan={ PLAN_BUSINESS }
-				title={ translate(
-					'Unlock ALL premium themes and upload your own themes with our Business and eCommerce plans!'
-				) }
+				title={
+					/* translators: %(planName1)s and %(planName2)s are the short-hand version of the Business and Commerce plan names */
+					translate(
+						'Unlock ALL premium themes and upload your own themes with our %(planName1)s and %(planName2)s plans!',
+						{
+							args: {
+								planName1: getPlan( PLAN_BUSINESS )?.getTitle() ?? '',
+								planName2: getPlan( PLAN_ECOMMERCE )?.getTitle() ?? '',
+							},
+						}
+					)
+				}
 				callToAction={ translate( 'Upgrade now' ) }
-				showIcon={ true }
+				showIcon
 			/>
 		);
 	};
@@ -103,48 +91,15 @@ const ConnectedSingleSiteJetpack = connectOptions( ( props ) => {
 			<QueryActiveTheme siteId={ siteId } />
 			{ currentThemeId && <QueryCanonicalTheme themeId={ currentThemeId } siteId={ siteId } /> }
 
+			{ isPossibleJetpackConnectionProblem && <JetpackConnectionHealthBanner siteId={ siteId } /> }
+
 			<ThemeShowcase
 				{ ...props }
 				upsellUrl={ upsellUrl() }
 				siteId={ siteId }
-				isJetpackSite={ true }
+				isJetpackSite
 				upsellBanner={ displayUpsellBanner ? upsellBanner() : null }
-			>
-				{ showWpcomThemesList && (
-					<div>
-						<ConnectedThemesSelection
-							origin="wpcom"
-							defaultOption="activate"
-							secondaryOption="tryandcustomize"
-							search={ search }
-							tier={ tier }
-							filter={ filter }
-							vertical={ vertical }
-							siteId={ siteId /* This is for the options in the '...' menu only */ }
-							getScreenshotUrl={ function ( theme ) {
-								if ( ! getScreenshotOption( theme ).getUrl ) {
-									return null;
-								}
-								return getScreenshotOption( theme ).getUrl( theme );
-							} }
-							onScreenshotClick={ function ( themeId ) {
-								if ( ! getScreenshotOption( themeId ).action ) {
-									return;
-								}
-								getScreenshotOption( themeId ).action( themeId );
-							} }
-							getActionLabel={ function ( theme ) {
-								return getScreenshotOption( theme ).label;
-							} }
-							trackScrollPage={ props.trackScrollPage }
-							source="wpcom"
-							emptyContent={ emptyContent }
-							upsellUrl={ upsellUrl }
-							forceWpOrgSearch
-						/>
-					</div>
-				) }
-			</ThemeShowcase>
+			/>
 		</Main>
 	);
 } );
@@ -159,9 +114,8 @@ export default connect( ( state, { siteId, tier } ) => {
 		currentThemeId,
 		tier,
 		showWpcomThemesList,
-		emptyContent: null,
 		isAtomic: isAtomicSite( state, siteId ),
 		isMultisite,
 		requestingSitePlans: isRequestingSitePlans( state, siteId ),
 	};
-} )( ConnectedSingleSiteJetpack );
+} )( withJetpackConnectionProblem( ConnectedSingleSiteJetpack ) );

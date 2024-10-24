@@ -36,13 +36,47 @@ export const getPostAutoSharingOptions = ( post ) => {
 	return post?.metadata?.find( ( meta ) => meta.key === '_wpas_options' )?.value;
 };
 
-export const getPostCustomImage = ( post ) => {
-	return getPostAutoSharingOptions( post )?.attached_media?.[ 0 ]?.url;
-};
+export function getPostAttachedMedia( post ) {
+	return getPostAutoSharingOptions( post )?.attached_media || [];
+}
+
+export function getPostImageGeneratorSettings( post ) {
+	return getPostAutoSharingOptions( post )?.image_generator_settings || {};
+}
 
 export const isSocialPost = ( post ) => {
-	return !! getPostAutoSharingOptions( post )?.should_upload_attached_media;
+	const socialPostOptions = getPostAutoSharingOptions( post );
+
+	if ( socialPostOptions?.version === 2 ) {
+		return getPostAttachedMedia( post ).length > 0;
+	}
+
+	return Boolean( socialPostOptions?.should_upload_attached_media );
 };
+
+export function getPostCustomMedia( post ) {
+	// Attach media only if "Share as a social post" option is enabled.
+	if ( isSocialPost( post ) ) {
+		return getPostAttachedMedia( post ).map( ( { id, url, type } ) => ( {
+			type: type || post.attachments?.[ id ]?.mime_type,
+			url,
+			alt: '',
+		} ) );
+	}
+
+	return [];
+}
+
+export function getSigImageUrl( post ) {
+	const sigSettings = getPostImageGeneratorSettings( post );
+
+	if ( sigSettings.enabled && sigSettings.token ) {
+		const baseUrl = 'https://jetpack.com/redirect/?source=sigenerate&query=';
+
+		return baseUrl + encodeURIComponent( `t=${ sigSettings.token }` );
+	}
+	return '';
+}
 
 export const getExcerptForPost = ( post ) => {
 	if ( ! post ) {
@@ -68,7 +102,6 @@ export const getExcerptForPost = ( post ) => {
 /**
  * Returns a summary of a post, truncated approximately at the same length as our servers
  * and Facebook truncate it.
- *
  * @param {Object} post A post object.
  * @param {Function} translate The i18n-calypso function.
  * @param {number} maxWords Approximation of the truncation logic performed by our servers.

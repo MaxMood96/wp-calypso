@@ -30,12 +30,20 @@ export interface Secrets {
 	storeSandboxCookieValue: string;
 	testCouponCode: string;
 	wpccAuthPath: string;
+	wooSignupPath: string;
+	wooLoginPath: string;
 	calypsoOauthApplication: {
 		client_id: string;
 		client_secret: string;
 	};
 	martechTosUploadCredentials: {
 		bearer_token: string;
+	};
+	socialAccounts: {
+		tumblr: {
+			username: string;
+			password: string;
+		};
 	};
 	mailosaur: {
 		apiKey: string;
@@ -44,6 +52,7 @@ export interface Secrets {
 		domainsInboxId: string;
 		defaultUserInboxId: string;
 		totpUserInboxId: string;
+		manualTesting: string;
 	};
 	testAccounts: {
 		[ key in TestAccountName ]: TestAccountCredentials;

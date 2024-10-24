@@ -20,7 +20,6 @@ let lastRetargetTime = 0;
 
 /**
  * Fire tracking events for the purposes of retargeting on all Calypso pages
- *
  * @param {string} urlPath The URL path we should report to the ad-trackers which may be different from the actual one
  * for privacy reasons.
  * @returns {void}
@@ -77,6 +76,12 @@ export async function retarget( urlPath ) {
 	if ( mayWeTrackByTracker( 'adroll' ) ) {
 		debug( 'retarget: [AdRoll]' );
 		window.adRoll.trackPageview();
+	}
+
+	// Reddit
+	if ( mayWeTrackByTracker( 'reddit' ) ) {
+		debug( 'retarget: [Reddit]' );
+		window.rdt( 'track', 'PageVisit' );
 	}
 
 	// Rate limited retargeting (secondary trackers)

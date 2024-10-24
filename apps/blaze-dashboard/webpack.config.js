@@ -1,6 +1,5 @@
 const path = require( 'path' );
 const process = require( 'process' ); // eslint-disable-line
-const BuildMetaPlugin = require( '@automattic/calypso-apps-builder/build-meta-webpack-plugin.cjs' );
 const FileConfig = require( '@automattic/calypso-build/webpack/file-loader' );
 const Minify = require( '@automattic/calypso-build/webpack/minify' );
 const SassConfig = require( '@automattic/calypso-build/webpack/sass' );
@@ -60,14 +59,7 @@ module.exports = {
 	optimization: {
 		minimize: ! isDevelopment,
 		concatenateModules: ! shouldEmitStats,
-		minimizer: Minify( {
-			extractComments: false,
-			terserOptions: {
-				ecma: 5,
-				safari10: true,
-				mangle: { reserved: [ '__', '_n', '_nx', '_x' ] },
-			},
-		} ),
+		minimizer: Minify(),
 		splitChunks: false,
 	},
 	module: {
@@ -108,7 +100,13 @@ module.exports = {
 				use: {
 					loader: './filter-json-config-loader',
 					options: {
-						keys: [ 'features', 'dsp_stripe_pub_key', 'dsp_widget_js_src' ],
+						keys: [
+							'features',
+							'dsp_stripe_pub_key',
+							'dsp_widget_js_src',
+							'client_slug',
+							'hotjar_enabled',
+						],
 					},
 				},
 			},
@@ -121,7 +119,6 @@ module.exports = {
 	},
 	node: false,
 	plugins: [
-		BuildMetaPlugin( { outputPath } ),
 		new webpack.DefinePlugin( {
 			global: 'window',
 			'process.env.NODE_DEBUG': JSON.stringify( process.env.NODE_DEBUG || false ),
@@ -130,6 +127,9 @@ module.exports = {
 			filename: '[name].min.css',
 			chunkFilename: '[contenthash].css',
 			minify: ! isDevelopment,
+		} ),
+		new webpack.DefinePlugin( {
+			__i18n_text_domain__: JSON.stringify( 'blaze-dashboard' ),
 		} ),
 		new DependencyExtractionWebpackPlugin( {
 			injectPolyfill: true,
@@ -187,7 +187,7 @@ module.exports = {
 		),
 		new webpack.NormalModuleReplacementPlugin(
 			/^calypso\/components\/formatted-header$/,
-			'calypso/components/jetpack/jetpack-header'
+			path.resolve( __dirname, 'src/components/generic-header' )
 		),
 		...excludedPackagePlugins,
 		shouldEmitStats &&

@@ -1,15 +1,19 @@
 import accessibleFocus from '@automattic/accessible-focus';
 import config from '@automattic/calypso-config';
+import page from '@automattic/calypso-router';
+import { addBreadcrumb, initSentry } from '@automattic/calypso-sentry';
 import { getUrlParts } from '@automattic/calypso-url';
 import { geolocateCurrencySymbol } from '@automattic/format-currency';
 import { getLanguageSlugs } from '@automattic/i18n-utils';
+import { getToken } from '@automattic/oauth-token';
+import { JETPACK_PRICING_PAGE } from '@automattic/urls';
 import debugFactory from 'debug';
-import page from 'page';
 import ReactDom from 'react-dom';
 import Modal from 'react-modal';
 import store from 'store';
 import emailVerification from 'calypso/components/email-verification';
 import { ProviderWrappedLayout } from 'calypso/controller';
+import isA8CForAgencies from 'calypso/lib/a8c-for-agencies/is-a8c-for-agencies';
 import { initializeAnalytics } from 'calypso/lib/analytics/init';
 import getSuperProps from 'calypso/lib/analytics/super-props';
 import { tracksEvents } from 'calypso/lib/analytics/tracks';
@@ -19,15 +23,12 @@ import detectHistoryNavigation from 'calypso/lib/detect-history-navigation';
 import isJetpackCloud from 'calypso/lib/jetpack/is-jetpack-cloud';
 import loadDevHelpers from 'calypso/lib/load-dev-helpers';
 import { attachLogmein } from 'calypso/lib/logmein';
-import { getToken } from 'calypso/lib/oauth-token';
 import { checkFormHandler } from 'calypso/lib/protect-form';
 import { setReduxStore as setReduxBridgeReduxStore } from 'calypso/lib/redux-bridge';
 import { getSiteFragment, normalize } from 'calypso/lib/route';
 import { isLegacyRoute } from 'calypso/lib/route/legacy-routes';
-import { addBreadcrumb, initSentry } from 'calypso/lib/sentry';
 import { hasTouch } from 'calypso/lib/touch-detect';
 import { isOutsideCalypso } from 'calypso/lib/url';
-import { JETPACK_PRICING_PAGE } from 'calypso/lib/url/support';
 import { initializeCurrentUser } from 'calypso/lib/user/shared-utils';
 import { onDisablePersistence } from 'calypso/lib/user/store';
 import { setSupportSessionReduxStore } from 'calypso/lib/user/support-user-interop';
@@ -53,7 +54,6 @@ const debug = debugFactory( 'calypso' );
 
 const setupContextMiddleware = ( reduxStore, reactQueryClient ) => {
 	page( '*', ( context, next ) => {
-		// page.js url parsing is broken so we had to disable it with `decodeURLComponents: false`
 		const parsed = getUrlParts( context.canonicalPath );
 		const path = parsed.pathname + parsed.search || null;
 		context.prevPath = path === context.path ? false : path;
@@ -135,7 +135,7 @@ function saveOauthFlags() {
 
 function authorizePath() {
 	const redirectUri = new URL(
-		isJetpackCloud() ? '/connect/oauth/token' : '/api/oauth/token',
+		isJetpackCloud() || isA8CForAgencies() ? '/connect/oauth/token' : '/api/oauth/token',
 		window.location
 	);
 	redirectUri.search = new URLSearchParams( {
@@ -154,7 +154,8 @@ function authorizePath() {
 	return authUri.toString();
 }
 
-const JP_CLOUD_PUBLIC_ROUTES = [ '/pricing', '/plans', '/features/comparison' ];
+const JP_CLOUD_PUBLIC_ROUTES = [ '/pricing', '/plans', '/features/comparison', '/manage/pricing' ];
+const A4A_PUBLIC_ROUTES = [ '/signup' ];
 
 const oauthTokenMiddleware = () => {
 	if ( config.isEnabled( 'oauth' ) ) {
@@ -167,6 +168,10 @@ const oauthTokenMiddleware = () => {
 					...JP_CLOUD_PUBLIC_ROUTES.map( ( route ) => `/${ slug }${ route }` )
 				);
 			} );
+		}
+
+		if ( isA8CForAgencies() ) {
+			loggedOutRoutes.push( ...A4A_PUBLIC_ROUTES );
 		}
 
 		// Forces OAuth users to the /login page if no token is present
@@ -218,14 +223,14 @@ const utils = () => {
 const configureReduxStore = ( currentUser, reduxStore ) => {
 	debug( 'Executing Calypso configure Redux store.' );
 
-	if ( currentUser ) {
+	if ( currentUser && currentUser.ID ) {
 		// Set current user in Redux store
 		reduxStore.dispatch( setCurrentUser( currentUser ) );
 	}
 
 	if ( config.isEnabled( 'network-connection' ) ) {
-		asyncRequire( 'calypso/lib/network-connection', ( networkConnection ) =>
-			networkConnection.init( reduxStore )
+		asyncRequire( 'calypso/lib/network-connection' ).then( ( networkConnection ) =>
+			networkConnection.default.init( reduxStore )
 		);
 	}
 
@@ -408,7 +413,7 @@ const boot = async ( currentUser, registerRoutes ) => {
 	saveOauthFlags();
 	utils();
 
-	const queryClient = await createQueryClient( currentUser?.ID );
+	const { queryClient, unsubscribePersister } = await createQueryClient( currentUser?.ID );
 	const initialQueryState = getInitialQueryState();
 	hydrateServerState( queryClient, initialQueryState );
 
@@ -416,6 +421,7 @@ const boot = async ( currentUser, registerRoutes ) => {
 	const reduxStore = createReduxStore( initialState, initialReducer );
 	setStore( reduxStore, getStateFromCache( currentUser?.ID ) );
 	onDisablePersistence( persistOnChange( reduxStore, currentUser?.ID ) );
+	onDisablePersistence( unsubscribePersister );
 	setupLocale( currentUser, reduxStore );
 	geolocateCurrencySymbol();
 	configureReduxStore( currentUser, reduxStore );
@@ -431,7 +437,7 @@ const boot = async ( currentUser, registerRoutes ) => {
 		renderLayout( reduxStore, queryClient );
 	}
 
-	page.start( { decodeURLComponents: false } );
+	page.start();
 };
 
 export const bootApp = async ( appName, registerRoutes ) => {

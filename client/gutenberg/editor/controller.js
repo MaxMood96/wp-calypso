@@ -107,7 +107,6 @@ function waitForPreferredEditorView( context ) {
  * auth cookies from being stored while embedding WP Admin in Calypso (i.e. if the browser is preventing cross-site
  * tracking), so we redirect the user to the WP Admin login page in order to store the auth cookie. Users will be
  * redirected back to Calypso when they are authenticated in WP Admin.
- *
  * @param {Object} context Shared context in the route.
  * @param {Function} next  Next registered callback for the route.
  * @returns {*}            Whatever the next callback returns.
@@ -154,12 +153,33 @@ export const authenticate = ( context, next ) => {
 	// can cause the browser to not update it before redirecting to WP Admin. To avoid that, we manually generate the
 	// URL from the relevant parts.
 	const origin = window.location.origin;
-	const returnUrl = addQueryArgs(
+	let returnUrl = addQueryArgs(
 		{ ...context.query, authWpAdmin: true },
 		`${ origin }${ context.path }`
 	);
 
 	const siteAdminUrl = getSiteAdminUrl( state, siteId );
+
+	// If non-SSO Jetpack lets ensure return URL uses the sites native editor, as the dotcom
+	// redirect does not happen.
+	if ( isJetpack && ! isSSOEnabled( state, siteId ) ) {
+		const postType = determinePostType( context );
+		const postId = getPostID( context );
+
+		if ( postType ) {
+			returnUrl = `${ siteAdminUrl }post-new.php?post_type=${ postType }`;
+
+			if ( postId ) {
+				returnUrl = `${ siteAdminUrl }post.php?post=${ postId }&action=edit`;
+			}
+		} else {
+			returnUrl = `${ siteAdminUrl }site-editor.php`;
+		}
+
+		// pass along parameters, for example press-this
+		returnUrl = addQueryArgs( context.query, returnUrl );
+	}
+
 	const wpAdminLoginUrl = addQueryArgs(
 		{ redirect_to: returnUrl },
 		`${ siteAdminUrl }../wp-login.php`
@@ -206,8 +226,14 @@ export const redirect = async ( context, next ) => {
 };
 
 function getPressThisData( query ) {
-	const { text, url, title, embed } = query;
-	return url ? { text, url, title, embed } : null;
+	const { url, text, title, comment_content, comment_author } = query;
+
+	return url ? { url, text, title, comment_content, comment_author } : null;
+}
+
+function getBloggingPromptData( query ) {
+	const { answer_prompt, new_prompt } = query;
+	return answer_prompt || new_prompt ? { answer_prompt, new_prompt } : null;
 }
 
 function getAnchorFmData( query ) {
@@ -232,6 +258,7 @@ export const post = ( context, next ) => {
 	const state = context.store.getState();
 	const siteId = getSelectedSiteId( state );
 	const pressThisData = getPressThisData( context.query );
+	const bloggingPromptData = getBloggingPromptData( context.query );
 	const anchorFmData = getAnchorFmData( context.query );
 	const parentPostId = parseInt( context.query.parent_post, 10 ) || null;
 
@@ -248,6 +275,7 @@ export const post = ( context, next ) => {
 			postType={ postType }
 			duplicatePostId={ duplicatePostId }
 			pressThisData={ pressThisData }
+			bloggingPromptData={ bloggingPromptData }
 			anchorFmData={ anchorFmData }
 			parentPostId={ parentPostId }
 			creatingNewHomepage={ postType === 'page' && context.query.hasOwnProperty( 'new-homepage' ) }
@@ -272,7 +300,6 @@ export const exitPost = ( context, next ) => {
 
 /**
  * Redirects to the un-iframed Site Editor if the config is enabled.
- *
  * @param {Object} context Shared context in the route.
  * @returns {*}            Whatever the next callback returns.
  */
@@ -285,7 +312,6 @@ export const redirectSiteEditor = async ( context ) => {
 };
 /**
  * Redirect the logged user to the permalink of the post, page, custom post type if the post is published.
- *
  * @param {Object} context Shared context in the route.
  * @param {Function} next  Next registered callback for the route.
  * @returns undefined      Whatever the next callback returns.
@@ -295,23 +321,22 @@ export function redirectToPermalinkIfLoggedOut( context, next ) {
 		return next();
 	}
 	const siteFragment = context.params.site || getSiteFragment( context.path );
-	const CONFIGURABLE_TYPES = [ 'jetpack-portfolio', 'jetpack-testimonial' ];
-
-	// The context.path in this case could be one of the following:
-	// - /page/{site}/{id}
-	// - /post/{site}/{id}
-	// - /edit/jetpack-portfolio/{site}/{id}
-	// - /edit/jetpack-testimonial/{site}/{id}
-	const explodedPath = context.path.split( '/' );
-	if (
-		context.path &&
-		explodedPath[ 1 ] === 'edit' &&
-		! CONFIGURABLE_TYPES.includes( explodedPath[ 2 ] )
-	) {
+	if ( ! siteFragment || ! context.path ) {
 		return next();
 	}
-	// Redirect the logged user to the permalink of the post, page, custom post type if the post is published.
-	// else the endpoint will redirect the user to the login page.
-	window.location = `https://public-api.wordpress.com/wpcom/v2/sites/${ siteFragment }/editor/redirect?path=${ context.path }`;
-	return;
+	// "single view" pages are parsed from URLs like these:
+	// (posts, pages, custom post types, etc…)
+	//  - /page/{site}/{post_id}
+	//  - /post/{site}/{post_id}
+	//  - /edit/jetpack-portfolio/{site}/{post_id}
+	//  - /edit/jetpack-testimonial/{site}/{post_id}
+	const postId = parseInt( context.params.post, 10 );
+	const linksToSingleView = postId > 0;
+	if ( linksToSingleView ) {
+		// Redirect the logged user to the permalink of the post, page, custom post type if the post is published.
+		window.location = `https://public-api.wordpress.com/wpcom/v2/sites/${ siteFragment }/editor/redirect?path=${ context.path }`;
+		return;
+	}
+	// Else redirect the user to the login page.
+	return next();
 }

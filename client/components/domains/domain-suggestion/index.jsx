@@ -1,5 +1,5 @@
 import { Button, Gridicon } from '@automattic/components';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import DomainProductPrice from 'calypso/components/domains/domain-product-price';
@@ -15,9 +15,11 @@ class DomainSuggestion extends Component {
 		premiumDomain: PropTypes.object,
 		priceRule: PropTypes.string,
 		price: PropTypes.string,
+		renewPrice: PropTypes.string,
 		domain: PropTypes.string,
 		hidePrice: PropTypes.bool,
 		showChevron: PropTypes.bool,
+		isAdded: PropTypes.bool,
 	};
 
 	static defaultProps = {
@@ -29,6 +31,7 @@ class DomainSuggestion extends Component {
 			hidePrice,
 			premiumDomain,
 			price,
+			renewPrice,
 			priceRule,
 			salePrice,
 			isSignupStep,
@@ -47,6 +50,7 @@ class DomainSuggestion extends Component {
 		return (
 			<DomainProductPrice
 				price={ price }
+				renewPrice={ renewPrice }
 				salePrice={ salePrice }
 				rule={ priceRule }
 				isSignupStep={ isSignupStep }
@@ -59,7 +63,7 @@ class DomainSuggestion extends Component {
 	render() {
 		const { children, extraClasses, isAdded, isFeatured, showStrikedOutPrice, isReskinned } =
 			this.props;
-		const classes = classNames(
+		const classes = clsx(
 			'domain-suggestion',
 			'card',
 			'is-compact',
@@ -70,32 +74,41 @@ class DomainSuggestion extends Component {
 			extraClasses
 		);
 
-		const contentClassName = classNames( 'domain-suggestion__content', {
+		const contentClassName = clsx( 'domain-suggestion__content', {
 			'domain-suggestion__content-domain': showStrikedOutPrice && ! isFeatured,
 		} );
+
+		const [ badges = null, domainContent = null, matchReason = null ] = Array.isArray( children )
+			? children
+			: [];
 
 		/* eslint-disable jsx-a11y/click-events-have-key-events */
 		/* eslint-disable jsx-a11y/interactive-supports-focus */
 		return (
 			<div
 				className={ classes }
-				onClick={ this.props.onButtonClick }
+				onClick={ () => {
+					this.props.onButtonClick( isAdded );
+				} }
 				data-tracks-button-click-source={ this.props.tracksButtonClickSource }
 				role="button"
 				data-e2e-domain={ this.props.domain }
 			>
+				{ badges }
 				<div className={ contentClassName }>
-					{ children }
+					{ domainContent }
+					{ matchReason }
 					{ ( isReskinned || ! isFeatured ) && this.renderPrice() }
+					{ ! isReskinned && isFeatured && (
+						<div className="domain-suggestion__price-container">{ this.renderPrice() }</div>
+					) }
+					<div className="domain-suggestion__action-container">
+						<Button className="domain-suggestion__action" { ...this.props.buttonStyles }>
+							{ this.props.buttonContent }
+						</Button>
+					</div>
 				</div>
-				{ ! isReskinned && isFeatured && (
-					<div className="domain-suggestion__price-container">{ this.renderPrice() }</div>
-				) }
-				<div className="domain-suggestion__action-container">
-					<Button className="domain-suggestion__action" { ...this.props.buttonStyles }>
-						{ this.props.buttonContent }
-					</Button>
-				</div>
+
 				{ this.props.showChevron && (
 					<Gridicon className="domain-suggestion__chevron" icon="chevron-right" />
 				) }

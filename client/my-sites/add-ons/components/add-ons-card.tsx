@@ -1,23 +1,31 @@
-import { Button, Gridicon } from '@automattic/components';
+import { PRODUCT_1GB_SPACE } from '@automattic/calypso-products';
+import { Badge, Button, Gridicon, Spinner } from '@automattic/components';
 import styled from '@emotion/styled';
 import { Card, CardBody, CardFooter, CardHeader } from '@wordpress/components';
 import { Icon } from '@wordpress/icons';
 import { useTranslate } from 'i18n-calypso';
-import Badge from 'calypso/components/badge';
-import type { AddOnMeta } from '../hooks/use-add-ons';
+import { useSelector } from 'react-redux';
+import { getSelectedSiteId } from 'calypso/state/ui/selectors';
+import type { AddOnMeta } from '@automattic/data-stores';
 
 export interface Props {
 	actionPrimary?: {
-		text: string | React.ReactChild;
+		text: string;
 		handler: ( productSlug: string, quantity?: number ) => void;
 	};
 	actionSecondary?: {
-		text: string | React.ReactChild;
+		text: string;
 		handler: ( productSlug: string ) => void;
 	};
-	useAddOnAvailabilityStatus?: ( addOnMeta: AddOnMeta ) => {
+	useAddOnAvailabilityStatus?: ( {
+		selectedSiteId,
+		addOnMeta,
+	}: {
+		selectedSiteId?: number | null | undefined;
+		addOnMeta: AddOnMeta;
+	} ) => {
 		available: boolean;
-		text?: string | React.ReactChild;
+		text?: string;
 	};
 	highlightFeatured: boolean;
 	addOnMeta: AddOnMeta;
@@ -96,7 +104,9 @@ const AddOnCard = ( {
 	highlightFeatured,
 }: Props ) => {
 	const translate = useTranslate();
-	const availabilityStatus = useAddOnAvailabilityStatus?.( addOnMeta );
+	const selectedSiteId = useSelector( getSelectedSiteId );
+	const availabilityStatus = useAddOnAvailabilityStatus?.( { selectedSiteId, addOnMeta } );
+
 	const onActionPrimary = () => {
 		actionPrimary?.handler( addOnMeta.productSlug, addOnMeta.quantity );
 	};
@@ -104,10 +114,23 @@ const AddOnCard = ( {
 		actionSecondary?.handler( addOnMeta.productSlug );
 	};
 
+	const shouldRenderLoadingState = addOnMeta.isLoading;
+
+	// if product is space upgrade choose the action based on the purchased status
+	const shouldRenderPrimaryAction =
+		addOnMeta.productSlug === PRODUCT_1GB_SPACE
+			? ! addOnMeta.purchased && ! shouldRenderLoadingState
+			: availabilityStatus?.available && ! shouldRenderLoadingState;
+
+	const shouldRenderSecondaryAction =
+		addOnMeta.productSlug === PRODUCT_1GB_SPACE
+			? addOnMeta.purchased && ! shouldRenderLoadingState
+			: ! availabilityStatus?.available && ! shouldRenderLoadingState;
+
 	return (
 		<Container>
 			<Card className="add-ons-card">
-				<CardHeader isBorderless={ true } className="add-ons-card__header">
+				<CardHeader isBorderless className="add-ons-card__header">
 					<div className="add-ons-card__icon">
 						<Icon icon={ addOnMeta.icon } size={ 44 } />
 					</div>
@@ -124,8 +147,11 @@ const AddOnCard = ( {
 					</div>
 				</CardHeader>
 				<CardBody className="add-ons-card__body">{ addOnMeta.description }</CardBody>
-				<CardFooter isBorderless={ true } className="add-ons-card__footer">
-					{ ! availabilityStatus?.available && (
+				<CardFooter isBorderless className="add-ons-card__footer">
+					{ shouldRenderLoadingState && (
+						<Spinner size={ 24 } className="spinner-button__spinner" />
+					) }
+					{ shouldRenderSecondaryAction && (
 						<>
 							{ actionSecondary && (
 								<Button onClick={ onActionSecondary }>{ actionSecondary.text }</Button>
@@ -138,7 +164,7 @@ const AddOnCard = ( {
 							) }
 						</>
 					) }
-					{ availabilityStatus?.available && actionPrimary && (
+					{ shouldRenderPrimaryAction && actionPrimary && (
 						<Button onClick={ onActionPrimary } primary>
 							{ actionPrimary.text }
 						</Button>

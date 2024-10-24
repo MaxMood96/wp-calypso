@@ -1,9 +1,9 @@
 /**
  * @jest-environment jsdom
  */
-import { screen } from '@testing-library/react';
+import pageSpy from '@automattic/calypso-router';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import pageSpy from 'page';
 import { parse } from 'qs';
 import { reducer as ui } from 'calypso/state/ui/reducer';
 import { renderWithProvider } from 'calypso/test-helpers/testing-library';
@@ -16,7 +16,7 @@ jest.mock( 'calypso/reader/stats', () => ( {
 	recordGaEvent: () => {},
 	recordTrackForPost: () => {},
 } ) );
-jest.mock( 'page', () => jest.fn() );
+jest.mock( '@automattic/calypso-router', () => jest.fn() );
 jest.mock( 'calypso/components/sites-popover', () => () => <div data-testid="sites-popover" /> );
 
 const markPostSeen = jest.fn();
@@ -46,9 +46,9 @@ describe( 'DailyPostButton', () => {
 				<DailyPostButton
 					post={ dailyPromptPost }
 					site={ sampleReadingSite }
-					canParticipate={ true }
+					canParticipate
 					primarySiteSlug={ sampleUserSite.slug }
-					onlyOneSite={ true }
+					onlyOneSite
 					markPostSeen={ markPostSeen }
 				/>
 			);
@@ -63,9 +63,9 @@ describe( 'DailyPostButton', () => {
 					tagName="article"
 					post={ dailyPromptPost }
 					site={ sampleReadingSite }
-					canParticipate={ true }
+					canParticipate
 					primarySiteSlug={ sampleUserSite.slug }
-					onlyOneSite={ true }
+					onlyOneSite
 					markPostSeen={ markPostSeen }
 				/>
 			);
@@ -80,9 +80,9 @@ describe( 'DailyPostButton', () => {
 				<DailyPostButton
 					post={ dailyPromptPost }
 					site={ sampleReadingSite }
-					canParticipate={ true }
+					canParticipate
 					primarySiteSlug={ sampleUserSite.slug }
-					onlyOneSite={ true }
+					onlyOneSite
 					markPostSeen={ markPostSeen }
 				/>
 			);
@@ -100,7 +100,7 @@ describe( 'DailyPostButton', () => {
 					tagName="span"
 					post={ dailyPromptPost }
 					site={ sampleReadingSite }
-					canParticipate={ true }
+					canParticipate
 					primarySiteSlug={ sampleUserSite.slug }
 					onlyOneSite={ false }
 					markPostSeen={ markPostSeen }
@@ -112,7 +112,9 @@ describe( 'DailyPostButton', () => {
 			const btn = screen.getByRole( 'button' );
 			await userEvent.click( btn );
 
-			expect( screen.getByTestId( 'sites-popover' ) ).toBeInTheDocument();
+			await waitFor( () => {
+				expect( screen.getByTestId( 'sites-popover' ) ).toBeInTheDocument();
+			} );
 		} );
 	} );
 
@@ -123,9 +125,9 @@ describe( 'DailyPostButton', () => {
 					tagName="span"
 					post={ dailyPromptPost }
 					site={ sampleReadingSite }
-					canParticipate={ true }
+					canParticipate
 					primarySiteSlug={ sampleUserSite.slug }
-					onlyOneSite={ true }
+					onlyOneSite
 					markPostSeen={ markPostSeen }
 				/>
 			);

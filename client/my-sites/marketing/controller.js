@@ -1,5 +1,5 @@
+import page from '@automattic/calypso-router';
 import { translate } from 'i18n-calypso';
-import page from 'page';
 import { createElement } from 'react';
 import { errorNotice } from 'calypso/state/notices/actions';
 import { fetchPreferences } from 'calypso/state/preferences/actions';
@@ -84,7 +84,9 @@ export const connections = ( context, next ) => {
 		);
 	}
 
-	context.contentComponent = createElement( SharingConnections, { isP2Hub, siteId } );
+	const siteSlug = getSiteSlug( state, siteId );
+
+	context.contentComponent = createElement( SharingConnections, { isP2Hub, siteId, siteSlug } );
 
 	next();
 };

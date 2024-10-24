@@ -1,15 +1,14 @@
 import { useTranslate } from 'i18n-calypso';
 import moment from 'moment';
-import { useSelector } from 'react-redux';
 import ElementChart from 'calypso/components/chart';
 import useFetchMonitorData from 'calypso/data/agency-dashboard/use-fetch-monitor-data';
 import TextPlaceholder from 'calypso/jetpack-cloud/sections/partner-portal/text-placeholder';
+import { useSelector } from 'calypso/state';
 import { getSiteMonitorStatuses } from 'calypso/state/jetpack-agency-dashboard/selectors';
-import { useToggleActivateMonitor } from '../../hooks';
-import { getMonitorDowntimeText } from '../utils';
+import useToggleActivateMonitor from '../../hooks/use-toggle-activate-monitor';
 import ExpandedCard from './expanded-card';
+import useGetMonitorDowntimeText from './hooks/use-get-monitor-downtime-text';
 import type { Site } from '../types';
-import type { ReactChild } from 'react';
 
 interface Props {
 	hasMonitor: boolean;
@@ -22,6 +21,7 @@ const START_INDEX = 10;
 
 const MonitorDataContent = ( { siteId }: { siteId: number } ) => {
 	const translate = useTranslate();
+	const getMonitorDowntimeText = useGetMonitorDowntimeText();
 
 	const { data } = useFetchMonitorData( siteId, '30 days' );
 
@@ -32,7 +32,7 @@ const MonitorDataContent = ( { siteId }: { siteId: number } ) => {
 		const { date, status, downtime_in_minutes } = data;
 
 		let className = 'site-expanded-content__chart-bar-no-data';
-		let tooltipLabel: ReactChild = 'No data';
+		let tooltipLabel = 'No data';
 
 		if ( status === 'up' ) {
 			className = 'site-expanded-content__chart-bar-is-uptime';
@@ -67,8 +67,8 @@ const MonitorDataContent = ( { siteId }: { siteId: number } ) => {
 							minBarWidth={ 10 }
 							sliceFromBeginning={ false }
 							minBarsToBeShown={ 20 }
-							hideYAxis={ true }
-							hideXAxis={ true }
+							hideYAxis
+							hideXAxis
 						/>
 					) : (
 						<TextPlaceholder />
@@ -109,7 +109,7 @@ export default function MonitorActivity( { hasMonitor, site, trackEvent, hasErro
 			) }
 			isLoading={ isLoading }
 			hasError={ hasError }
-			// Allow to click on the card only if the monitor is not active
+			// Allow to click on the card only if the monitor is not active & the site is not atomic
 			onClick={ ! hasMonitor ? handleOnClick : undefined }
 		>
 			{ hasMonitor && <MonitorDataContent siteId={ site.blog_id } /> }

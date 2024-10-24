@@ -1,5 +1,5 @@
 import { Card } from '@automattic/components';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
@@ -53,7 +53,7 @@ class BlogSettings extends Component {
 
 		const { isExpanded } = this.state;
 
-		const styles = classNames( 'notification-settings-blog-settings', {
+		const styles = clsx( 'notification-settings-blog-settings', {
 			'is-compact': ! isExpanded,
 			'is-expanded': isExpanded,
 		} );
@@ -70,7 +70,7 @@ class BlogSettings extends Component {
 			'draft_post_prompt',
 		];
 
-		if ( site.options.woocommerce_is_active ) {
+		if ( site.options?.woocommerce_is_active ) {
 			settingKeys.push( 'store_order' );
 		}
 

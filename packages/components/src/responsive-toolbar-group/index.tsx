@@ -1,6 +1,6 @@
 import { useBreakpoint } from '@automattic/viewport-react';
-import classnames from 'classnames';
-import { ReactChild } from 'react';
+import clsx from 'clsx';
+import { ReactNode } from 'react';
 import DropdownGroup from './dropdown-group';
 import SwipeGroup from './swipe-group';
 
@@ -17,8 +17,9 @@ const ResponsiveToolbarGroup = ( {
 	swipeBreakpoint = '<660px',
 	hrefList = [],
 	forceSwipe = false,
+	swipeEnabled = true,
 }: {
-	children: ReactChild[];
+	children: ReactNode[];
 	className?: string;
 	hideRatio?: number;
 	showRatio?: number;
@@ -36,11 +37,16 @@ const ResponsiveToolbarGroup = ( {
 	 * Rendering mode
 	 */
 	forceSwipe?: boolean;
-} ) => {
-	const classes = classnames( 'responsive-toolbar-group', className );
-	const shouldSwipe = useBreakpoint( swipeBreakpoint ) || forceSwipe;
 
-	if ( shouldSwipe ) {
+	/**
+	 * When false completely disables swipe at all breakpoints.
+	 */
+	swipeEnabled?: boolean;
+} ) => {
+	const classes = clsx( 'responsive-toolbar-group', className );
+	const isWithinBreakpoint = useBreakpoint( swipeBreakpoint );
+
+	if ( forceSwipe || ( swipeEnabled && isWithinBreakpoint ) ) {
 		return (
 			<SwipeGroup
 				className={ classes }

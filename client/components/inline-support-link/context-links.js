@@ -1,15 +1,23 @@
+// Links are localized at InlineSupportLink during render
+/* eslint-disable wpcalypso/i18n-unlocalized-url */
+import { DEVELOPER_WORDPRESS_BLOG_ID } from 'calypso/blocks/inline-help/constants';
+
 const contextLinks = {
 	'account-settings': {
 		link: 'https://wordpress.com/support/account-settings/',
 		post_id: 80368,
+	},
+	'admin-interface-style': {
+		link: 'https://wordpress.com/support/set-your-admin-interface-style/',
+		post_id: 386651,
 	},
 	advertising: {
 		link: 'https://wordpress.com/support/promote-a-post/',
 		post_id: 213203,
 	},
 	autorenewal: {
-		link: 'https://wordpress.com/support/manage-purchases/#automatic-renewal',
-		post_id: 111349,
+		link: 'https://wordpress.com/support/manage-purchases/automatic-renewal/',
+		post_id: 267092,
 	},
 	backups: {
 		link: 'https://wordpress.com/support/restore/',
@@ -28,8 +36,8 @@ const contextLinks = {
 		post_id: 240330,
 	},
 	cancel_purchase: {
-		link: 'https://wordpress.com/support/manage-purchases/#cancel-a-purchase',
-		post_id: 111349,
+		link: 'https://wordpress.com/support/manage-purchases/cancel-a-purchase/',
+		post_id: 267077,
 	},
 	categories: {
 		link: 'https://wordpress.com/support/posts/categories/',
@@ -39,6 +47,14 @@ const contextLinks = {
 		link: 'https://wordpress.com/support/comments/',
 		post_id: 113,
 	},
+	dashboard: {
+		link: 'https://wordpress.com/support/dashboard/',
+		post_id: 137,
+	},
+	delete_site: {
+		link: 'https://wordpress.com/support/delete-site/',
+		post_id: 14411,
+	},
 	discussion: {
 		link: 'https://wordpress.com/support/settings/discussion-settings/',
 		post_id: 1504,
@@ -46,6 +62,10 @@ const contextLinks = {
 	domains: {
 		link: 'https://wordpress.com/support/domains/',
 		post_id: 1988,
+	},
+	donations: {
+		link: 'https://wordpress.com/support/wordpress-editor/blocks/donations/',
+		post_id: 171110,
 	},
 	earn: {
 		link: 'https://wordpress.com/support/monetize-your-site/',
@@ -60,8 +80,8 @@ const contextLinks = {
 		post_id: 2087,
 	},
 	'export-media-library': {
-		link: 'https://wordpress.com/support/export/#exporting-the-media-library',
-		post_id: 2087,
+		link: 'https://wordpress.com/support/export-your-media-library',
+		post_id: 278472,
 	},
 	followers: {
 		link: 'https://wordpress.com/support/followers/',
@@ -80,24 +100,44 @@ const contextLinks = {
 		post_id: 98905,
 	},
 	'hosting-sftp': {
-		link: 'https://wordpress.com/support/sftp/',
-		post_id: 159771,
+		link: 'https://developer.wordpress.com/docs/developer-tools/sftp/',
+		post_id: 99380,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
 	},
 	'hosting-staging-site': {
-		link: 'https://wordpress.com/support/how-to-create-a-staging-site/',
-		post_id: 239448,
+		link: 'https://developer.wordpress.com/docs/developer-tools/staging-sites/',
+		post_id: 99381,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'hosting-edge-cache': {
+		link: 'https://developer.wordpress.com/docs/site-performance/global-edge-cache/',
+		post_id: 99415,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
 	},
 	'hosting-clear-cache': {
-		link: 'https://wordpress.com/support/clear-your-sites-cache/',
-		post_id: 164969,
+		link: 'https://developer.wordpress.com/docs/site-performance/global-edge-cache/#1-clear-your-site-s-cache',
+		post_id: 99415,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'hosting-defensive-mode': {
+		link: 'https://developer.wordpress.com/docs/site-performance/defensive-mode/',
+		post_id: 99415,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
 	},
 	'hosting-connect-to-ssh': {
-		link: 'https://wordpress.com/support/connect-to-ssh-on-wordpress-com/',
-		post_id: 213309,
+		link: 'https://developer.wordpress.com/docs/developer-tools/ssh/',
+		post_id: 100385,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
 	},
 	'hosting-mysql': {
-		link: 'https://wordpress.com/support/phpmyadmin-and-mysql/',
-		post_id: 159822,
+		link: 'https://developer.wordpress.com/docs/developer-tools/database-access/',
+		post_id: 99378,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'hosting-elasticsearch': {
+		link: 'https://developer.wordpress.com/docs/elasticsearch/elasticsearch-queries/',
+		post_id: 99387,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
 	},
 	import: {
 		link: 'https://wordpress.com/support/import/',
@@ -117,15 +157,15 @@ const contextLinks = {
 	},
 	'importers-substack': {
 		link: 'https://wordpress.com/support/import/import-from-substack/',
-		post_id: 87696,
+		post_id: 257527,
 	},
 	'importers-wix': {
 		link: 'https://wordpress.com/support/import/import-from-wix/',
 		post_id: 147777,
 	},
 	'importers-wordpress': {
-		link: 'https://wordpress.com/support/export/',
-		post_id: 2087,
+		link: 'https://wordpress.com/support/import/import-a-sites-content/#step-1-obtain-an-export-file',
+		post_id: 194757,
 	},
 	'introduction-to-woocommerce': {
 		link: 'https://wordpress.com/support/introduction-to-woocommerce/',
@@ -155,6 +195,14 @@ const contextLinks = {
 		link: 'https://wordpress.com/support/paid-newsletters/',
 		post_id: 168381,
 	},
+	payments_blocks: {
+		link: 'https://wordpress.com/support/wordpress-editor/blocks/payments',
+		post_id: 169123,
+	},
+	payment_button_block: {
+		link: 'https://wordpress.com/support/wordpress-editor/blocks/payments/#payment-button-block',
+		post_id: 169123,
+	},
 	payment_method_all_subscriptions: {
 		link: 'https://wordpress.com/support/payment/#using-a-payment-method-for-all-subscriptions',
 		post_id: 76237,
@@ -166,6 +214,10 @@ const contextLinks = {
 	payment_methods_manage: {
 		link: 'https://wordpress.com/support/payment/#manage-payment-methods',
 		post_id: 76237,
+	},
+	paypal: {
+		link: 'https://wordpress.com/support/wordpress-editor/blocks/pay-with-paypal/',
+		post_id: 168671,
 	},
 	performance: {
 		link: 'https://wordpress.com/support/settings/performance-settings/',
@@ -187,9 +239,25 @@ const contextLinks = {
 		link: 'https://wordpress.com/support/posts/',
 		post_id: 84,
 	},
+	premium_content_block: {
+		link: 'https://wordpress.com/support/wordpress-editor/blocks/premium-content-block/',
+		post_id: 243475,
+	},
 	privacy: {
-		link: 'https://wordpress.com/support/settings/privacy-settings/',
+		link: 'https://wordpress.com/support/privacy-settings/',
 		post_id: 1507,
+	},
+	'privacy-preview-link': {
+		link: 'https://wordpress.com/support/settings/privacy-settings/#preview-link',
+		post_id: 1507,
+	},
+	'privacy-prevent-third-party-sharing': {
+		link: 'https://wordpress.com/support/privacy-settings/make-your-website-public/#prevent-third-party-sharing',
+		post_id: 1507,
+	},
+	'primary-site-address': {
+		link: 'https://wordpress.com/support/domains/set-a-primary-address/',
+		post_id: 197437,
 	},
 	publicize: {
 		link: 'https://wordpress.com/support/post-automatically-to-social-media/',
@@ -215,9 +283,18 @@ const contextLinks = {
 		link: 'https://wordpress.com/support/transferring-a-site-to-another-wordpress-com-account/',
 		post_id: 102743,
 	},
+	'site-reset': {
+		link: 'https://wordpress.com/support/reset-your-site/',
+		post_id: 296649,
+	},
 	'site-verification': {
 		link: 'https://wordpress.com/support/site-verification-services/',
 		post_id: 5022,
+	},
+	'staging-to-production-sync': {
+		link: 'https://developer.wordpress.com/docs/developer-tools/staging-sites/#staging-to-production',
+		post_id: 99381,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
 	},
 	stats: {
 		link: 'https://wordpress.com/support/stats/',
@@ -259,9 +336,53 @@ const contextLinks = {
 		link: 'https://wordpress.com/support/traffic/',
 		post_id: 155209,
 	},
+	'two-step-authentication-security-key': {
+		link: 'https://wordpress.com/support/security/two-step-authentication/security-key-authentication/',
+		post_id: 263616,
+	},
 	'webmaster-tools': {
 		link: 'https://wordpress.com/support/webmaster-tools/',
 		post_id: 5022,
+	},
+	'site-monitoring': {
+		link: 'https://developer.wordpress.com/docs/troubleshooting/site-monitoring/',
+		post_id: 99421,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'site-monitoring-metrics': {
+		link: 'https://developer.wordpress.com/docs/troubleshooting/site-monitoring/#metrics',
+		post_id: 99421,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'site-monitoring-logs': {
+		link: 'https://developer.wordpress.com/docs/troubleshooting/site-monitoring/#php-logs-and-webserver-logs',
+		post_id: 99421,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'github-deployments': {
+		link: 'https://developer.wordpress.com/docs/developer-tools/github-deployments/',
+		post_id: 99879,
+		blog_id: DEVELOPER_WORDPRESS_BLOG_ID,
+	},
+	'subscriptions-and-newsletters': {
+		link: 'https://wordpress.com/support/subscriptions-and-newsletters/',
+		post_id: 67810,
+	},
+	'featured-images': {
+		link: 'https://wordpress.com/support/featured-images/',
+		post_id: 5259,
+	},
+	'hosting-configuration': {
+		link: 'https://wordpress.com/support/hosting-configuration/',
+		post_id: 160841,
+	},
+	'site-icons': {
+		link: 'https://wordpress.com/support/site-icons/',
+		post_id: 1327,
+	},
+	'site-performance': {
+		link: 'https://wordpress.com/support/check-your-sites-performance/',
+		post_id: 386816,
 	},
 };
 

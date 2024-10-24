@@ -1,9 +1,20 @@
 #!/usr/bin/env node
-import util from 'util';
+import util from 'node:util';
 import glob from 'glob';
 import runTask from './teamcity-task-runner.mjs';
 
 const globPromise = util.promisify( glob );
+
+// Promise.allSettled with some extra code to throw an error.
+async function completeTasks( promises ) {
+	const results = await Promise.allSettled( promises );
+	const exitCodes = results
+		.filter( ( { status } ) => status === 'rejected' )
+		.map( ( { reason } ) => reason );
+	if ( exitCodes.length ) {
+		throw exitCodes[ 0 ];
+	}
+}
 
 function withTscInfo( { cmd, id } ) {
 	return {
@@ -29,7 +40,6 @@ const tscPackages = withTscInfo( {
 } );
 
 const tscCommands = [
-	{ cmd: 'tsc --noEmit --project apps/editing-toolkit/tsconfig.json', id: 'type_check_etk' },
 	{ cmd: 'tsc --noEmit --project client/tsconfig.json', id: 'type_check_client' },
 	{ cmd: 'tsc --noEmit --project test/e2e/tsconfig.json', id: 'type_check_tests' },
 ].map( withTscInfo );
@@ -45,14 +55,20 @@ const tscCommands = [
 // runs by itself with 8 cores, and the other tasks run one by one with 4 other
 // cores. This leaves a final 4 cores free for tsc + any other tasks. This seems
 // to result in the fastest overall completion time.
-const testClient = withUnitTestInfo( 'test-client --maxWorkers=8' );
-const testPackages = withUnitTestInfo( 'test-packages --maxWorkers=4' );
-const testServer = withUnitTestInfo( 'test-server --maxWorkers=4' );
-const testBuildTools = withUnitTestInfo( 'test-build-tools --maxWorkers=4' );
+//
+// --workerIdleMemoryLimit=512MB is added because of https://github.com/jestjs/jest/issues/11956
+const testClient = withUnitTestInfo( 'test-client --maxWorkers=8 --workerIdleMemoryLimit=1GB' );
+const testPackages = withUnitTestInfo( 'test-packages --maxWorkers=4 --workerIdleMemoryLimit=1GB' );
+const testServer = withUnitTestInfo( 'test-server --maxWorkers=4 --workerIdleMemoryLimit=1GB' );
+const testBuildTools = withUnitTestInfo(
+	'test-build-tools --maxWorkers=4 --workerIdleMemoryLimit=1GB'
+);
+// Includes ETK and Odyssey Stats, migrated here from their individual builds.
+const testApps = withUnitTestInfo( 'test-apps --maxWorkers=1 --workerIdleMemoryLimit=1GB' );
 
 const testWorkspaces = {
 	name: 'yarn',
-	args: 'workspaces foreach --verbose --parallel run storybook --ci --smoke-test',
+	args: 'workspaces foreach -A --verbose --parallel run storybook --ci --smoke-test',
 	testId: 'check_storybook',
 };
 
@@ -75,7 +91,7 @@ try {
 	const tscTasks = ( async () => {
 		// This task is a prerequisite for the other tsc tasks, so it must run separately.
 		await runTask( tscPackages );
-		await Promise.all( tscCommands.map( runTask ) );
+		await completeTasks( tscCommands.map( runTask ) );
 	} )();
 
 	// Run these smaller tasks in serial to keep a healthy amount of CPU available for the other tasks.
@@ -84,10 +100,11 @@ try {
 		await runTask( testServer );
 		await runTask( testBuildTools );
 		await runTask( testWorkspaces );
+		await runTask( testApps );
 	} )();
 
-	await Promise.all( [ testClientTask, tscTasks, otherTestTasks ] );
+	await completeTasks( [ testClientTask, tscTasks, otherTestTasks ] );
 } catch ( exitCode ) {
-	console.log( `A task failed with exit code ${ exitCode }` );
+	console.error( 'One or more tasks failed.' );
 	process.exit( exitCode );
 }

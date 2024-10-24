@@ -6,9 +6,10 @@ import {
 	isJetpackProduct,
 	JETPACK_LEGACY_PLANS,
 } from '@automattic/calypso-products';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
+import InfoPopover from 'calypso/components/info-popover';
+import InlineSupportLink from 'calypso/components/inline-support-link';
 import { useLocalizedMoment } from 'calypso/components/localized-moment';
 import {
 	hasPaymentMethod,
@@ -18,6 +19,7 @@ import {
 	isExpired,
 } from 'calypso/lib/purchases';
 import { isAkismetTemporarySitePurchase } from 'calypso/me/purchases/utils';
+import { useSelector } from 'calypso/state';
 import { getCurrentUserId } from 'calypso/state/current-user/selectors';
 import AutoRenewToggle from './auto-renew-toggle';
 import type { SiteDetails } from '@automattic/data-stores';
@@ -50,7 +52,6 @@ function PurchaseMetaExpiration( {
 }: ExpirationProps ) {
 	const translate = useTranslate();
 	const moment = useLocalizedMoment();
-
 	const isProductOwner = purchase?.userId === useSelector( getCurrentUserId );
 	const isJetpackPurchase = isJetpackPlan( purchase ) || isJetpackProduct( purchase );
 	const isCancellableSitelessPurchase = isAkismetTemporarySitePurchase( purchase );
@@ -83,7 +84,7 @@ function PurchaseMetaExpiration( {
 				siteSlug={ site && ! isCancellableSitelessPurchase ? site.slug : '' }
 				purchase={ purchase }
 				toggleSource="manage-purchase"
-				showLink={ true }
+				showLink
 				getChangePaymentMethodUrlFor={ getChangePaymentMethodUrlFor }
 			/>
 		) : (
@@ -135,6 +136,20 @@ function PurchaseMetaExpiration( {
 				},
 			} );
 		}
+		const shouldShowTooltip = () => {
+			if ( ! purchase.expiryDate || ! purchase.renewDate ) {
+				return false;
+			}
+
+			if (
+				purchase.renewDate !== purchase.expiryDate &&
+				( purchase.expiryStatus === 'active' || purchase.expiryStatus === 'auto-renewing' )
+			) {
+				return true;
+			}
+
+			return false;
+		};
 
 		return (
 			<li className="manage-purchase__meta-expiration">
@@ -147,11 +162,29 @@ function PurchaseMetaExpiration( {
 					</div>
 				) }
 				<span
-					className={ classNames( 'manage-purchase__detail', {
+					className={ clsx( 'manage-purchase__detail', {
 						'is-expiring': isCloseToExpiration( purchase ),
 					} ) }
 				>
 					{ subsBillingText }
+					{ shouldShowTooltip() && (
+						<InfoPopover position="bottom right">
+							{ translate(
+								'Your subscription is paid through {{dateSpan}}%(expireDate)s{{/dateSpan}}, but will be renewed prior to that date. {{inlineSupportLink}}Learn more{{/inlineSupportLink}}',
+								{
+									args: {
+										expireDate: moment( purchase.expiryDate ).format( 'LL' ),
+									},
+									components: {
+										dateSpan,
+										inlineSupportLink: (
+											<InlineSupportLink supportContext="autorenewal" showIcon={ false } />
+										),
+									},
+								}
+							) }
+						</InfoPopover>
+					) }
 				</span>
 				{ ! isAutorenewalEnabled &&
 					! hideAutoRenew &&

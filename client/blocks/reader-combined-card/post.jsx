@@ -1,4 +1,4 @@
-import classnames from 'classnames';
+import clsx from 'clsx';
 import closest from 'component-closest';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
@@ -76,7 +76,6 @@ class ReaderCombinedCardPost extends Component {
 			currentRoute,
 			post,
 			streamUrl,
-			isDiscover,
 			isSelected,
 			postKey,
 			hasOrganization,
@@ -122,7 +121,7 @@ class ReaderCombinedCardPost extends Component {
 		if ( isEligibleForUnseen( { isWPForTeamsItem, currentRoute, hasOrganization } ) ) {
 			isSeen = post?.is_seen;
 		}
-		const classes = classnames( {
+		const classes = clsx( {
 			'reader-combined-card__post': true,
 			'is-selected': isSelected,
 			'is-seen': isSeen,
@@ -143,7 +142,7 @@ class ReaderCombinedCardPost extends Component {
 							</a>
 						</h1>
 					</AutoDirection>
-					<ReaderExcerpt post={ post } isDiscover={ isDiscover } />
+					<ReaderExcerpt post={ post } />
 					<div className="reader-combined-card__post-author-and-time ignore-click">
 						<ReaderVisitLink href={ post.URL } iconSize={ 14 }>
 							{ this.props.translate( 'Visit' ) }

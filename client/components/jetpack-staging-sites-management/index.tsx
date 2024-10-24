@@ -3,8 +3,9 @@ import { ToggleControl } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 import { useTranslate } from 'i18n-calypso';
 import { FunctionComponent, useCallback, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import QueryBackupStagingSite from 'calypso/components/data/query-backup-staging-site';
+import { useDispatch, useSelector } from 'calypso/state';
+import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import getBackupStagingSiteInfo from 'calypso/state/rewind/selectors/get-backup-staging-site-info';
 import getBackupStagingUpdateRequestStatus from 'calypso/state/rewind/selectors/get-backup-staging-update-status';
 import hasFetchedStagingSiteInfo from 'calypso/state/rewind/selectors/has-fetched-staging-site-info';
@@ -39,9 +40,18 @@ const JetpackStagingSitesManagement: FunctionComponent = () => {
 		}
 	}, [ hasFetched, isLoading, isStaging ] );
 
+	useEffect( () => {
+		dispatch( recordTracksEvent( 'calypso_jetpack_backup_setup_staging_site_view' ) );
+	}, [ dispatch ] );
+
 	const toggleStagingFlag = useCallback( () => {
 		setStagingToggle( ! stagingToggle );
 		dispatch( requestUpdateBackupStagingFlag( siteId, ! isStaging ) );
+		dispatch(
+			recordTracksEvent( 'calypso_jetpack_backup_setup_staging_site_toggle', {
+				toggle: ! isStaging,
+			} )
+		);
 	}, [ dispatch, isStaging, siteId, stagingToggle ] );
 
 	const stagingIcon = (
@@ -68,38 +78,30 @@ const JetpackStagingSitesManagement: FunctionComponent = () => {
 		</svg>
 	);
 
-	const StagingToggleControl = ToggleControl as React.ComponentType<
-		ToggleControl.Props & {
-			disabled?: boolean;
-		}
-	>;
-
 	return (
 		<>
 			<QueryBackupStagingSite siteId={ siteId } />
 			<div className="jetpack-staging-sites-management">
-				<Card compact={ true } className="setting-title">
+				<Card compact className="setting-title">
 					<h3>{ translate( 'Set up as staging site' ) }</h3>
 					<div className="staging-icon">{ stagingIcon }</div>
 				</Card>
 				<Card className="setting-content">
 					<div className="setting-option">
 						<div className="setting-option__toggle">
-							<StagingToggleControl
+							<ToggleControl
+								label={ translate(
+									'{{strong}}Set this site as a Staging Site.{{/strong}} You will be able to copy any site to this staging site and test your changes safely.',
+									{
+										components: {
+											strong: <strong />,
+										},
+									}
+								) }
 								disabled={ isLoading }
 								checked={ isStaging }
 								onChange={ toggleStagingFlag }
 							/>
-						</div>
-						<div className="setting-option__description">
-							{ translate(
-								'{{strong}}Set this site as a Staging Site.{{/strong}} You will be able to copy any site to this staging site and test your changes safely.',
-								{
-									components: {
-										strong: <strong />,
-									},
-								}
-							) }
 						</div>
 					</div>
 				</Card>

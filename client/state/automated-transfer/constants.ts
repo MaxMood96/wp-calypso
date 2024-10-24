@@ -15,6 +15,8 @@ export const transferStates = {
 	BACKFILLING: 'backfilling',
 	RELOCATING: 'relocating_switcheroo',
 	COMPLETE: 'complete',
+	COMPLETED: 'completed', // there seems to be two spellings for this state
+	NULL: null,
 	/**
 	 * Similar to 'none' there is no existing transfer, but this is when the site has been already reverted from atomic
 	 */
@@ -26,6 +28,15 @@ export const transferStates = {
 	 */
 	REQUEST_FAILURE: 'request_failure',
 } as const;
+
+export const transferInProgress = [
+	transferStates.START,
+	transferStates.PENDING,
+	transferStates.ACTIVE,
+	transferStates.PROVISIONED,
+] as const;
+
+export const transferRevertingInProgress = [ transferStates.RELOCATING_REVERT ] as const;
 
 export type TransferStates = ( typeof transferStates )[ keyof typeof transferStates ];
 
@@ -45,4 +56,5 @@ export const eligibilityHolds = {
 	NO_SSL_CERTIFICATE: 'NO_SSL_CERTIFICATE',
 	EMAIL_UNVERIFIED: 'EMAIL_UNVERIFIED',
 	EXCESSIVE_DISK_SPACE: 'EXCESSIVE_DISK_SPACE',
+	IS_STAGING_SITE: 'IS_STAGING_SITE',
 };

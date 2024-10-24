@@ -1,5 +1,4 @@
-import config from '@automattic/calypso-config';
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { makeLayout, render as clientRender } from 'calypso/controller';
 import { navigation, siteSelection, sites } from 'calypso/my-sites/controller';
 import {
@@ -17,6 +16,7 @@ import {
 	emailStats,
 	emailSummary,
 	subscribers,
+	purchase,
 } from './controller';
 
 import './style.scss';
@@ -41,6 +41,8 @@ export default function () {
 		'filedownloads',
 		'searchterms',
 		'annualstats',
+		'utm',
+		'devices',
 	].join( '|' );
 
 	// Redirect this to default /stats/day view in order to keep
@@ -50,16 +52,16 @@ export default function () {
 	// Stat Overview Page
 	statsPage( `/stats/:period(${ validPeriods })`, overview );
 
-	statsPage( '/stats/insights', sites );
+	// Stat Purchase Page
+	statsPage( '/stats/purchase/:site?', purchase );
 
 	// Stat Insights Page
+	statsPage( '/stats/insights', sites );
 	statsPage( '/stats/insights/:site', insights );
 
-	if ( config.isEnabled( 'stats/subscribers-section' ) ) {
-		// Stat Subscribers Page (do not cofuse with people/subscribers/)
-		statsPage( '/stats/subscribers/:site', subscribers );
-		statsPage( `/stats/subscribers/:period(${ validPeriods })/:site`, subscribers );
-	}
+	// Stat Subscribers Page (do not confuse with people/subscribers/)
+	statsPage( '/stats/subscribers/:site', subscribers );
+	statsPage( `/stats/subscribers/:period(${ validPeriods })/:site`, subscribers );
 
 	// Stat Site Pages
 	statsPage( `/stats/:period(${ validPeriods })/:site`, site );
@@ -88,13 +90,8 @@ export default function () {
 	page( '/stats/ads/(.*)', redirectToDefaultWordAdsPeriod );
 
 	// Email stats Pages
-	if ( config.isEnabled( 'newsletter/stats' ) ) {
-		statsPage(
-			`/stats/email/:statType/:period(${ validEmailPeriods })/:email_id/:site`,
-			emailStats
-		);
-		statsPage( `/stats/day/emails/:site`, emailSummary );
-	}
+	statsPage( `/stats/email/:statType/:period(${ validEmailPeriods })/:email_id/:site`, emailStats );
+	statsPage( `/stats/day/emails/:site`, emailSummary );
 
 	// Anything else should redirect to default stats page
 	page( '/stats/(.*)', redirectToDefaultSitePage );

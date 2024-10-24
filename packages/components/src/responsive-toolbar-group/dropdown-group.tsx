@@ -1,8 +1,16 @@
-import { ToolbarGroup, ToolbarButton, Dropdown, MenuItem, MenuGroup } from '@wordpress/components';
+import {
+	ToolbarGroup,
+	ToolbarButton,
+	Dropdown,
+	MenuItem,
+	MenuGroup,
+	SlotFillProvider,
+	Popover,
+} from '@wordpress/components';
 import { Icon, chevronDown } from '@wordpress/icons';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
-import { ReactChild, useCallback, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 import './style.scss';
 
@@ -19,7 +27,7 @@ export default function DropdownGroup( {
 	onClick = () => null,
 	initialActiveIndex = -1,
 }: {
-	children: ReactChild[];
+	children: ReactNode[];
 	className?: string;
 	hideRatio?: number;
 	showRatio?: number;
@@ -27,7 +35,7 @@ export default function DropdownGroup( {
 	onClick?: ( index: number ) => void;
 	initialActiveIndex?: number;
 } ) {
-	const classes = classnames( 'responsive-toolbar-group__dropdown', className );
+	const classes = clsx( 'responsive-toolbar-group__dropdown', className );
 
 	const containerRef = useRef< HTMLDivElement >( null );
 	const [ calculatedOnce, setCalculatedOnce ] = useState< boolean >( false );
@@ -82,45 +90,49 @@ export default function DropdownGroup( {
 
 		if ( containGroupedIndexes || always ) {
 			return (
-				<Dropdown
-					renderToggle={ ( { onToggle } ) => (
-						<ToolbarButton
-							className={ classnames(
-								'responsive-toolbar-group__more-item',
-								'responsive-toolbar-group__button-item'
-							) }
-							isActive={ groupedIndexes[ activeIndex ] }
-							onClick={ () => {
-								onToggle();
-							} }
-						>
-							{ translate( 'More' ) }
-							<Icon icon={ chevronDown } />
-						</ToolbarButton>
-					) }
-					renderContent={ ( { onClose } ) => (
-						<MenuGroup>
-							{ getChildrenToRender()
-								.filter( ( { grouped } ) => grouped )
-								.map( ( { index, child } ) => (
-									<MenuItem
-										key={ `menu-item-${ index }` }
-										onClick={ () => {
-											setActiveIndex( parseInt( index ) );
-											onClick( parseInt( index ) );
-											onClose();
-										} }
-										className={ classnames(
-											'responsive-toolbar-group__menu-item',
-											activeIndex === parseInt( index ) ? 'is-selected' : ''
-										) }
-									>
-										{ child }
-									</MenuItem>
-								) ) }
-						</MenuGroup>
-					) }
-				/>
+				<SlotFillProvider>
+					{ /* @ts-expect-error-ignore  */ }
+					<Popover.Slot />
+					<Dropdown
+						renderToggle={ ( { onToggle } ) => (
+							<ToolbarButton
+								className={ clsx(
+									'responsive-toolbar-group__more-item',
+									'responsive-toolbar-group__button-item'
+								) }
+								isActive={ groupedIndexes[ activeIndex ] }
+								onClick={ () => {
+									onToggle();
+								} }
+							>
+								{ translate( 'More' ) }
+								<Icon icon={ chevronDown } />
+							</ToolbarButton>
+						) }
+						renderContent={ ( { onClose } ) => (
+							<MenuGroup>
+								{ getChildrenToRender()
+									.filter( ( { grouped } ) => grouped )
+									.map( ( { index, child } ) => (
+										<MenuItem
+											key={ `menu-item-${ index }` }
+											onClick={ () => {
+												setActiveIndex( parseInt( index ) );
+												onClick( parseInt( index ) );
+												onClose();
+											} }
+											className={ clsx(
+												'responsive-toolbar-group__menu-item',
+												activeIndex === parseInt( index ) ? 'is-selected' : ''
+											) }
+										>
+											{ child }
+										</MenuItem>
+									) ) }
+							</MenuGroup>
+						) }
+					/>
+				</SlotFillProvider>
 			);
 		}
 
@@ -209,7 +221,7 @@ export default function DropdownGroup( {
 				{ maybeRenderMore( true ) }
 			</ToolbarGroup>
 			<ToolbarGroup
-				className={ classnames(
+				className={ clsx(
 					'responsive-toolbar-group__grouped-list',
 					calculatedOnce ? 'is-visible' : ''
 				) }

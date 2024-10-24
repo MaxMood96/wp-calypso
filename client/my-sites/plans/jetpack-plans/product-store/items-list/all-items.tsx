@@ -1,11 +1,10 @@
+import { isEnabled } from '@automattic/calypso-config';
 import {
 	isJetpackPlanSlug,
-	PRODUCT_JETPACK_SOCIAL_ADVANCED,
-	PRODUCT_JETPACK_SOCIAL_ADVANCED_MONTHLY,
-	PRODUCT_JETPACK_SOCIAL_BASIC,
-	PRODUCT_JETPACK_SOCIAL_BASIC_MONTHLY,
+	isJetpackSocialSlug,
+	isJetpackStatsPaidProductSlug,
 } from '@automattic/calypso-products';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useStoreItemInfoContext } from '../context/store-item-info-context';
 import { ItemPrice } from '../item-price';
 import { MoreInfoLink } from '../more-info-link';
@@ -28,6 +27,7 @@ export const AllItems: React.FC< AllItemsProps > = ( {
 		getCtaAriaLabel,
 		getIsDeprecated,
 		getIsExternal,
+		getIsIndirectCheckout,
 		getIsIncludedInPlan,
 		getIsIncludedInPlanOrSuperseded,
 		getIsMultisiteCompatible,
@@ -41,7 +41,7 @@ export const AllItems: React.FC< AllItemsProps > = ( {
 		getIsProductInCart,
 	} = useStoreItemInfoContext();
 
-	const wrapperClassName = classNames( 'jetpack-product-store__all-items', className );
+	const wrapperClassName = clsx( 'jetpack-product-store__all-items', className );
 
 	return (
 		<div className={ wrapperClassName }>
@@ -56,6 +56,7 @@ export const AllItems: React.FC< AllItemsProps > = ( {
 					const isSuperseded = getIsSuperseded( item );
 					const isDeprecated = getIsDeprecated( item );
 					const isExternal = getIsExternal( item );
+					const isIndirectCheckout = getIsIndirectCheckout( item );
 					const isIncludedInPlanOrSuperseded = getIsIncludedInPlanOrSuperseded( item );
 					const isIncludedInPlan = getIsIncludedInPlan( item );
 					const isMultiSiteIncompatible = isMultisite && ! getIsMultisiteCompatible( item );
@@ -87,7 +88,7 @@ export const AllItems: React.FC< AllItemsProps > = ( {
 								<MoreInfoLink
 									onClick={ onClickMoreInfoFactory( item ) }
 									item={ item }
-									isExternal={ isExternal }
+									isLinkExternal={ isExternal || isIndirectCheckout }
 								/>
 							) }
 						</>
@@ -100,22 +101,17 @@ export const AllItems: React.FC< AllItemsProps > = ( {
 						isSuperseded
 					);
 
-					const isSocialProduct = [
-						PRODUCT_JETPACK_SOCIAL_ADVANCED,
-						PRODUCT_JETPACK_SOCIAL_ADVANCED_MONTHLY,
-						PRODUCT_JETPACK_SOCIAL_BASIC,
-						PRODUCT_JETPACK_SOCIAL_BASIC_MONTHLY,
-					].includes( item.productSlug );
+					const isMultiPlanSelectProduct =
+						( isJetpackSocialSlug( item.productSlug ) &&
+							! isEnabled( 'jetpack/social-plans-v1' ) ) ||
+						isJetpackStatsPaidProductSlug( item.productSlug );
 
-					// Go to the checkout page for all products when they click on the 'GET' CTA,
-					// except for Jetpack Social when it isn't owned or included in an active plan,
-					// in which case we open a modal.
-					const ctaHref =
-						isSocialProduct && ! isIncludedInPlanOrSuperseded
-							? `#${ item.productSlug }`
-							: getCheckoutURL( item );
+					let ctaHref = getCheckoutURL( item );
+					if ( isMultiPlanSelectProduct && ! isIncludedInPlanOrSuperseded ) {
+						ctaHref = `#${ item.productSlug }`;
+					}
 
-					const onClickCta = isSocialProduct
+					const onClickCta = isMultiPlanSelectProduct
 						? onClickMoreInfoFactory( item )
 						: getOnClickPurchase( item );
 

@@ -23,8 +23,14 @@ export const SITE_REQUEST_FIELDS = [
 	'is_wpcom_atomic',
 	'is_wpcom_staging_site',
 	'was_ecommerce_trial',
+	'was_migration_trial',
+	'was_upgraded_from_trial',
+	'was_hosting_trial',
 	'description',
 	'user_interactions',
+	'is_deleted',
+	'is_a4a_client',
+	'is_a4a_dev_site',
 ].join();
 
 export const SITE_REQUEST_OPTIONS = [
@@ -74,11 +80,15 @@ export const SITE_REQUEST_OPTIONS = [
 	'site_creation_flow',
 	'site_source_slug',
 	'is_difm_lite_in_progress',
-	'difm_lite_site_options',
 	'site_intent',
+	'theme_slug',
 	'launchpad_screen',
 	'launchpad_checklist_tasks_statuses',
 	'wpcom_production_blog_id',
 	'wpcom_staging_blog_ids',
 	'can_blaze',
+	'is_commercial',
+	'is_commercial_reasons',
+	'wpcom_admin_interface',
+	'wpcom_classic_early_release',
 ].join();

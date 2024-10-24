@@ -3,7 +3,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook } from '@testing-library/react-hooks';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import nock from 'nock';
 import { useDispatch } from 'react-redux';
 import usePayInvoiceMutation from 'calypso/state/partner-portal/invoices/hooks/pay-invoice-mutation';
@@ -15,10 +15,7 @@ jest.mock( 'react-redux', () => ( {
 } ) );
 
 function createQueryClient() {
-	const logger = {
-		error: jest.fn(),
-	};
-	return new QueryClient( { logger } );
+	return new QueryClient();
 }
 
 describe( 'useInvoicesQuery', () => {
@@ -55,7 +52,7 @@ describe( 'useInvoicesQuery', () => {
 			.get( '/wpcom/v2/jetpack-licensing/partner/invoices?starting_after=&ending_before=' )
 			.reply( 200, stub );
 
-		const { result, waitFor } = renderHook(
+		const { result } = renderHook(
 			() =>
 				useInvoicesQuery( {
 					starting_after: '',
@@ -66,46 +63,9 @@ describe( 'useInvoicesQuery', () => {
 			}
 		);
 
-		await waitFor( () => result.current.isSuccess );
+		await waitFor( () => expect( result.current.isSuccess ).toBe( true ) );
 
 		expect( result.current.data ).toEqual( formattedStub );
-	} );
-
-	it( 'dispatches notice on error', async () => {
-		const queryClient = createQueryClient();
-		const wrapper = ( { children } ) => (
-			<QueryClientProvider client={ queryClient }>{ children }</QueryClientProvider>
-		);
-
-		nock( 'https://public-api.wordpress.com' )
-			.get( '/wpcom/v2/jetpack-licensing/partner/invoices?starting_after=&ending_before=' )
-			.reply( 403 );
-
-		const dispatch = jest.fn();
-		useDispatch.mockReturnValue( dispatch );
-
-		const { result, waitFor } = renderHook(
-			() =>
-				useInvoicesQuery(
-					{
-						starting_after: '',
-						ending_before: '',
-					},
-					{ retry: false }
-				),
-			{
-				wrapper,
-			}
-		);
-
-		await waitFor( () => result.current.isError );
-
-		expect( result.current.isError ).toBe( true );
-		expect( dispatch.mock.calls[ 0 ][ 0 ].type ).toBe( 'NOTICE_CREATE' );
-		expect( dispatch.mock.calls[ 0 ][ 0 ].notice.noticeId ).toBe(
-			'partner-portal-invoices-failure'
-		);
-		expect( dispatch.mock.calls[ 0 ][ 0 ].notice.status ).toBe( 'is-error' );
 	} );
 } );
 
@@ -132,7 +92,7 @@ describe( 'usePayInvoiceMutation', () => {
 		const dispatch = jest.fn();
 		useDispatch.mockReturnValue( dispatch );
 
-		const { result, waitFor } = renderHook( () => usePayInvoiceMutation(), {
+		const { result } = renderHook( () => usePayInvoiceMutation(), {
 			wrapper,
 		} );
 
@@ -167,12 +127,9 @@ describe( 'usePayInvoiceMutation', () => {
 		useDispatch.mockReturnValue( dispatch );
 
 		// Prevent console.error from being loud during testing because of the test 500 error.
-		const { result, waitFor } = renderHook(
-			() => usePayInvoiceMutation( { useErrorBoundary: false } ),
-			{
-				wrapper,
-			}
-		);
+		const { result } = renderHook( () => usePayInvoiceMutation( { useErrorBoundary: false } ), {
+			wrapper,
+		} );
 
 		try {
 			await act( async () => result.current.mutateAsync( { invoiceId: invoiceStub.id } ) );
@@ -182,7 +139,6 @@ describe( 'usePayInvoiceMutation', () => {
 		}
 
 		await waitFor( () => {
-			expect( result.current.isError ).toBe( true );
 			expect( dispatch.mock.calls[ 0 ][ 0 ].type ).toBe( 'NOTICE_CREATE' );
 			expect( dispatch.mock.calls[ 0 ][ 0 ].notice.text ).toBe( stub.message );
 			expect( dispatch.mock.calls[ 0 ][ 0 ].notice.noticeId ).toBe(

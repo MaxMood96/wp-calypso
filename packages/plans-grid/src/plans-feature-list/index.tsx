@@ -2,16 +2,15 @@ import { Button } from '@wordpress/components';
 import { createInterpolateElement } from '@wordpress/element';
 import { Icon, check, close } from '@wordpress/icons';
 import { useI18n } from '@wordpress/react-i18n';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import * as React from 'react';
 import type { DomainSuggestions, Plans } from '@automattic/data-stores';
-
-import '../types-patch';
 
 import './style.scss';
 
 interface FeatureListItemContentWrapperProps {
 	className: string;
+	children: React.ReactNode;
 }
 
 interface FeatureListIconProps {
@@ -58,7 +57,7 @@ function computeDomainFeatureItem(
 		NO_DOMAIN: {
 			FREE_PLAN: null,
 			PAID_PLAN: {
-				wrapperClassName: classnames( commonWrapperClassName, 'is-cta' ),
+				wrapperClassName: clsx( commonWrapperClassName, 'is-cta' ),
 				bulletIcon: billingPeriod === 'ANNUALLY' ? TickIcon : CrossIcon,
 				// actionIcon: ChevronDown,
 				requiresAnnuallyBilledPlan: true,
@@ -69,7 +68,7 @@ function computeDomainFeatureItem(
 		FREE_DOMAIN: {
 			FREE_PLAN: null,
 			PAID_PLAN: {
-				wrapperClassName: classnames( commonWrapperClassName, 'is-cta' ),
+				wrapperClassName: clsx( commonWrapperClassName, 'is-cta' ),
 				bulletIcon: billingPeriod === 'ANNUALLY' ? TickIcon : CrossIcon,
 				// actionIcon: ChevronDown,
 				requiresAnnuallyBilledPlan: true,
@@ -79,7 +78,7 @@ function computeDomainFeatureItem(
 		},
 		PAID_DOMAIN: {
 			FREE_PLAN: {
-				wrapperClassName: classnames( commonWrapperClassName, 'is-unavailable' ),
+				wrapperClassName: clsx( commonWrapperClassName, 'is-unavailable' ),
 				bulletIcon: CrossIcon,
 				// actionIcon: undefined,
 				requiresAnnuallyBilledPlan: false,
@@ -142,7 +141,7 @@ const PlansFeatureListItem: React.FunctionComponent< FeatureListItemProps > = (
 	return (
 		<li
 			key={ index }
-			className={ classnames(
+			className={ clsx(
 				'plans-feature-list__item',
 				{
 					'plans-feature-list__item--requires-annual-enabled':
@@ -207,9 +206,9 @@ const PlansFeatureList: React.FunctionComponent< PlansFeatureListProps > = ( {
 			requiresAnnuallyBilledPlan: domainFeatureItem.requiresAnnuallyBilledPlan,
 			contentWrapperNode: ( { children, className } ) => (
 				<Button
-					className={ classnames( domainFeatureItem.wrapperClassName, className ) }
+					className={ clsx( domainFeatureItem.wrapperClassName, className ) }
 					onClick={ onPickDomain }
-					isLink
+					variant="link"
 				>
 					{ children }
 				</Button>
@@ -228,7 +227,7 @@ const PlansFeatureList: React.FunctionComponent< PlansFeatureListProps > = ( {
 	return (
 		<div className="plans-feature-list" hidden={ ! isOpen }>
 			<ul
-				className={ classnames( 'plans-feature-list__item-group', {
+				className={ clsx( 'plans-feature-list__item-group', {
 					'plans-feature-list__item-group--columns': multiColumn,
 				} ) }
 			>

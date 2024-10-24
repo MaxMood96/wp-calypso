@@ -1,6 +1,19 @@
-import { makeLayout } from 'calypso/controller';
+import { getLanguageRouteParam, getAnyLanguageRouteParam } from '@automattic/i18n-utils';
+import { makeLayout, ssrSetupLocale } from 'calypso/controller';
+import { setHrefLangLinks } from 'calypso/controller/localized-links';
 import { tagsListing, fetchTrendingTags, fetchAlphabeticTags } from './controller';
 
 export default function ( router ) {
-	router( '/tags', fetchTrendingTags, fetchAlphabeticTags, tagsListing, makeLayout );
+	const langParam = getLanguageRouteParam();
+	const anyLangParam = getAnyLanguageRouteParam();
+
+	router(
+		[ '/tags', `/${ langParam }/tags`, `/${ anyLangParam }/tags` ],
+		ssrSetupLocale,
+		setHrefLangLinks,
+		fetchTrendingTags,
+		fetchAlphabeticTags,
+		tagsListing,
+		makeLayout
+	);
 }

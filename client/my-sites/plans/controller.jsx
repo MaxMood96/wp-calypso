@@ -1,6 +1,5 @@
-import { is2023PricingGridActivePage } from '@automattic/calypso-products/src/plans-utilities';
-import page from 'page';
-import { isValidFeatureKey } from 'calypso/lib/plans/features-list';
+import { PLAN_100_YEARS, isValidFeatureKey } from '@automattic/calypso-products';
+import page from '@automattic/calypso-router';
 import { productSelect } from 'calypso/my-sites/plans/jetpack-plans/controller';
 import setJetpackPlansHeader from 'calypso/my-sites/plans/jetpack-plans/plans-header';
 import isSiteWpcom from 'calypso/state/selectors/is-site-wpcom';
@@ -14,7 +13,17 @@ function showJetpackPlans( context ) {
 	return ! isWpcom;
 }
 
+function is100YearPlanUser( context ) {
+	const state = context.store.getState();
+	const selectedSite = getSelectedSite( state );
+	return selectedSite?.plan?.product_slug === PLAN_100_YEARS;
+}
+
 export function plans( context, next ) {
+	// Redirecting users for the 100-Year plan to the my-plan page.
+	if ( is100YearPlanUser( context ) ) {
+		return page.redirect( `/plans/my-plan/${ context.params.site }` );
+	}
 	if ( showJetpackPlans( context ) ) {
 		if ( context.params.intervalType ) {
 			return page.redirect( `/plans/${ context.params.site }` );
@@ -23,6 +32,14 @@ export function plans( context, next ) {
 		return productSelect( '/plans' )( context, next );
 	}
 
+	// Emails rely on the `discount` query param to auto-apply coupons
+	// from the Calypso admin plans page. The `/start` onboarding flow
+	// plans page, however, relies on the `coupon` query param for the
+	// same purpose. We handle both coupon and discount here for the time
+	// being to avoid confusion. We'll probably consolidate to just `coupon`
+	// in the future.
+	const withDiscount = context.query.coupon || context.query.discount;
+
 	context.primary = (
 		<Plans
 			context={ context }
@@ -30,7 +47,7 @@ export function plans( context, next ) {
 			customerType={ context.query.customerType }
 			selectedFeature={ context.query.feature }
 			selectedPlan={ context.query.plan }
-			withDiscount={ context.query.discount }
+			withDiscount={ withDiscount }
 			discountEndDate={ context.query.ts }
 			redirectTo={ context.query.redirect_to }
 			redirectToAddDomainFlow={
@@ -38,8 +55,8 @@ export function plans( context, next ) {
 					? context.query.addDomainFlow === 'true'
 					: undefined
 			}
-			domainAndPlanPackage={ context.query.domainAndPlanPackage }
-			is2023PricingGridVisible={ is2023PricingGridActivePage( null, context.pathname ) }
+			domainAndPlanPackage={ context.query.domainAndPlanPackage === 'true' }
+			jetpackAppPlans={ context.query.jetpackAppPlans === 'true' }
 		/>
 	);
 	next();

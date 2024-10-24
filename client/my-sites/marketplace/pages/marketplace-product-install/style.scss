@@ -2,36 +2,18 @@ body.is-section-marketplace.theme-default.color-scheme {
 	--color-surface-backdrop: var(--studio-white);
 }
 
-.is-section-marketplace {
-	&.has-no-sidebar {
-		.layout__content {
-			height: 100vh;
-			@media ( max-width: 782px ) {
-				padding: 0;
-				height: 100vh;
-				.layout__primary {
-					height: 100vh;
-				}
-			}
-		}
-	}
-}
-
 .marketplace-plugin-install__masterbar {
-	display: flex;
-	align-items: baseline;
-	justify-content: flex-start;
+	--color-masterbar-background: var(--studio-white);
+	--color-masterbar-text: var(--studio-gray-60);
+	padding-right: 24px;
+	border-bottom: 0;
 
-	.marketplace-plugin-install__wpcom-wordmark {
-		align-self: center;
-		margin-left: 10px;
-	}
-
-	.masterbar__item,
-	.masterbar__item:hover {
-		color: var(--color-primary-5);
-		flex-grow: 0;
-		background: var(--color-masterbar-background);
+	.marketplace-plugin-install__logo {
+		fill: rgb(54, 54, 54);
+		margin: 24px 12px 24px 24px;
+		@media (min-width: 480px) {
+			margin: 24px;
+		}
 	}
 }
 
@@ -40,6 +22,10 @@ body.is-section-marketplace.theme-default.color-scheme {
 	justify-content: center;
 	height: 100vh;
 	align-items: center;
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
 
 	> div {
 		width: 90%;

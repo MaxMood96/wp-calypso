@@ -20,6 +20,16 @@ export interface SocialPreviewBaseProps {
 	 * The URL of the image to use in the post/page preview.
 	 */
 	image?: string;
+
+	/**
+	 * The array of media items to use in the preview.
+	 */
+	media?: Array< MediaItem >;
+
+	/**
+	 * The caption.
+	 */
+	caption?: string;
 }
 
 export interface SocialPreviewsBaseProps {

@@ -4,6 +4,7 @@ import AdvancedCredentials from 'calypso/components/advanced-credentials';
 import BackupRetentionManagement from 'calypso/components/backup-retention-management';
 import DocumentHead from 'calypso/components/data/document-head';
 import HasSitePurchasesSwitch from 'calypso/components/has-site-purchases-switch';
+import BackupScheduleSetting from 'calypso/components/jetpack/backup-schedule-setting';
 import IsCurrentUserAdminSwitch from 'calypso/components/jetpack/is-current-user-admin-switch';
 import NotAuthorizedPage from 'calypso/components/jetpack/not-authorized-page';
 import JetpackStagingSitesManagement from 'calypso/components/jetpack-staging-sites-management';
@@ -18,13 +19,14 @@ import HasRetentionCapabilitiesSwitch from './has-retention-capabilities-switch'
 import HasSiteCredentialsSwitch from './has-site-credentials-switch';
 import AdvancedCredentialsLoadingPlaceholder from './loading';
 import SettingsPage from './main';
+import type { Callback } from '@automattic/calypso-router';
 
-export const settings: PageJS.Callback = ( context, next ) => {
+export const settings: Callback = ( context, next ) => {
 	context.primary = <SettingsPage />;
 	next();
 };
 
-export const advancedCredentials: PageJS.Callback = ( context, next ) => {
+export const advancedCredentials: Callback = ( context, next ) => {
 	const { host, action } = context.query;
 	const siteId = getSelectedSiteId( context.store.getState() ) as number;
 	const sectionElt = <AdvancedCredentials action={ action } host={ host } role="main" />;
@@ -74,13 +76,14 @@ export const advancedCredentials: PageJS.Callback = ( context, next ) => {
 				falseComponent={ null }
 				loadingComponent={ <AdvancedCredentialsLoadingPlaceholder /> }
 			/>
+			{ config.isEnabled( 'jetpack/backup-schedule-setting' ) ? <BackupScheduleSetting /> : null }
 		</Main>
 	);
 
 	next();
 };
 
-export const showNotAuthorizedForNonAdmins: PageJS.Callback = ( context, next ) => {
+export const showNotAuthorizedForNonAdmins: Callback = ( context, next ) => {
 	context.primary = (
 		<IsCurrentUserAdminSwitch
 			trueComponent={ context.primary }
@@ -91,7 +94,7 @@ export const showNotAuthorizedForNonAdmins: PageJS.Callback = ( context, next ) 
 	next();
 };
 
-export const disconnectSite: PageJS.Callback = ( context, next ) => {
+export const disconnectSite: Callback = ( context, next ) => {
 	context.primary = (
 		<DisconnectSite
 			// Ignore type checking because TypeScript is incorrectly inferring the prop type due to the redirectNonJetpack HOC.
@@ -105,7 +108,7 @@ export const disconnectSite: PageJS.Callback = ( context, next ) => {
 	next();
 };
 
-export const disconnectSiteConfirm: PageJS.Callback = ( context, next ) => {
+export const disconnectSiteConfirm: Callback = ( context, next ) => {
 	const { reason, type, text } = context.query;
 	const dashboardHref = dashboardPath();
 	context.primary = (

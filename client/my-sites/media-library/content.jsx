@@ -1,9 +1,10 @@
+import { PLAN_PREMIUM, getPlan } from '@automattic/calypso-products';
+import page from '@automattic/calypso-router';
 import { localizeUrl } from '@automattic/i18n-utils';
 import { withMobileBreakpoint } from '@automattic/viewport-react';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import { groupBy, isEmpty, map, size, values } from 'lodash';
-import page from 'page';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
@@ -36,7 +37,6 @@ import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 import MediaLibraryExternalHeader from './external-media-header';
 import MediaLibraryHeader from './header';
 import MediaLibraryList from './list';
-
 import './content.scss';
 
 const noop = () => {};
@@ -141,7 +141,10 @@ export class MediaLibraryContent extends Component {
 			let onDismiss;
 			const i18nOptions = {
 				count: occurrences.length,
-				args: occurrences.length,
+				args: {
+					occurrences: occurrences.length,
+					planName: getPlan( PLAN_PREMIUM )?.getTitle(),
+				},
 			};
 
 			if ( site ) {
@@ -162,15 +165,15 @@ export class MediaLibraryContent extends Component {
 					upgradeNudgeName = 'plan-media-storage-error-video';
 					upgradeNudgeFeature = 'video-upload';
 					message = translate(
-						'%d file could not be uploaded because your site does not support video files. Upgrade to a premium plan for video support.',
-						'%d files could not be uploaded because your site does not support video files. Upgrade to a premium plan for video support.',
+						'%(occurrences)d file could not be uploaded because your site does not support video files. Upgrade to the %(planName)s plan for video support.',
+						'%(occurrences)d files could not be uploaded because your site does not support video files. Upgrade to the %(planName)s plan for video support.',
 						i18nOptions
 					);
 					break;
 				case MediaValidationErrors.FILE_TYPE_UNSUPPORTED:
 					message = translate(
-						'%d file could not be uploaded because the file type is not supported.',
-						'%d files could not be uploaded because their file types are unsupported.',
+						'%(occurrences)d file could not be uploaded because the file type is not supported.',
+						'%(occurrences)d files could not be uploaded because their file types are unsupported.',
 						i18nOptions
 					);
 					actionText = translate( 'See supported file types' );
@@ -179,15 +182,15 @@ export class MediaLibraryContent extends Component {
 					break;
 				case MediaValidationErrors.UPLOAD_VIA_URL_404:
 					message = translate(
-						'%d file could not be uploaded because no image exists at the specified URL.',
-						'%d files could not be uploaded because no images exist at the specified URLs',
+						'%(occurrences)d file could not be uploaded because no image exists at the specified URL.',
+						'%(occurrences)d files could not be uploaded because no images exist at the specified URLs',
 						i18nOptions
 					);
 					break;
 				case MediaValidationErrors.EXCEEDS_MAX_UPLOAD_SIZE:
 					message = translate(
-						'%d file could not be uploaded because it exceeds the maximum upload size.',
-						'%d files could not be uploaded because they exceed the maximum upload size.',
+						'%(occurrences)d file could not be uploaded because it exceeds the maximum upload size.',
+						'%(occurrences)d files could not be uploaded because they exceed the maximum upload size.',
 						i18nOptions
 					);
 					break;
@@ -195,8 +198,8 @@ export class MediaLibraryContent extends Component {
 					upgradeNudgeName = 'plan-media-storage-error';
 					upgradeNudgeFeature = 'extra-storage';
 					message = translate(
-						'%d file could not be uploaded because there is not enough space left.',
-						'%d files could not be uploaded because there is not enough space left.',
+						'%(occurrences)d file could not be uploaded because there is not enough space left.',
+						'%(occurrences)d files could not be uploaded because there is not enough space left.',
 						i18nOptions
 					);
 					break;
@@ -210,8 +213,8 @@ export class MediaLibraryContent extends Component {
 						upgradeNudgeFeature = 'extra-storage';
 					}
 					message = translate(
-						'%d file could not be uploaded because you have reached your plan storage limit.',
-						'%d files could not be uploaded because you have reached your plan storage limit.',
+						'%(occurrences)d file could not be uploaded because you have reached your plan storage limit.',
+						'%(occurrences)d files could not be uploaded because you have reached your plan storage limit.',
 						i18nOptions
 					);
 					break;
@@ -233,8 +236,8 @@ export class MediaLibraryContent extends Component {
 
 				default:
 					message = translate(
-						'%d file could not be uploaded because an error occurred while uploading.',
-						'%d files could not be uploaded because errors occurred while uploading.',
+						'%(occurrences)d file could not be uploaded because an error occurred while uploading.',
+						'%(occurrences)d files could not be uploaded because errors occurred while uploading.',
 						i18nOptions
 					);
 					break;
@@ -306,7 +309,7 @@ export class MediaLibraryContent extends Component {
 		};
 		return (
 			<NoticeAction
-				external={ true }
+				external
 				href={
 					upgradeNudgeFeature
 						? `/plans/compare/${ this.props.siteSlug }?feature=${ upgradeNudgeFeature }`
@@ -480,7 +483,7 @@ export class MediaLibraryContent extends Component {
 	}
 
 	render() {
-		const classNames = classnames( 'media-library__content', {
+		const classNames = clsx( 'media-library__content', {
 			'has-no-upload-button': ! this.props.displayUploadMediaButton,
 		} );
 

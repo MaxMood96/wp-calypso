@@ -1,7 +1,7 @@
 import styled from '@emotion/styled';
 import AddOnCard from './add-ons-card';
 import type { Props as CardProps } from './add-ons-card';
-import type { AddOnMeta } from '../hooks/use-add-ons';
+import type { AddOnMeta } from '@automattic/data-stores';
 
 interface Props extends Omit< CardProps, 'addOnMeta' > {
 	addOns: ( AddOnMeta | null )[];
@@ -30,7 +30,9 @@ const AddOnsGrid = ( {
 			{ addOns.map( ( addOn ) =>
 				addOn ? (
 					<AddOnCard
-						key={ addOn.productSlug }
+						key={
+							addOn.quantity ? `${ addOn.productSlug }-${ addOn.quantity }` : addOn.productSlug
+						}
 						actionPrimary={ actionPrimary }
 						actionSecondary={ actionSecondary }
 						useAddOnAvailabilityStatus={ useAddOnAvailabilityStatus }

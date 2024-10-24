@@ -1,14 +1,17 @@
+import jetpackAI from './images/jetpack-ai.svg';
 import jetpackAntiSpam from './images/jetpack-anti-spam.svg';
 import jetpackBackupAddon from './images/jetpack-backup-addon.svg';
 import jetpackBackup from './images/jetpack-backup.svg';
 import jetpackBoost from './images/jetpack-boost.svg';
 import jetpackBundles from './images/jetpack-bundles.svg';
+import jetpackCreator from './images/jetpack-creator.svg';
 import jetpackCrm from './images/jetpack-crm.svg';
 import jetpackFree from './images/jetpack-free.svg';
 import jetpackGoldenToken from './images/jetpack-golden-token.svg';
 import jetpackScan from './images/jetpack-scan.svg';
 import jetpackSearch from './images/jetpack-search.svg';
 import jetpackSocial from './images/jetpack-social.svg';
+import jetpackStats from './images/jetpack-stats.svg';
 import jetpackVideoPress from './images/jetpack-videopress.svg';
 import wpcomBlogger from './images/wpcom-blogger.svg';
 import wpcomBusiness from './images/wpcom-business.svg';
@@ -18,6 +21,7 @@ import wpcomPersonal from './images/wpcom-personal.svg';
 import wpcomPremium from './images/wpcom-premium.svg';
 
 export const paths = {
+	'jetpack-ai': jetpackAI,
 	'jetpack-anti-spam': jetpackAntiSpam,
 	'jetpack-backup': jetpackBackup,
 	'jetpack-boost': jetpackBoost,
@@ -29,6 +33,7 @@ export const paths = {
 	'jetpack-professional': jetpackBundles,
 	'jetpack-scan': jetpackScan,
 	'jetpack-search': jetpackSearch,
+	'jetpack-stats': jetpackStats,
 	'jetpack-security': jetpackBundles,
 	'jetpack-social': jetpackSocial,
 	'jetpack-starter': jetpackBundles,
@@ -41,6 +46,7 @@ export const paths = {
 	'wpcom-premium': wpcomPremium,
 	'jetpack-backup-addon': jetpackBackupAddon,
 	'jetpack-golden-token-lifetime': jetpackGoldenToken,
+	'jetpack-creator': jetpackCreator,
 };
 
 export type SupportedSlugs =
@@ -62,6 +68,8 @@ export type SupportedSlugs =
 	| 'business-bundle-monthly'
 	| 'pro-plan'
 	| 'starter-plan'
+	| 'jetpack_ai_monthly'
+	| 'jetpack_ai_yearly'
 	| 'jetpack_free'
 	| 'jetpack_personal'
 	| 'jetpack_personal_monthly'
@@ -91,6 +99,7 @@ export type SupportedSlugs =
 	| 'jetpack_backup_t2_monthly'
 	| 'jetpack_boost'
 	| 'jetpack_boost_monthly'
+	| 'jetpack_boost_yearly'
 	| 'jetpack_scan'
 	| 'jetpack_scan_monthly'
 	| 'jetpack_scan_v2'
@@ -101,12 +110,17 @@ export type SupportedSlugs =
 	| 'jetpack_scan_realtime_monthly_v2'
 	| 'jetpack_search'
 	| 'jetpack_search_monthly'
+	| 'jetpack_stats_monthly'
+	| 'jetpack_stats_yearly'
+	| 'jetpack_stats_pwyw_yearly'
+	| 'jetpack_stats_free_yearly'
 	| 'jetpack_social'
 	| 'jetpack_social_monthly'
 	| 'wpcom_search'
 	| 'wpcom_search_monthly'
 	| 'jetpack_search_v2'
 	| 'jetpack_search_monthly_v2'
+	| 'jetpack_search_free'
 	| 'jetpack_anti_spam'
 	| 'jetpack_anti_spam_monthly'
 	| 'jetpack_anti_spam_v2'
@@ -129,6 +143,9 @@ export type SupportedSlugs =
 	| 'jetpack_starter_monthly'
 	| 'jetpack_videopress'
 	| 'jetpack_videopress_monthly'
+	| 'jetpack_creator_monthly'
+	| 'jetpack_creator_yearly'
+	| 'jetpack_creator_bi_yearly'
 	| 'jetpack_backup_addon_storage_10gb_monthly'
 	| 'jetpack_backup_addon_storage_100gb_monthly'
 	| 'jetpack_backup_addon_storage_1tb_monthly'
@@ -154,6 +171,7 @@ export const iconToProductSlugMap: Record< keyof typeof paths, readonly Supporte
 	],
 	'wpcom-ecommerce': [ 'ecommerce-bundle', 'ecommerce-bundle-2y', 'ecommerce-bundle-monthly' ],
 	'wpcom-business': [ 'business-bundle', 'business-bundle-2y', 'business-bundle-monthly' ],
+	'jetpack-ai': [ 'jetpack_ai_monthly', 'jetpack_ai_yearly' ],
 	'jetpack-free': [ 'jetpack_free' ],
 	'jetpack-personal': [ 'jetpack_personal', 'jetpack_personal_monthly' ],
 	'jetpack-premium': [ 'jetpack_premium', 'jetpack_premium_monthly' ],
@@ -192,7 +210,7 @@ export const iconToProductSlugMap: Record< keyof typeof paths, readonly Supporte
 		'jetpack_backup_addon_storage_3tb_yearly',
 		'jetpack_backup_addon_storage_5tb_yearly',
 	],
-	'jetpack-boost': [ 'jetpack_boost', 'jetpack_boost_monthly' ],
+	'jetpack-boost': [ 'jetpack_boost', 'jetpack_boost_monthly', 'jetpack_boost_yearly' ],
 	'jetpack-scan': [
 		'jetpack_scan',
 		'jetpack_scan_monthly',
@@ -210,6 +228,14 @@ export const iconToProductSlugMap: Record< keyof typeof paths, readonly Supporte
 		'wpcom_search_monthly',
 		'jetpack_search_v2',
 		'jetpack_search_monthly_v2',
+		'jetpack_search_free',
+		'jetpack_search_monthly',
+	],
+	'jetpack-stats': [
+		'jetpack_stats_monthly',
+		'jetpack_stats_yearly',
+		'jetpack_stats_pwyw_yearly',
+		'jetpack_stats_free_yearly',
 	],
 	'jetpack-anti-spam': [
 		'jetpack_anti_spam',
@@ -237,4 +263,9 @@ export const iconToProductSlugMap: Record< keyof typeof paths, readonly Supporte
 	'jetpack-videopress': [ 'jetpack_videopress', 'jetpack_videopress_monthly' ],
 	'jetpack-starter': [ 'jetpack_starter_yearly', 'jetpack_starter_monthly' ],
 	'jetpack-golden-token-lifetime': [ 'jetpack_golden_token_lifetime' ],
+	'jetpack-creator': [
+		'jetpack_creator_monthly',
+		'jetpack_creator_yearly',
+		'jetpack_creator_bi_yearly',
+	],
 } as const;

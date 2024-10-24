@@ -1,9 +1,9 @@
 import { Button, Gridicon } from '@automattic/components';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { useTranslate } from 'i18n-calypso';
 import { FunctionComponent } from 'react';
-import { useSelector } from 'react-redux';
 import { settingsPath } from 'calypso/lib/jetpack/paths';
+import { useSelector } from 'calypso/state';
 import { CredentialsTestProgress as Progress } from 'calypso/state/data-layer/wpcom/activity-log/update-credentials/vendor';
 import getJetpackCredentialsUpdateError, {
 	UpdateError,
@@ -76,7 +76,7 @@ const Verification: FunctionComponent< Props > = ( {
 } ) => {
 	const translate = useTranslate();
 
-	const siteSlug = useSelector( getSelectedSiteSlug );
+	const siteSlug = useSelector( getSelectedSiteSlug ) as string;
 	const siteId = useSelector( getSelectedSiteId );
 	const updateError = useSelector( ( state ) => getJetpackCredentialsUpdateError( state, siteId ) );
 	const updateProgress = useSelector( ( state ) =>
@@ -124,7 +124,7 @@ const Verification: FunctionComponent< Props > = ( {
 					}[ step.state ] ?? [ 'verification__step-unknown', 'notice' ];
 
 					return (
-						<li key={ step.label } className={ classNames( 'verification__step-item', className ) }>
+						<li key={ step.label } className={ clsx( 'verification__step-item', className ) }>
 							<Gridicon icon={ icon } />
 							{ stepLabels.has( step.label ) ? stepLabels.get( step.label ) : step.label }
 						</li>

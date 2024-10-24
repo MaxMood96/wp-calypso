@@ -1,6 +1,5 @@
-import { isEnabled } from '@automattic/calypso-config';
 import { Dialog } from '@automattic/components';
-import classNames from 'classnames';
+import clsx from 'clsx';
 import { localize } from 'i18n-calypso';
 import { filter, find, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
@@ -8,8 +7,9 @@ import { Component } from 'react';
 import { connect } from 'react-redux';
 import Notice from 'calypso/components/notice';
 import { warningNotice } from 'calypso/state/notices/actions';
+import siteHasFeature from 'calypso/state/selectors/site-has-feature';
+import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 import AccountDialogAccount from './account-dialog-account';
-
 import './account-dialog.scss';
 
 class AccountDialog extends Component {
@@ -21,6 +21,7 @@ class AccountDialog extends Component {
 		service: PropTypes.object,
 		translate: PropTypes.func,
 		warningNotice: PropTypes.func,
+		hasMultiConnections: PropTypes.bool,
 	};
 
 	static defaultProps = {
@@ -29,6 +30,7 @@ class AccountDialog extends Component {
 		onAccountSelected: () => {},
 		service: Object.freeze( {} ),
 		warningNotice: () => {},
+		hasMultiConnections: false,
 	};
 
 	state = {
@@ -91,7 +93,7 @@ class AccountDialog extends Component {
 
 	areAccountsConflicting( account, otherAccount ) {
 		// If we support multiple connections, accounts should never conflict.
-		if ( isEnabled( 'jetpack-social/multiple-connections' ) ) {
+		if ( this.props.hasMultiConnections ) {
 			return false;
 		}
 
@@ -196,7 +198,7 @@ class AccountDialog extends Component {
 	}
 
 	render() {
-		const classes = classNames( 'account-dialog', {
+		const classes = clsx( 'account-dialog', {
 			'single-account': 1 === this.props.accounts.length,
 		} );
 		const buttons = [
@@ -227,4 +229,11 @@ class AccountDialog extends Component {
 	}
 }
 
-export default connect( null, { warningNotice } )( localize( AccountDialog ) );
+const mapStateToProps = ( state ) => ( {
+	hasMultiConnections: siteHasFeature(
+		state,
+		getSelectedSiteId( state ),
+		'social-multi-connections'
+	),
+} );
+export default connect( mapStateToProps, { warningNotice } )( localize( AccountDialog ) );

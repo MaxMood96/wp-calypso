@@ -69,7 +69,7 @@ describe( DataHelper.createSuiteTitle( `Editor: Schedule` ), function () {
 				date: date.getUTCDate(),
 				hours: 12,
 				minutes: 1,
-				meridian: 'am',
+				meridian: 'AM',
 			} );
 		} );
 
@@ -107,7 +107,7 @@ describe( DataHelper.createSuiteTitle( `Editor: Schedule` ), function () {
 			await editorPage.openSettings();
 		} );
 
-		it( 'Schedule post to fist of the current month of last year', async function () {
+		it( 'Schedule post to first of the current month of last year', async function () {
 			const date = new Date();
 			date.setUTCFullYear( date.getUTCFullYear() - 1 );
 
@@ -117,7 +117,7 @@ describe( DataHelper.createSuiteTitle( `Editor: Schedule` ), function () {
 				month: date.getUTCMonth(),
 				hours: 12,
 				minutes: 59,
-				meridian: 'pm',
+				meridian: 'PM',
 			} );
 		} );
 

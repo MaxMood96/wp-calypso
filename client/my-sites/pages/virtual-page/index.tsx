@@ -1,4 +1,5 @@
 import { isEnabled } from '@automattic/calypso-config';
+import pageRouter from '@automattic/calypso-router';
 import { CompactCard, Gridicon } from '@automattic/components';
 import { useTemplate } from '@automattic/data-stores';
 import { localizeUrl, useIsEnglishLocale } from '@automattic/i18n-utils';
@@ -6,7 +7,6 @@ import { ExternalLink } from '@wordpress/components';
 import { decodeEntities } from '@wordpress/html-entities';
 import { hasTranslation } from '@wordpress/i18n';
 import { useTranslate } from 'i18n-calypso';
-import pageRouter from 'page';
 import { connect } from 'react-redux';
 import EllipsisMenu from 'calypso/components/ellipsis-menu';
 import InfoPopover from 'calypso/components/info-popover';
@@ -34,8 +34,8 @@ const HomepagePopover = ( { isAdmin, template }: HomepagePopoverProps ) => {
 	const learnMoreLink = (
 		<ExternalLink
 			href={ localizeUrl( 'https://wordpress.com/support/templates/#template-hierarchy' ) }
-			target="_blank"
 			rel="noopener noreferrer"
+			children={ null }
 		/>
 	);
 

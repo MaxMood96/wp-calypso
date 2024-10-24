@@ -1,6 +1,5 @@
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { PropsWithChildren, useContext, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import CSSTransition from 'react-transition-group/CSSTransition';
 import TransitionGroup from 'react-transition-group/TransitionGroup';
 import QueryJetpackPartnerPortalLicenses from 'calypso/components/data/query-jetpack-partner-portal-licenses';
@@ -13,6 +12,7 @@ import LicensePreview, {
 } from 'calypso/jetpack-cloud/sections/partner-portal/license-preview';
 import { LicenseType } from 'calypso/jetpack-cloud/sections/partner-portal/types';
 import { addQueryArgs } from 'calypso/lib/route';
+import { useDispatch, useSelector } from 'calypso/state';
 import { recordTracksEvent } from 'calypso/state/analytics/actions';
 import { LICENSES_PER_PAGE } from 'calypso/state/partner-portal/licenses/constants';
 import {
@@ -83,20 +83,22 @@ export default function LicenseList() {
 					licenses.items.map( ( license ) => (
 						<LicenseTransition key={ license.licenseKey }>
 							<LicensePreview
+								parentLicenseId={ license.licenseId }
 								licenseKey={ license.licenseKey }
 								product={ license.product }
-								username={ license.username }
 								blogId={ license.blogId }
 								siteUrl={ license.siteUrl }
+								hasDownloads={ license.hasDownloads }
 								issuedAt={ license.issuedAt }
 								attachedAt={ license.attachedAt }
 								revokedAt={ license.revokedAt }
-								filter={ filter }
 								licenseType={
 									license.ownerType === LicenseType.Standard
 										? LicenseType.Standard
 										: LicenseType.Partner
 								}
+								quantity={ license.quantity }
+								isChildLicense={ !! license.parentLicenseId }
 							/>
 						</LicenseTransition>
 					) ) }

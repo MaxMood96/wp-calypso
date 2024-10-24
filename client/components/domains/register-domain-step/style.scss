@@ -15,9 +15,10 @@
 	}
 
 	.search-filters__dropdown-filters {
-		height: 50px;
+		height: 40px;
+
 		@include break-mobile {
-			min-width: 120px;
+			height: 48px;
 		}
 	}
 
@@ -66,7 +67,12 @@
 	.search-component.is-open {
 		border: 1px solid #a7aaad;
 		border-radius: 4px;
-		height: 48px;
+		box-sizing: border-box;
+		height: 40px;
+
+		@include break-mobile {
+			height: 48px;
+		}
 	}
 
 	.search-component.is-open.has-focus {
@@ -97,6 +103,7 @@
 		@include breakpoint-deprecated( ">660px" ) {
 			padding-top: 18px;
 
+			.is-section-stepper &,
 			.is-white-signup & {
 				padding-top: 0;
 				padding-bottom: 16px;
@@ -238,6 +245,7 @@ body.is-section-signup:not(.is-white-signup) {
 	}
 }
 
+body.is-section-stepper,
 body.is-section-signup.is-white-signup {
 	.domain-search-results__domain-availability .card {
 		box-shadow: none;

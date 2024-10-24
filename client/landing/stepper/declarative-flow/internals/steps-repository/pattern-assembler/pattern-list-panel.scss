@@ -1,22 +1,32 @@
-@import "@automattic/typography/styles/variables.scss";
+@import "@wordpress/base-styles/breakpoints";
+@import "@wordpress/base-styles/mixins";
+@import "@automattic/typography/styles/variables";
 
 .pattern-list-panel__wrapper {
-	position: absolute;
-	top: 0;
-	left: 0;
-	margin-inline-start: 348px;
-	width: 348px;
+	width: 340px;
+	padding: 20px;
 	background: var(--studio-gray-0);
 	border-left: 1px solid rgba(0, 0, 0, 0.03);
-	box-shadow: 183px 0 110px rgb(0 0 0 / 2%), 81px 0 81px rgb(0 0 0 / 3%), 20px 0 45px rgb(0 0 0 / 3%), 0 0 0 rgb(0 0 0 / 3%);
-	padding: 24px;
 	max-height: 100vh;
 	min-height: 100vh;
 	overflow-y: auto;
 	box-sizing: border-box;
 	transform: translateX(0);
+	// Preserve spaces for the scrollbar to prevent unwanted layout change
 	scrollbar-gutter: stable;
 	font-family: "SF Pro Text", $sans;
+
+	@include break-wide {
+		width: 348px;
+		padding: 24px;
+	}
+
+	.global-styles-variations__container {
+		display: flex;
+		flex-direction: column;
+		gap: 32px;
+		padding-top: 4px;
+	}
 }
 
 .pattern-list-panel__title {
@@ -34,4 +44,14 @@
 	font-weight: 400;
 	color: var(--studio-gray-60);
 	letter-spacing: -0.15px;
+	text-wrap: pretty;
+}
+
+.pattern-list-panel__show-more {
+	text-align: center;
+	padding-top: 10px;
+
+	svg {
+		margin-inline-start: 10px;
+	}
 }

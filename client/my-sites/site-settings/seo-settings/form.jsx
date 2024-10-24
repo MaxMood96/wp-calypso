@@ -1,10 +1,12 @@
 import {
 	FEATURE_ADVANCED_SEO,
 	FEATURE_SEO_PREVIEW_TOOLS,
+	PLAN_BUSINESS,
 	TYPE_BUSINESS,
 	findFirstSimilarPlanKey,
+	getPlan,
 } from '@automattic/calypso-products';
-import { Card, Button, FormInputValidation } from '@automattic/components';
+import { Card, Button, FormInputValidation, FormLabel } from '@automattic/components';
 import { localize } from 'i18n-calypso';
 import { get, isEqual, mapValues, pickBy } from 'lodash';
 import { Component, createRef } from 'react';
@@ -15,12 +17,12 @@ import QueryJetpackModules from 'calypso/components/data/query-jetpack-modules';
 import QueryJetpackPlugins from 'calypso/components/data/query-jetpack-plugins';
 import QuerySiteSettings from 'calypso/components/data/query-site-settings';
 import CountedTextarea from 'calypso/components/forms/counted-textarea';
-import FormLabel from 'calypso/components/forms/form-label';
 import FormSettingExplanation from 'calypso/components/forms/form-setting-explanation';
 import Notice from 'calypso/components/notice';
 import NoticeAction from 'calypso/components/notice/notice-action';
 import MetaTitleEditor from 'calypso/components/seo/meta-title-editor';
 import { toApi as seoTitleToApi } from 'calypso/components/seo/meta-title-editor/mappings';
+import SupportInfo from 'calypso/components/support-info';
 import WebPreview from 'calypso/components/web-preview';
 import { protectForm } from 'calypso/lib/protect-form';
 import { getFirstConflictingPlugin } from 'calypso/lib/seo';
@@ -230,7 +232,6 @@ export class SiteSettingsFormSEO extends Component {
 			isSavingSettings,
 		} = this.props;
 		const { slug = '', URL: siteUrl = '' } = selectedSite;
-
 		const {
 			frontPageMetaDescription,
 			showPasteError = false,
@@ -255,7 +256,8 @@ export class SiteSettingsFormSEO extends Component {
 				  }
 				: {
 						title: translate(
-							'Boost your search engine ranking with the powerful SEO tools in the Business plan'
+							'Boost your search engine ranking with the powerful SEO tools in the %(businessPlanName)s plan',
+							{ args: { businessPlanName: getPlan( PLAN_BUSINESS ).getTitle() } }
 						),
 						feature: FEATURE_ADVANCED_SEO,
 						plan:
@@ -292,7 +294,9 @@ export class SiteSettingsFormSEO extends Component {
 							);
 						} )() }
 					>
-						<NoticeAction href={ generalTabUrl }>{ translate( 'Privacy Settings' ) }</NoticeAction>
+						<NoticeAction href={ generalTabUrl }>
+							{ translate( 'Privacy Settings', { context: 'Site visibility settings' } ) }
+						</NoticeAction>
 					</Notice>
 				) }
 				{ conflictedSeoPlugin && (
@@ -318,7 +322,7 @@ export class SiteSettingsFormSEO extends Component {
 							'Get tools to optimize your site for improved search engine results.'
 						) }
 						event="calypso_seo_settings_upgrade_nudge"
-						showIcon={ true }
+						showIcon
 					/>
 				) }
 				<form
@@ -348,6 +352,16 @@ export class SiteSettingsFormSEO extends Component {
 											'social media sites, and browser tabs.'
 									) }
 								</p>
+								{ siteIsJetpack && (
+									<SupportInfo
+										text={ translate(
+											'To help improve your search page ranking, you can customize how the content titles' +
+												' appear for your site. You can reorder items such as ‘Site Name’ and ‘Tagline’,' +
+												' and also add custom separators between the items.'
+										) }
+										link=" https://wordpress.com/support/seo-tools/#page-title-structure"
+									/>
+								) }
 							</Card>
 							<Card>
 								<MetaTitleEditor
@@ -392,7 +406,7 @@ export class SiteSettingsFormSEO extends Component {
 									/>
 									{ hasHtmlTagError && (
 										<FormInputValidation
-											isError={ true }
+											isError
 											text={ translate( 'HTML tags are not allowed.' ) }
 										/>
 									) }
@@ -401,9 +415,7 @@ export class SiteSettingsFormSEO extends Component {
 											{ translate( 'Show Previews' ) }
 										</Button>
 										<span className="seo-settings__preview-explanation">
-											{ translate(
-												'See how this will look on ' + 'Google, Facebook, and Twitter.'
-											) }
+											{ translate( 'See how this will look on Google, Facebook, and X.' ) }
 										</span>
 									</FormSettingExplanation>
 								</Card>

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { callApi } from '../helpers';
 import { useCacheKey, useIsLoggedIn } from '../hooks';
+import { subscriptionsCountQueryKeyPrefix } from '../queries/use-subscriptions-count-query';
 import { PendingSiteSubscriptionsResult, SubscriptionManagerSubscriptionsCount } from '../types';
 
 type PendingSiteDeleteParams = {
@@ -12,9 +13,10 @@ type PendingSiteDeleteResponse = {
 };
 
 const usePendingSiteDeleteMutation = () => {
-	const isLoggedIn = useIsLoggedIn();
+	const { isLoggedIn } = useIsLoggedIn();
 	const queryClient = useQueryClient();
-	const countCacheKey = useCacheKey( [ 'read', 'subscriptions-count' ] );
+	const countCacheKey = useCacheKey( subscriptionsCountQueryKeyPrefix );
+
 	return useMutation( {
 		mutationFn: async ( params: PendingSiteDeleteParams ) => {
 			if ( ! params.id ) {
@@ -25,8 +27,10 @@ const usePendingSiteDeleteMutation = () => {
 			}
 
 			const response = await callApi< PendingSiteDeleteResponse >( {
+				apiNamespace: 'wpcom/v2',
 				path: `/pending-blog-subscriptions/${ params.id }/delete`,
 				method: 'POST',
+				isLoggedIn,
 				apiVersion: '2',
 			} );
 			if ( ! response.deleted ) {
@@ -39,8 +43,10 @@ const usePendingSiteDeleteMutation = () => {
 			return response;
 		},
 		onMutate: async ( params ) => {
-			await queryClient.cancelQueries( [ 'read', 'pending-site-subscriptions', isLoggedIn ] );
-			await queryClient.cancelQueries( countCacheKey );
+			await queryClient.cancelQueries( {
+				queryKey: [ 'read', 'pending-site-subscriptions', isLoggedIn ],
+			} );
+			await queryClient.cancelQueries( { queryKey: countCacheKey } );
 
 			const previousPendingSiteSubscriptions =
 				queryClient.getQueryData< PendingSiteSubscriptionsResult >( [
@@ -92,8 +98,10 @@ const usePendingSiteDeleteMutation = () => {
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries( [ 'read', 'pending-site-subscriptions', isLoggedIn ] );
-			queryClient.invalidateQueries( countCacheKey );
+			queryClient.invalidateQueries( {
+				queryKey: [ 'read', 'pending-site-subscriptions', isLoggedIn ],
+			} );
+			queryClient.invalidateQueries( { queryKey: countCacheKey } );
 		},
 	} );
 };

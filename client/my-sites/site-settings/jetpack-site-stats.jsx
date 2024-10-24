@@ -1,4 +1,4 @@
-import { CompactCard } from '@automattic/components';
+import { CompactCard, FoldableCard } from '@automattic/components';
 import { ToggleControl } from '@wordpress/components';
 import { localize } from 'i18n-calypso';
 import { includes } from 'lodash';
@@ -6,7 +6,6 @@ import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
 import QueryJetpackConnection from 'calypso/components/data/query-jetpack-connection';
-import FoldableCard from 'calypso/components/foldable-card';
 import FormFieldset from 'calypso/components/forms/form-fieldset';
 import FormLegend from 'calypso/components/forms/form-legend';
 import FormSettingExplanation from 'calypso/components/forms/form-setting-explanation';
@@ -87,11 +86,18 @@ class JetpackSiteStats extends Component {
 			onChange = handleAutosavingToggle( name );
 		}
 
+		// Admin users should always be able to access stats, so we don't want to enable the toggle for them.
+		const isAdminToggleForStatsVisibilitySection = name === 'roles_administrator';
+
 		return (
 			<ToggleControl
-				checked={ checked }
+				checked={ checked || isAdminToggleForStatsVisibilitySection }
 				disabled={
-					isRequestingSettings || isSavingSettings || moduleUnavailable || ! statsModuleActive
+					isRequestingSettings ||
+					isSavingSettings ||
+					moduleUnavailable ||
+					! statsModuleActive ||
+					isAdminToggleForStatsVisibilitySection
 				}
 				onChange={ onChange }
 				key={ name }

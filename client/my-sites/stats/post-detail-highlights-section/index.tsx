@@ -1,13 +1,10 @@
-import config from '@automattic/calypso-config';
-import { Card, PostStatsCard } from '@automattic/components';
+import { Card, Count, PostStatsCard } from '@automattic/components';
 import { useTranslate } from 'i18n-calypso';
-import { useSelector } from 'react-redux';
-import Count from 'calypso/components/count';
 import QuerySiteStats from 'calypso/components/data/query-site-stats';
 import { decodeEntities, stripHTML } from 'calypso/lib/formatting';
+import { useSelector } from 'calypso/state';
 import { getCurrentUserLocale } from 'calypso/state/current-user/selectors';
-import isSiteWpcomAtomic from 'calypso/state/selectors/is-site-wpcom-atomic';
-import { isJetpackSite } from 'calypso/state/sites/selectors';
+import getEnvStatsFeatureSupportChecks from 'calypso/state/sites/selectors/get-env-stats-feature-supports';
 import { getPostStat } from 'calypso/state/stats/posts/selectors';
 import StatsDetailsNavigation from '../stats-details-navigation';
 import PostLikes from '../stats-post-likes';
@@ -60,50 +57,56 @@ export default function PostDetailHighlightsSection( {
 		post_thumbnail: post?.post_thumbnail?.URL || null,
 		title: decodeEntities( stripHTML( textTruncator( post?.title, POST_STATS_CARD_TITLE_LIMIT ) ) ),
 	};
-
-	const isJetpack = useSelector( ( state ) => siteId && isJetpackSite( state, siteId ) );
-	const isAtomic = useSelector( ( state ) => siteId && isSiteWpcomAtomic( state, siteId ) );
-	const isWPcomSite = ! isJetpack || isAtomic;
+	const { supportsEmailStats } = useSelector( ( state ) =>
+		getEnvStatsFeatureSupportChecks( state, siteId )
+	);
 
 	// postId > 0: Show the tabs for posts except for the Home Page (postId = 0).
-	// isWPcomSite: The Newsletter Stats is only covering `WPCOM sites` for now.
-	const isEmailTabsAvailable = config.isEnabled( 'newsletter/stats' ) && postId > 0 && isWPcomSite;
+	// TODO: remove the (post?.date && new Date(post?.date) >= new Date("2023-05-30")) check when the Newsletter Stats data is backfilled.
+	const isEmailTabsAvailable =
+		postId > 0 &&
+		post?.date &&
+		new Date( post?.date ) >= new Date( '2023-05-30' ) &&
+		supportsEmailStats;
 
 	return (
-		<div className="stats__post-detail-highlights-section">
-			{ siteId && (
-				<>
-					<QuerySiteStats siteId={ siteId } statType="stats" query={ {} } />
-					<QuerySiteStats siteId={ siteId } statType="statsInsights" />
-				</>
-			) }
-
-			<div className="highlight-cards">
-				<h1 className="highlight-cards-heading">{ translate( 'Highlights' ) }</h1>
-
-				{ isEmailTabsAvailable && (
+		<>
+			{ isEmailTabsAvailable && (
+				<div className="stats-navigation stats-navigation--modernized">
 					<StatsDetailsNavigation postId={ postId } givenSiteId={ siteId } />
+				</div>
+			) }
+			<div className="stats__post-detail-highlights-section">
+				{ siteId && (
+					<>
+						<QuerySiteStats siteId={ siteId } statType="stats" query={ {} } />
+						<QuerySiteStats siteId={ siteId } statType="statsInsights" />
+					</>
 				) }
 
-				<div className="highlight-cards-list">
-					<PostStatsCard
-						heading={ translate( 'All-time stats' ) }
-						likeCount={ post?.like_count || 0 }
-						post={ postData }
-						viewCount={ viewCount }
-						commentCount={ post?.comment_count || 0 }
-						locale={ userLocale }
-					/>
+				<div className="highlight-cards">
+					<h1 className="highlight-cards-heading">{ translate( 'Highlights' ) }</h1>
 
-					<Card className="highlight-card">
-						<div className="highlight-card-heading">
-							<span>{ translate( 'Post likes' ) }</span>
-							<Count count={ post?.like_count || 0 } />
-						</div>
-						<PostLikes siteId={ siteId } postId={ postId } postType={ post?.type } />
-					</Card>
+					<div className="highlight-cards-list">
+						<PostStatsCard
+							heading={ translate( 'All-time stats' ) }
+							likeCount={ post?.like_count || 0 }
+							post={ postData }
+							viewCount={ viewCount }
+							commentCount={ post?.comment_count || 0 }
+							locale={ userLocale }
+						/>
+
+						<Card className="highlight-card">
+							<div className="highlight-card-heading">
+								<span>{ translate( 'Post likes' ) }</span>
+								<Count count={ post?.like_count || 0 } />
+							</div>
+							<PostLikes siteId={ siteId } postId={ postId } postType={ post?.type } />
+						</Card>
+					</div>
 				</div>
 			</div>
-		</div>
+		</>
 	);
 }

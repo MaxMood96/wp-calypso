@@ -1,20 +1,24 @@
+import page from '@automattic/calypso-router';
 import { Spinner } from '@automattic/components';
+import { localizeUrl } from '@automattic/i18n-utils';
 import { localize, translate } from 'i18n-calypso';
 import { find, flowRight } from 'lodash';
 import moment from 'moment';
-import page from 'page';
 import PropTypes from 'prop-types';
 import { Component } from 'react';
 import { connect } from 'react-redux';
 import titlecase from 'to-title-case';
+import IllustrationStats from 'calypso/assets/images/stats/illustration-stats.svg';
 import { emailIntervals } from 'calypso/blocks/stats-navigation/constants';
 import Intervals from 'calypso/blocks/stats-navigation/intervals';
 import DocumentHead from 'calypso/components/data/document-head';
 import QueryEmailStats from 'calypso/components/data/query-email-stats';
+import QueryPostStats from 'calypso/components/data/query-post-stats';
+import QueryPosts from 'calypso/components/data/query-posts';
 import EmptyContent from 'calypso/components/empty-content';
-import FixedNavigationHeader from 'calypso/components/fixed-navigation-header';
 import Main from 'calypso/components/main';
-import PageViewTracker from 'calypso/lib/analytics/page-view-tracker';
+import NavigationHeader from 'calypso/components/navigation-header';
+import { decodeEntities, stripHTML } from 'calypso/lib/formatting';
 import memoizeLast from 'calypso/lib/memoize-last';
 import StatsEmailModule from 'calypso/my-sites/stats/stats-email-module';
 import { recordGoogleEvent } from 'calypso/state/analytics/actions';
@@ -24,12 +28,14 @@ import { getSiteSlug } from 'calypso/state/sites/selectors';
 import { PERIOD_ALL_TIME } from 'calypso/state/stats/emails/constants';
 import { getEmailStat, isRequestingEmailStats } from 'calypso/state/stats/emails/selectors';
 import { getPeriodWithFallback, getCharts } from 'calypso/state/stats/emails/utils';
+import { getPostStat, isRequestingPostStats } from 'calypso/state/stats/posts/selectors';
 import { getSelectedSiteId, getSelectedSiteSlug } from 'calypso/state/ui/selectors';
 import DatePicker from '../stats-date-picker';
 import StatsDetailsNavigation from '../stats-details-navigation';
 import ChartTabs from '../stats-email-chart-tabs';
 import StatsEmailTopRow from '../stats-email-top-row';
 import { StatsNoContentBanner } from '../stats-no-content-banner';
+import PageViewTracker from '../stats-page-view-tracker';
 import StatsPeriodHeader from '../stats-period-header';
 import StatsPeriodNavigation from '../stats-period-navigation';
 import { getPathWithUpdatedQueryString } from '../utils';
@@ -47,7 +53,7 @@ const getActiveTab = ( chartTab, statType ) => {
 
 const memoizedQuery = memoizeLast( ( period, endOf ) => ( {
 	period,
-	date: endOf.format( 'YYYY-MM-DD' ),
+	date: endOf,
 } ) );
 
 class StatsEmailDetail extends Component {
@@ -126,6 +132,24 @@ class StatsEmailDetail extends Component {
 
 	getTitle = ( statType ) => pageTitles[ statType ];
 
+	getNavigationTitle = () => {
+		const { isPostHomepage, post, postFallback } = this.props;
+
+		if ( isPostHomepage ) {
+			return translate( 'Home page / Archives' );
+		}
+
+		if ( typeof post?.title === 'string' && post.title.length ) {
+			return decodeEntities( stripHTML( post.title ) );
+		}
+
+		if ( typeof postFallback?.post_title === 'string' && postFallback.post_title.length ) {
+			return decodeEntities( stripHTML( postFallback.post_title ) );
+		}
+
+		return null;
+	};
+
 	onChangeLegend = ( activeLegend ) => this.setState( { activeLegend } );
 
 	onChangeMaxBars = ( maxBars ) => this.setState( { maxBars } );
@@ -168,12 +192,14 @@ class StatsEmailDetail extends Component {
 			path: `/stats/email/${ statType }`,
 		};
 
-		const query = memoizedQuery( period, endOf );
+		const query = memoizedQuery( period, endOf.format( 'YYYY-MM-DD' ) );
 		const slugPath = slug ? `/${ slug }` : '';
 		const pathTemplate = `${ traffic.path }/{{ interval }}/${ postId }${ slugPath }`;
 		return (
 			<>
-				<Main className="has-fixed-nav stats__email-detail">
+				<Main className="has-fixed-nav stats__email-detail stats">
+					<QueryPosts siteId={ siteId } postId={ postId } />
+					<QueryPostStats siteId={ siteId } postId={ postId } />
 					<QueryEmailStats
 						siteId={ siteId }
 						postId={ postId }
@@ -191,33 +217,35 @@ class StatsEmailDetail extends Component {
 						path="/stats/email/:statType/:site/:period/:email_id"
 						title="Stats > Single Email"
 					/>
-
-					<FixedNavigationHeader
-						navigationItems={ this.getNavigationItemsWithTitle( this.getTitle( statType ) ) }
-					></FixedNavigationHeader>
+					<NavigationHeader
+						navigationItems={ this.getNavigationItemsWithTitle( this.getNavigationTitle() ) }
+					/>
 
 					{ ! isRequestingStats && ! countViews && post && (
 						<EmptyContent
 							title={ noViewsLabel }
 							line={ translate( 'Learn some tips to attract more visitors' ) }
 							action={ translate( 'Get more traffic!' ) }
-							actionURL="https://wordpress.com/support/getting-more-views-and-traffic/"
+							actionURL={ localizeUrl(
+								'https://wordpress.com/support/getting-more-views-and-traffic/'
+							) }
 							actionTarget="blank"
-							illustration="/calypso/images/stats/illustration-stats.svg"
+							illustration={ IllustrationStats }
 							illustrationWidth={ 150 }
 						/>
 					) }
 					{ post ? (
 						<>
-							<div className="main-container">
-								<h1>{ this.getTitle( statType ) }</h1>
-
+							<div className="stats-navigation stats-navigation--modernized">
 								<StatsDetailsNavigation
 									postId={ postId }
 									period={ period }
 									statType={ statType }
 									givenSiteId={ givenSiteId }
 								/>
+							</div>
+							<div className="stats__email-wrapper">
+								<h3 className="highlight-cards-heading">{ this.getTitle( statType ) }</h3>
 
 								<StatsEmailTopRow siteId={ siteId } postId={ postId } statType={ statType } />
 
@@ -267,44 +295,44 @@ class StatsEmailDetail extends Component {
 								/>
 
 								{ ! isSitePrivate && <StatsNoContentBanner siteId={ siteId } siteSlug={ slug } /> }
-							</div>
-							<div className="stats__module-list">
-								<StatsEmailModule
-									path="countries"
-									statType={ statType }
-									postId={ postId }
-									siteId={ siteId }
-									period={ PERIOD_ALL_TIME }
-									date={ queryDate }
-								/>
-
-								<StatsEmailModule
-									path="devices"
-									statType={ statType }
-									postId={ postId }
-									siteId={ siteId }
-									period={ PERIOD_ALL_TIME }
-									date={ queryDate }
-								/>
-
-								<StatsEmailModule
-									path="clients"
-									statType={ statType }
-									postId={ postId }
-									siteId={ siteId }
-									period={ PERIOD_ALL_TIME }
-									date={ queryDate }
-								/>
-								{ statType === 'clicks' && (
+								<div className="stats__module-list">
 									<StatsEmailModule
-										path="links"
+										path="countries"
 										statType={ statType }
 										postId={ postId }
 										siteId={ siteId }
 										period={ PERIOD_ALL_TIME }
 										date={ queryDate }
 									/>
-								) }
+
+									<StatsEmailModule
+										path="devices"
+										statType={ statType }
+										postId={ postId }
+										siteId={ siteId }
+										period={ PERIOD_ALL_TIME }
+										date={ queryDate }
+									/>
+
+									<StatsEmailModule
+										path="clients"
+										statType={ statType }
+										postId={ postId }
+										siteId={ siteId }
+										period={ PERIOD_ALL_TIME }
+										date={ queryDate }
+									/>
+									{ statType === 'clicks' && (
+										<StatsEmailModule
+											path="links"
+											statType={ statType }
+											postId={ postId }
+											siteId={ siteId }
+											period={ PERIOD_ALL_TIME }
+											date={ queryDate }
+										/>
+									) }
+								</div>
 							</div>
 						</>
 					) : (
@@ -320,7 +348,12 @@ const connectComponent = connect(
 	( state, ownProps ) => {
 		const { postId, statType, isValidStartDate } = ownProps;
 		const siteId = getSelectedSiteId( state );
-		const post = getSitePost( state, siteId, postId );
+		const postFallback = getPostStat( state, siteId, postId, 'post' );
+		const post = getSitePost( state, siteId, postId ) ?? {
+			title: postFallback?.post_title,
+			date: postFallback?.post_date,
+			ID: postFallback?.ID,
+		};
 
 		// set start date to date of our post
 		// we show a loading indicator until post is loaded
@@ -334,17 +367,19 @@ const connectComponent = connect(
 
 		return {
 			countViews: getEmailStat( state, siteId, postId, period, statType ),
-			isRequestingStats: isRequestingEmailStats(
-				state,
-				siteId,
-				postId,
-				period,
-				statType,
-				endOf.format( 'YYYY-MM-DD' )
-			),
+			isRequestingStats:
+				isRequestingEmailStats(
+					state,
+					siteId,
+					postId,
+					period,
+					statType,
+					endOf.format( 'YYYY-MM-DD' )
+				) || isRequestingPostStats( state, siteId, postId ),
 			siteSlug: getSiteSlug( state, siteId ),
 			slug: getSelectedSiteSlug( state ),
 			post,
+			postFallback,
 			isSitePrivate: isPrivateSite( state, siteId ),
 			siteId,
 			period: { period, endOf },

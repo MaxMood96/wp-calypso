@@ -1,5 +1,5 @@
 import { Gridicon } from '@automattic/components';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import { translate } from 'i18n-calypso';
 import * as React from 'react';
 import { getThreatType } from 'calypso/components/jetpack/threat-item/utils';
@@ -31,9 +31,11 @@ const getThreatMessage = ( threat: Threat ) => {
 
 	switch ( getThreatType( threat ) ) {
 		case 'core':
-			return translate( 'Vulnerable WordPress version: %s', {
-				args: [ version ],
-			} );
+			return version
+				? translate( 'Vulnerable WordPress version: %s', {
+						args: [ version ],
+				  } )
+				: translate( 'Vulnerable WordPress version.' );
 
 		case 'core_file':
 			return translate( 'Infected core file: %s', {
@@ -72,7 +74,7 @@ const getThreatMessage = ( threat: Threat ) => {
 					count: Object.keys( threat.rows ).length,
 					args: {
 						threatCount: Object.keys( threat.rows ).length,
-						threatTable: threat.table,
+						threatTable: threat.table as string,
 					},
 				}
 			);
@@ -91,7 +93,7 @@ const ThreatItemHeader: React.FC< Props > = ( { threat } ) => {
 				<div className="threat-item-header__titles">
 					<div className="threat-item-header__card-top">{ getThreatMessage( threat ) }</div>
 					<div
-						className={ classnames(
+						className={ clsx(
 							'threat-item-header__card-bottom',
 							severityClassNames( threat.severity )
 						) }

@@ -1,30 +1,46 @@
-// Adds a top border to first card in the Site Stream
-.is-reader-page .is-site-stream .reader-post-card.card:nth-child(2) {
-	border-top: 1px solid var(--color-neutral-10);
-}
-
 .reader-post-options-menu__ellipsis-menu {
-	position: relative;
+	margin-left: 16px;
 
 	.ellipsis-menu__toggle {
 		padding: 0;
 		height: 24px;
-		position: relative;
-		right: -1px;
-		top: 6px;
+	}
+}
 
-		.ellipsis-menu__toggle-icon {
-			top: -1px;
+.reader-post-options-menu__popover .popover__menu .popover__menu-item {
+	display: flex;
+
+	&.follow-button:hover,
+	&.follow-button:focus {
+		.follow-button__label {
+			color: var(--color-text-inverted);
+		}
+		.reader-following-feed,
+		.reader-follow-feed {
+			.following-icon-background,
+			path {
+				fill: var(--color-text-inverted);
+			}
+			.following-icon-tick {
+				stroke: var(--color-text-inverted);
+			}
 		}
 	}
 }
 
 .reader-post-card.card {
-	border-bottom: 5px solid var(--color-neutral-0);
-	box-shadow: none;
+	border-bottom: 5px solid var(--color-neutral-5);
+	border-radius: 6px; /* stylelint-disable-line scales/radii */
+	box-shadow: rgba(0, 0, 0, 0.05) 0 0 0 1px inset;
 	margin: 0;
-	padding: 20px 0;
+	margin-bottom: 24px;
 	position: relative;
+
+	@include breakpoint-deprecated( "<660px" ) {
+		background: none;
+		border-radius: 0;
+		box-shadow: none;
+	}
 
 	@include breakpoint-deprecated( ">660px" ) {
 		border-bottom: 1px solid #e9e9ea;
@@ -55,11 +71,7 @@
 			box-sizing: border-box;
 		}
 
-		.reader-post-card__post-details {
-			margin-top: 18px;
-		}
-
-		&.is-photo:not(.is-tag-post) {
+		&.is-photo {
 			.reader-post-card__post {
 				flex-direction: column;
 			}
@@ -72,7 +84,7 @@
 			.reader-post-card__post-details {
 				flex: 0 auto; // IE11 Photo card actions hidden
 				margin: 0;
-				padding-top: 8px;
+				padding-top: 24px;
 			}
 
 			.reader-post-card__title {
@@ -95,6 +107,7 @@
 				color: var(--color-text-inverted);
 				display: inline;
 				font-size: $font-body-extra-small;
+				line-height: 20px;
 			}
 
 			.reader-post-actions {
@@ -109,10 +122,6 @@
 
 	&.has-thumbnail,
 	&.is-gallery {
-		.reader-post-card__post {
-			margin-top: 10px;
-		}
-
 		.reader-post-card__post-details {
 			flex: 1;
 		}
@@ -143,86 +152,50 @@
 	}
 
 	&.is-compact {
-		.reader-post-card__byline-details {
+		.reader-post-card__post {
+			display: inherit;
+			margin: 0;
+		}
+
+		.reader-post-card__post-heading {
 			display: flex;
-			flex-direction: row;
-			max-height: 16px * 1.4;
-			max-width: calc(100% - 75px);
-			position: relative;
-
-			&::after {
-				@include long-content-fade( $size: 10% );
-			}
+			justify-content: space-between;
 		}
 
-		.reader-post-card__byline-author-site {
-			flex: 0 0 auto;
-			width: auto;
-		}
-
-		.reader-post-card__timestamp-and-tag {
-			margin-top: 0;
-			margin-left: 0;
-
-			@include breakpoint-deprecated( ">480px" ) {
-				margin-left: 5px;
-			}
-		}
-
-		.reader-post-card__byline-author-site,
-		.reader-post-card__timestamp-and-tag {
-			&::after {
-				display: none;
-			}
-		}
-
-		.reader-post-card__timestamp-link {
-			color: var(--color-text-subtle);
-		}
-
-		.reader-post-options-menu {
-			position: absolute;
-			right: 14px;
-			top: 0;
-		}
-
-		.reader-featured-image {
-			height: auto;
-			margin-bottom: 0;
-			min-width: 100px;
-		}
-
-		.reader-post-card__post {
-			margin-top: 0;
-		}
-
-		.reader-post-card__post-details {
-			margin-top: 0;
-		}
-
-		.reader-post-card__post-details .reader-excerpt {
-			font-size: $font-body;
-			font-weight: 400;
-			margin-top: 4px;
-			max-height: 16px * 1.4;
-			overflow: hidden;
-			position: relative;
-			word-wrap: break-word;
-		}
-	}
-
-	&.is-tag-post {
-
-		.reader-featured-image {
-			width: 200px !important;
-			min-height: 140px;
-			max-height: 140px;
-		}
-
-		.reader-post-card__post {
+		.reader-post-card__post-content {
 			flex-direction: row;
 			gap: 24px;
-			margin: 0;
+			margin-bottom: 8px;
+
+			@include breakpoint-deprecated( "<660px" ) {
+				flex-direction: column-reverse;
+				gap: 12px;
+			}
+
+			&.reader-post-card__no-excerpt {
+				flex-direction: column;
+				gap: 0;
+
+				.reader-post-card__post-details {
+					min-height: auto;
+					padding-bottom: 6px;
+				}
+			}
+
+			&:not(.reader-post-card__no-excerpt) {
+				.reader-featured-image {
+					width: 200px !important;
+
+					@include breakpoint-deprecated( "<660px" ) {
+						width: auto !important;
+						height: 300px !important;
+					}
+
+					@include breakpoint-deprecated( "<480px" ) {
+						height: 200px !important;
+					}
+				}
+			}
 		}
 
 		.reader-post-card__post-details {
@@ -235,10 +208,65 @@
 			-webkit-line-clamp: 2;
 			-webkit-box-orient: vertical;
 			overflow: hidden;
+			overflow-wrap: anywhere;
+			max-width: 344px;
 		}
 
-		.reader-post-card__featured-images {
+		.reader-post-card__post-media {
 			flex-direction: row;
+			text-align: right;
+		}
+
+		.reader-excerpt {
+			max-height: none;
+			-webkit-line-clamp: 3;
+		}
+	}
+
+	&:not(.is-compact) {
+		.reader-post-card__post-details .reader-post-card__title {
+			margin-top: 24px;
+		}
+		.reader-excerpt__content {
+			margin: 7px 0 0;
+		}
+		.reader-featured-image {
+			margin-top: 24px;
+		}
+		.reader-post-card__featured-images,
+		.reader-featured-video {
+			margin-top: 24px;
+			.reader-featured-image {
+				margin-top: 0;
+			}
+		}
+		div[role="presentation"] {
+			margin-top: 24px;
+			padding-bottom: 24px;
+			border-bottom: 1px solid var(--color-neutral-5);
+		}
+		.reader-post-actions {
+			margin-top: 24px;
+		}
+		.comments__comment-list.is-inline {
+			margin: 24px 0 0 10px;
+			.comments__form {
+				margin-top: 0;
+			}
+
+			.comments__comment .comments__form {
+				margin-top: 10px;
+			}
+
+			@include breakpoint-deprecated( "<660px" ) {
+				margin: 24px 0 0;
+			}
+		}
+	}
+
+	&.is-compact.has-thumbnail {
+		.ellipsis-menu__toggle {
+			padding-bottom: 36px;
 		}
 	}
 
@@ -262,19 +290,25 @@
 			top: inherit;
 		}
 	}
+
+	// When comment list is attached to reader post card, remove top border and margin to feel more
+	// cohesive.
+	.comments__comment-list {
+		border-top: none;
+		margin: 20px 0 0 10px;
+		padding-top: 0;
+
+		@include breakpoint-deprecated( "<660px" ) {
+			margin: 20px 0 0;
+		}
+	}
 }
 
 .reader-post-card__conversation-post {
 	.comments__comment-actions {
 		display: flex;
 		justify-content: flex-start;
-	}
-	.reader-post-card__byline {
-		margin-top: 16px;
-	}
-	.reader-post-options-menu__ellipsis-menu {
-		flex: 1;
-		text-align: right;
+		padding-top: 8px;
 	}
 }
 
@@ -289,8 +323,7 @@
 	position: relative;
 	top: 0;
 	height: 300px;
-	margin-right: 0;
-	margin-bottom: 0;
+	margin: 24px 0 0;
 	max-width: 100%;
 
 	&:hover {
@@ -344,14 +377,12 @@
 }
 
 // Need .reader__content to override .reader__content a
-.reader__content .reader-post-card__timestamp-link,
-.reader__content .reader-post-card__timestamp-slug,
+.reader__content .reader-post-card__byline-secondary-item,
 .reader__content .reader-post-card__tag-link {
 	color: var(--color-neutral-40);
 	/* stylelint-disable-next-line declaration-property-unit-allowed-list */
 	font-size: 12px;
 	margin-top: 2px;
-	white-space: nowrap;
 	cursor: pointer;
 	&:hover {
 		color: var(--color-text-subtle);
@@ -369,10 +400,24 @@
 	outline: dotted 1px;
 }
 
-.reader-post-card__timestamp-bullet {
-	color: var(--color-text-subtle);
+.reader-post-card__byline-secondary-item {
+	// Add extra margin to give space for the bullet that may exist between items.
+	margin-right: 12px;
+	&:last-of-type {
+		margin-right: 0;
+	}
+}
+
+.reader-post-card__byline-secondary-bullet-wrapper {
+	position: relative;
 	display: inline-block;
-	margin: 0 4px;
+	// Set bullet as relative absoulte position so it doesnt affect the layout when hiding it.
+	.reader-post-card__byline-secondary-bullet {
+		color: var(--color-text-subtle);
+		position: absolute;
+		left: -8px;
+		bottom: -5px;
+	}
 }
 
 .reader-post-card__byline-details {
@@ -388,7 +433,7 @@
 	flex: inherit;
 }
 
-.reader-post-card__byline-author-site {
+.reader-post-card__byline-site {
 	font-family: $sans;
 	font-weight: 600;
 	margin-bottom: 2px;
@@ -402,7 +447,7 @@
 	}
 }
 
-.reader-post-card__timestamp-and-tag {
+.reader-post-card__author-and-timestamp {
 	align-items: flex-start;
 	display: flex;
 	flex-direction: row;
@@ -410,7 +455,7 @@
 	margin-top: -2px;
 }
 
-.reader-post-card__timestamp {
+.reader-post-card__byline-secondary {
 	display: inline-table;
 }
 
@@ -489,7 +534,6 @@
 	display: flex;
 	flex-direction: column;
 	margin-left: 52px;
-	margin-top: 6px;
 
 	.reader-post-card__post-details {
 		width: 100%;
@@ -498,7 +542,7 @@
 
 @include breakpoint-deprecated( "<660px" ) {
 	.reader-post-card__post {
-		margin-left: 0;
+		margin: 0;
 	}
 }
 
@@ -507,7 +551,7 @@
 }
 
 .reader-post-card__post-details {
-	font-family: $serif;
+	font-family: $sans;
 }
 
 .reader-post-card__title {
@@ -527,6 +571,7 @@
 	font-weight: 600;
 	display: block;
 	line-height: 29px;
+	text-wrap: pretty;
 
 	&:hover {
 		color: var(--color-neutral-70);
@@ -563,12 +608,7 @@
 	.like-button {
 		align-items: center;
 		display: flex;
-		height: 20px;
 		text-align: left;
-		.like-button__like-icons {
-			position: relative;
-			top: 1px;
-		}
 	}
 
 	.reader-share__button-label,
@@ -650,7 +690,7 @@
 
 // Gallery cards
 .reader-post-card .reader-featured-video__video {
-	padding-bottom: 17px;
+	padding-bottom: 0;
 }
 
 .reader-post-card__gallery-image {
@@ -776,6 +816,9 @@
 			width: 100%;
 		}
 		/* Second and third images */
+		.column-two .reader-post-card__featured-images {
+			margin-top: 0;
+		}
 		.reader-post-card__featured-images-item.column-two {
 			width: calc(50% - 1px);
 		}
@@ -894,4 +937,18 @@
 
 .reader-post-card__featured-images-img {
 	vertical-align: middle;
+}
+
+.tag-stream__main .reader-post-card__byline-details {
+	display: flex;
+	justify-content: space-between;
+
+	.reader-post-options-menu__ellipsis-menu {
+		margin-top: -2px;
+		margin-left: 5px;
+	}
+}
+
+.reader-post-card__post-content {
+	display: flex;
 }

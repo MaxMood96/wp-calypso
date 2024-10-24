@@ -1,5 +1,5 @@
 import config from '@automattic/calypso-config';
-import page from 'page';
+import page from '@automattic/calypso-router';
 import { makeLayout, render as clientRender } from 'calypso/controller';
 import { sidebar } from 'calypso/me/controller';
 import * as membershipsController from 'calypso/me/memberships/controller';
@@ -53,6 +53,14 @@ export default ( router ) => {
 		clientRender
 	);
 
+	router(
+		paths.purchasesRoot + '/subscription-removed',
+		sidebar,
+		membershipsController.cancelledSubscriptionReturnFromRedirect,
+		makeLayout,
+		clientRender
+	);
+
 	// Legacy:
 
 	router( paths.deprecated.upcomingCharges, () => page.redirect( paths.purchasesRoot ) );
@@ -85,6 +93,14 @@ export default ( router ) => {
 		paths.managePurchase( ':site', ':purchaseId' ),
 		sidebar,
 		controller.managePurchase,
+		makeLayout,
+		clientRender
+	);
+
+	router(
+		paths.managePurchaseByOwnership( ':ownershipId' ),
+		sidebar,
+		controller.managePurchaseByOwnership,
 		makeLayout,
 		clientRender
 	);

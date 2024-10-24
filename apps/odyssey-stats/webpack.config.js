@@ -1,6 +1,5 @@
 const path = require( 'path' );
 const process = require( 'process' ); // eslint-disable-line
-const BuildMetaPlugin = require( '@automattic/calypso-apps-builder/build-meta-webpack-plugin.cjs' );
 const FileConfig = require( '@automattic/calypso-build/webpack/file-loader' );
 const Minify = require( '@automattic/calypso-build/webpack/minify' );
 const SassConfig = require( '@automattic/calypso-build/webpack/sass' );
@@ -32,12 +31,12 @@ const cachePath = path.resolve( '.cache', extraPath );
 const excludedPackages = [
 	/^calypso\/components\/inline-support-link$/,
 	/^calypso\/components\/web-preview.*$/,
-	/^calypso\/blocks\/upsell-nudge.*$/,
 	/^calypso\/my-sites\/stats\/mini-carousel.*$/,
 	/^calypso\/blocks\/jetpack-backup-creds-banner.*$/,
 	/^calypso\/components\/data\/query-keyring-connections$/,
 	/^calypso\/components\/data\/query-jetpack-modules$/,
 	/^calypso\/components\/data\/query-site-keyrings$/,
+	/^calypso\/components\/data\/query-preferences$/,
 ];
 
 const excludedPackagePlugins = excludedPackages.map(
@@ -65,14 +64,7 @@ module.exports = {
 	optimization: {
 		minimize: ! isDevelopment,
 		concatenateModules: ! shouldEmitStats,
-		minimizer: Minify( {
-			extractComments: false,
-			terserOptions: {
-				ecma: 5,
-				safari10: true,
-				mangle: { reserved: [ '__', '_n', '_nx', '_x' ] },
-			},
-		} ),
+		minimizer: Minify(),
 		splitChunks: false,
 	},
 	module: {
@@ -121,7 +113,6 @@ module.exports = {
 	},
 	node: false,
 	plugins: [
-		BuildMetaPlugin( { outputPath } ),
 		new webpack.DefinePlugin( {
 			global: 'window',
 			'process.env.NODE_DEBUG': JSON.stringify( process.env.NODE_DEBUG || false ),
@@ -197,6 +188,18 @@ module.exports = {
 		new webpack.NormalModuleReplacementPlugin(
 			/^calypso\/components\/formatted-header$/,
 			'calypso/components/jetpack/jetpack-header'
+		),
+		new webpack.NormalModuleReplacementPlugin(
+			/^calypso\/components\/data\/query-site-purchases$/,
+			path.resolve( __dirname, 'src/components/odyssey-query-site-purchases' )
+		),
+		new webpack.NormalModuleReplacementPlugin(
+			/^calypso\/components\/data\/query-products-list$/,
+			path.resolve( __dirname, 'src/components/odyssey-query-products' )
+		),
+		new webpack.NormalModuleReplacementPlugin(
+			/^calypso\/components\/data\/query-memberships$/,
+			path.resolve( __dirname, 'src/components/odyssey-query-memberships' )
 		),
 		...excludedPackagePlugins,
 		shouldEmitStats &&

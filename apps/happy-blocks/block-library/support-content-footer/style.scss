@@ -11,11 +11,12 @@ $system-font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", "Segoe UI",
 	max-width: none !important;
 	align-items: normal !important;
 	box-sizing: border-box;
-	padding: 20px 24px;
+	padding: 96px 24px 76px 24px;
 
 	p {
 		font-size: 1rem;
 		line-height: 24px;
+		margin-top: 4px;
 	}
 
 	h4 {
@@ -29,41 +30,6 @@ $system-font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", "Segoe UI",
 		max-width: var(--wp--style--global--wide-size);
 	}
 
-	.support-content-cta {
-		border-bottom: 1px solid var(--studio-gray-5);
-		display: flex;
-		margin-bottom: 2rem;
-		font-size: 1.25rem;
-
-		.support-content-cta-left {
-			flex: 1;
-			padding: 40px 20px 20px 0;
-
-			h4 {
-				line-height: 32px;
-			}
-
-			p {
-				color: var(--studio-gray-60);
-			}
-		}
-
-		.support-content-cta-right {
-			flex: 1;
-			display: flex;
-			justify-content: flex-end;
-
-			figure {
-				margin-bottom: 0;
-				height: 100%;
-
-				img {
-					height: 100%;
-				}
-			}
-		}
-	}
-
 	.support-content-resources {
 		display: flex;
 		gap: 24px;
@@ -74,13 +40,15 @@ $system-font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", "Segoe UI",
 			min-width: 0;
 			overflow-wrap: break-word;
 			word-break: break-word;
-			border-bottom: 1px solid var(--studio-gray-5);
-			padding: 32px 16px 32px 0;
+			border-bottom: 1px solid var(--studio-gray-0);
+			padding: 0 16px 32px 0;
 			font-size: 1.25rem;
 		}
 
 		p {
 			color: var(--studio-gray-60);
+			margin-top: 16px;
+			margin-bottom: 28px;
 		}
 
 		h4 {
@@ -117,10 +85,17 @@ $system-font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", "Segoe UI",
 		justify-content: space-between;
 		margin-top: 3rem;
 
+		p,
+		form {
+			margin-bottom: 10px;
+			margin-top: 0;
+		}
+
+
 		.support-content-subscribe-disclaimer {
 			color: var(--studio-gray-60);
 			font-size: 0.75rem;
-			line-height: 26px;
+			line-height: 20px;
 
 			a {
 				color: inherit;
@@ -130,39 +105,33 @@ $system-font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", "Segoe UI",
 			}
 		}
 
-		.support-content-subscribe form {
+		.support-content-subscribe .subscribe-shortcode-wrapper {
 			display: flex;
-			align-items: flex-start;
+			justify-content: space-between;
+			flex-grow: 1;
+			border-radius: 4px;
+			border: 1px solid #dcdcde;
+			font-size: 1rem;
+			padding: 8px;
+			width: 100%;
+			min-height: 40px;
+			margin: 8px 0;
+			gap: 10px;
 
-			p {
-				margin: 0;
-			}
-
-			.support-content-subscribe-email {
-				flex-grow: 1;
-				border-radius: 4px;
-				border: 1px solid #dcdcde;
-				font-size: 1rem;
-				padding: 16px;
-				width: 100%;
-				height: 40px;
-			}
-
-			button.support-content-subscribe-submit {
-				background-color: var(--color-primary);
-				border-radius: 4px !important;
-				border: none;
-				color: var(--color-primary-0);
+			.wpcom-guides-learn-button {
 				cursor: pointer;
-				font-size: 0.875rem;
-				line-height: 20px;
-				margin: 0;
-				margin-left: 10px;
-				padding: 10px 24px;
-				height: 40px;
 
-				&:hover {
-					opacity: 0.9;
+				&.busy {
+					color: #7f8389;
+				}
+			}
+
+			@media screen and (max-width: 782px) {
+				flex-direction: column;
+				align-items: flex-start;
+
+				.wpcom-guides-learn-button {
+					margin-top: 8px;
 				}
 			}
 		}
@@ -173,49 +142,48 @@ $system-font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", "Segoe UI",
 
 		h4 {
 			font-size: 1.25rem;
-			line-height: 26px;
+			line-height: 26px !important;
 		}
 
 		p {
-			font-size: 0.875rem;
 			margin-top: 4px;
-			margin-bottom: 8px;
-			line-height: 20px;
-		}
-
-		.support-content-cta {
-			margin-bottom: 0;
-
-			.support-content-cta-left {
-				padding: 0 48px 16px 0;
-			}
-
-			.support-content-cta-right {
-				display: none;
-			}
+			margin-bottom: 16px;
 		}
 
 		.support-content-resources {
 			flex-direction: column;
-			gap: 8px;
+			gap: 0;
 
 			.support-content-resource {
 				min-width: 317px;
-				padding: 16px 48px 16px 0;
+				padding: 24px 48px 24px 0;
 
 				.resource-link {
 					line-height: 20px;
 				}
+
+
+				p {
+					margin-top: 4px;
+					margin-bottom: 16px;
+				}
+			}
+		}
+
+		.support-content-links {
+			a {
+				display: inline-block;
+			}
+
+			p {
+				margin-bottom: 16px !important;
 			}
 		}
 
 		.support-content-links-subscribe {
 			flex-direction: column;
 			padding-bottom: 36px;
-
-			.support-content-subscribe {
-				margin-top: 32px;
-			}
+			margin-top: 48px;
 
 			.support-content-subscribe form {
 				.support-content-subscribe-email {

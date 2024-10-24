@@ -1,3 +1,4 @@
+import { LaunchpadContainer } from '@automattic/launchpad';
 import { useSelect } from '@wordpress/data';
 import WordPressLogo from 'calypso/components/wordpress-logo';
 import { useGetDomainsQuery } from 'calypso/data/domains/use-get-domains-query';
@@ -12,18 +13,26 @@ import { getLaunchpadTranslations } from './translations';
 import type { SiteSelect } from '@automattic/data-stores';
 
 type StepContentProps = {
+	launchpadKey: string;
 	siteSlug: string | null;
 	submit: NavigationControls[ 'submit' ];
 	goNext: NavigationControls[ 'goNext' ];
 	goToStep?: NavigationControls[ 'goToStep' ];
-	flow: string | null;
+	flow: string;
 };
 
 function sortByRegistrationDate( domainObjectA: ResponseDomain, domainObjectB: ResponseDomain ) {
 	return domainObjectA.registrationDate > domainObjectB.registrationDate ? -1 : 1;
 }
 
-const StepContent = ( { siteSlug, submit, goNext, goToStep, flow }: StepContentProps ) => {
+const StepContent = ( {
+	launchpadKey,
+	siteSlug,
+	submit,
+	goNext,
+	goToStep,
+	flow,
+}: StepContentProps ) => {
 	const { flowName } = getLaunchpadTranslations( flow );
 	const site = useSite();
 	const adminUrl = useSelect(
@@ -50,24 +59,36 @@ const StepContent = ( { siteSlug, submit, goNext, goToStep, flow }: StepContentP
 	// The adminUrl points to the .wordpress.com domain for this site, so we'll use this for the preview.
 	const iFrameURL = adminUrl ? new URL( adminUrl as string ).host : null;
 
+	const header = (
+		<>
+			<WordPressLogo className="launchpad__sidebar-header-logo" size={ 24 } />
+			<span className="launchpad__sidebar-header-flow-name">{ flowName }</span>
+		</>
+	);
+
+	const sidebar = (
+		<Sidebar
+			sidebarDomain={ sidebarDomain }
+			launchpadKey={ launchpadKey }
+			siteSlug={ siteSlug }
+			submit={ submit }
+			goNext={ goNext }
+			goToStep={ goToStep }
+			flow={ flow }
+		/>
+	);
+
 	return (
-		<main className="launchpad__container">
-			<div className="launchpad__sidebar-header">
-				<WordPressLogo className="launchpad__sidebar-header-logo" size={ 24 } />
-				<span className="launchpad__sidebar-header-flow-name">{ flowName }</span>
-			</div>
-			<div className="launchpad__content">
-				<Sidebar
-					sidebarDomain={ sidebarDomain }
-					siteSlug={ siteSlug }
-					submit={ submit }
-					goNext={ goNext }
-					goToStep={ goToStep }
-					flow={ flow }
-				/>
-				<LaunchpadSitePreview flow={ flow } siteSlug={ iFrameURL } />
-			</div>
-		</main>
+		<LaunchpadContainer
+			headerClassName="launchpad__sidebar-header"
+			contentClassName="launchpad__content"
+			sidebarClassName="launchpad__sidebar"
+			mainContentClassName="launchpad__main-content"
+			header={ header }
+			sidebar={ sidebar }
+		>
+			<LaunchpadSitePreview flow={ flow } siteSlug={ iFrameURL } />
+		</LaunchpadContainer>
 	);
 };
 

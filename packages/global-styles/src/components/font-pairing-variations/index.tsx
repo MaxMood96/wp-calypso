@@ -1,20 +1,25 @@
+import { PremiumBadge } from '@automattic/components';
 import {
 	__unstableComposite as Composite,
 	__unstableUseCompositeState as useCompositeState,
 	__unstableCompositeItem as CompositeItem,
 } from '@wordpress/components';
-import { GlobalStylesContext } from '@wordpress/edit-site/build-module/components/global-styles/context';
-import { mergeBaseAndUserConfigs } from '@wordpress/edit-site/build-module/components/global-styles/global-styles-provider';
-import classnames from 'classnames';
+import clsx from 'clsx';
 import { translate } from 'i18n-calypso';
 import { useMemo, useContext } from 'react';
+import { InView, IntersectionObserverProps } from 'react-intersection-observer';
+import {
+	GlobalStylesContext,
+	mergeBaseAndUserConfigs,
+	withExperimentalBlockEditorProvider,
+} from '../../gutenberg-bridge';
 import { useFontPairingVariations } from '../../hooks';
 import FontPairingVariationPreview from './preview';
 import type { GlobalStylesObject } from '../../types';
 import './style.scss';
 
 interface FontPairingVariationProps {
-	fontPairingVariation: GlobalStylesObject;
+	fontPairingVariation?: GlobalStylesObject;
 	isActive: boolean;
 	composite?: Record< string, unknown >;
 	onSelect: () => void;
@@ -25,6 +30,7 @@ interface FontPairingVariationsProps {
 	stylesheet: string;
 	selectedFontPairingVariation: GlobalStylesObject | null;
 	onSelect: ( fontPairingVariation: GlobalStylesObject | null ) => void;
+	limitGlobalStyles?: boolean;
 }
 
 const FontPairingVariation = ( {
@@ -40,14 +46,13 @@ const FontPairingVariation = ( {
 			base,
 			merged: mergeBaseAndUserConfigs( base, fontPairingVariation ),
 		};
-	}, [ fontPairingVariation, base ] );
-
+	}, [ fontPairingVariation?.slug, base ] );
 	return (
 		<CompositeItem
 			role="option"
 			as="button"
 			{ ...composite }
-			className={ classnames( 'global-styles-variation__item', {
+			className={ clsx( 'global-styles-variation__item', {
 				'is-active': isActive,
 			} ) }
 			onClick={ onSelect }
@@ -55,15 +60,24 @@ const FontPairingVariation = ( {
 			aria-label={
 				translate( 'Font: %s', {
 					comment: 'Aria label for font preview buttons',
-					args: fontPairingVariation.title ?? translate( 'Default' ),
+					// The default font pairing has no title
+					args: fontPairingVariation?.title ?? translate( 'Free font' ),
 				} ) as string
 			}
 		>
-			<div className="global-styles-variation__item-preview">
-				<GlobalStylesContext.Provider value={ context }>
-					<FontPairingVariationPreview title={ fontPairingVariation.title } />
-				</GlobalStylesContext.Provider>
-			</div>
+			<InView triggerOnce>
+				{
+					( ( { inView, ref } ) => (
+						<div className="global-styles-variation__item-preview" ref={ ref }>
+							{ ( isActive || inView ) && (
+								<GlobalStylesContext.Provider value={ context }>
+									<FontPairingVariationPreview />
+								</GlobalStylesContext.Provider>
+							) }
+						</div>
+					) ) as IntersectionObserverProps[ 'children' ]
+				}
+			</InView>
 		</CompositeItem>
 	);
 };
@@ -73,36 +87,57 @@ const FontPairingVariations = ( {
 	stylesheet,
 	selectedFontPairingVariation,
 	onSelect,
+	limitGlobalStyles,
 }: FontPairingVariationsProps ) => {
-	const { base } = useContext( GlobalStylesContext );
+	// The theme font pairings don't include the default font pairing
 	const fontPairingVariations = useFontPairingVariations( siteId, stylesheet ) ?? [];
 	const composite = useCompositeState();
-
 	return (
 		<Composite
 			{ ...composite }
 			role="listbox"
-			className="font-pairing-variations"
 			aria-label={ translate( 'Font pairing variations' ) }
+			className="global-styles-variations__container"
 		>
-			<FontPairingVariation
-				key="base"
-				fontPairingVariation={ base }
-				isActive={ ! selectedFontPairingVariation }
-				composite={ composite }
-				onSelect={ () => onSelect( null ) }
-			/>
-			{ fontPairingVariations.map( ( fontPairingVariation, index ) => (
-				<FontPairingVariation
-					key={ index }
-					fontPairingVariation={ fontPairingVariation }
-					isActive={ fontPairingVariation.title === selectedFontPairingVariation?.title }
-					composite={ composite }
-					onSelect={ () => onSelect( fontPairingVariation ) }
-				/>
-			) ) }
+			<div className="global-styles-variations__group">
+				<h3 className="global-styles-variations__group-title">{ translate( 'Free font' ) }</h3>
+				<div className="font-pairing-variations">
+					<FontPairingVariation
+						key="base"
+						// The base is the theme.json, which has the default font pairing
+						isActive={ ! selectedFontPairingVariation }
+						composite={ composite }
+						onSelect={ () => onSelect( null ) }
+					/>
+				</div>
+			</div>
+			<div className="global-styles-variations__group">
+				<h3 className="global-styles-variations__group-title">
+					<span className="global-styles-variations__group-title-actual">
+						{ translate( 'Premium fonts' ) }
+					</span>
+					<PremiumBadge
+						shouldHideTooltip
+						shouldCompactWithAnimation
+						labelText={
+							limitGlobalStyles ? translate( 'Upgrade' ) : translate( 'Included in your plan' )
+						}
+					/>
+				</h3>
+				<div className="font-pairing-variations">
+					{ fontPairingVariations.map( ( fontPairingVariation, index ) => (
+						<FontPairingVariation
+							key={ index }
+							fontPairingVariation={ fontPairingVariation }
+							isActive={ fontPairingVariation.title === selectedFontPairingVariation?.title }
+							composite={ composite }
+							onSelect={ () => onSelect( fontPairingVariation ) }
+						/>
+					) ) }
+				</div>
+			</div>
 		</Composite>
 	);
 };
 
-export default FontPairingVariations;
+export default withExperimentalBlockEditorProvider( FontPairingVariations );

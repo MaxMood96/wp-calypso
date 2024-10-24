@@ -18,6 +18,18 @@ export interface Typography {
 	lineHeight?: string;
 }
 
+export type SetConfigCallback = ( config: GlobalStylesObject ) => GlobalStylesObject;
+
+export type SetConfig = ( callback: SetConfigCallback ) => void;
+
+export interface GlobalStylesContextObject {
+	user?: GlobalStylesObject;
+	base: GlobalStylesObject;
+	merged?: GlobalStylesObject;
+	setUserConfig?: SetConfig;
+	isReady?: boolean;
+}
+
 export interface GlobalStylesObject {
 	id?: number;
 	slug?: string;
@@ -37,6 +49,7 @@ export interface GlobalStylesObject {
 			};
 		};
 		typography?: Typography;
+		blocks?: Record< string, { variations?: object } >;
 	};
 }
 

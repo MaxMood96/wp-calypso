@@ -13,9 +13,9 @@ export class MastodonSharePreview extends PureComponent {
 			articleTitle,
 			articleContent,
 			imageUrl,
-			customImage,
-			isSocialPost,
+			media,
 			message,
+			hidePostPreview,
 		} = this.props;
 
 		return (
@@ -26,13 +26,13 @@ export class MastodonSharePreview extends PureComponent {
 				description={ decodeEntities( articleContent ) }
 				customText={ decodeEntities( message ) }
 				image={ imageUrl }
-				customImage={ customImage }
-				isSocialPost={ isSocialPost }
+				media={ media }
 				user={ {
 					displayName: externalName,
 					avatarUrl: externalProfilePicture,
 					address: externalDisplay,
 				} }
+				hidePostPreview={ hidePostPreview }
 			/>
 		);
 	}

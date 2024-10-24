@@ -3,6 +3,8 @@ import {
 	HOSTING_GEO_AFFINITY_REQUEST,
 	HOSTING_GEO_AFFINITY_SET,
 	HOSTING_PHP_VERSION_SET,
+	HOSTING_WP_VERSION_REQUEST,
+	HOSTING_WP_VERSION_SET,
 	HOSTING_SFTP_USER_UPDATE,
 	HOSTING_SFTP_USERS_SET,
 	HOSTING_SSH_ACCESS_SET,
@@ -10,6 +12,7 @@ import {
 	HOSTING_CLEAR_CACHE_REQUEST,
 	HOSTING_SFTP_USERS_REQUEST,
 	HOSTING_SSH_ACCESS_REQUEST,
+	HOSTING_CLEAR_EDGE_CACHE_SUCCESS,
 } from 'calypso/state/action-types';
 import {
 	combineReducers,
@@ -76,6 +79,26 @@ const phpVersion = ( state = null, { type, version } ) => {
 	return state;
 };
 
+const isFetchingWpVersion = ( state = false, { type } ) => {
+	switch ( type ) {
+		case HOSTING_WP_VERSION_REQUEST:
+			return true;
+		case HOSTING_WP_VERSION_SET:
+			return false;
+	}
+
+	return state;
+};
+
+const wpVersion = ( state = null, { type, version } ) => {
+	switch ( type ) {
+		case HOSTING_WP_VERSION_SET:
+			return version;
+	}
+
+	return state;
+};
+
 const sshAccess = ( state = null, { type, status } ) => {
 	switch ( type ) {
 		case HOSTING_SSH_ACCESS_SET:
@@ -117,6 +140,18 @@ export const lastCacheClearTimestamp = withSchemaValidation(
 	} )
 );
 
+export const lastEdgeCacheClearTimestamp = withSchemaValidation(
+	{ type: 'integer' },
+	withPersistence( ( state = null, { type } ) => {
+		switch ( type ) {
+			case HOSTING_CLEAR_EDGE_CACHE_SUCCESS:
+				return new Date().valueOf();
+		}
+
+		return state;
+	} )
+);
+
 const atomicHostingReducer = combineReducers( {
 	geoAffinity,
 	isFetchingGeoAffinity,
@@ -126,7 +161,10 @@ const atomicHostingReducer = combineReducers( {
 	sshAccess,
 	isLoadingSshAccess,
 	staticFile404,
+	isFetchingWpVersion,
+	wpVersion,
 	lastCacheClearTimestamp,
+	lastEdgeCacheClearTimestamp,
 } );
 
 const reducer = keyedReducer( 'siteId', atomicHostingReducer );

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { Campaign } from 'calypso/data/promote-post/use-promote-post-campaigns-query';
+import { Campaign } from 'calypso/data/promote-post/types';
 import { requestDSP } from 'calypso/lib/promote-post';
 
 export const useCancelCampaignMutation = ( onError: () => void ) => {
@@ -9,14 +9,16 @@ export const useCancelCampaignMutation = ( onError: () => void ) => {
 		mutationFn: async ( { siteId, campaignId }: { siteId: number; campaignId: number } ) =>
 			await requestDSP< { results: Campaign[] } >( siteId, `/campaigns/${ campaignId }/stop` ),
 		onSuccess( data, { siteId } ) {
-			queryClient.invalidateQueries( [ 'promote-post-campaigns', siteId ] );
+			queryClient.invalidateQueries( {
+				queryKey: [ 'promote-post-campaigns', siteId ],
+			} );
 		},
 		onError,
 	} );
 
 	const { mutate } = mutation;
 	const cancelCampaign = useCallback(
-		( siteId, campaignId ) => mutate( { siteId, campaignId } ),
+		( siteId: number, campaignId: number ) => mutate( { siteId, campaignId } ),
 		[ mutate ]
 	);
 

@@ -1,4 +1,4 @@
-import { PLAN_ECOMMERCE_TRIAL_MONTHLY } from '@automattic/calypso-products';
+import { PLAN_100_YEARS } from '@automattic/calypso-products';
 import { isMobile } from '@automattic/viewport';
 import { localize } from 'i18n-calypso';
 import PropTypes from 'prop-types';
@@ -10,6 +10,7 @@ import NavTabs from 'calypso/components/section-nav/tabs';
 import { sectionify } from 'calypso/lib/route';
 import isSiteOnFreePlan from 'calypso/state/selectors/is-site-on-free-plan';
 import isAtomicSite from 'calypso/state/selectors/is-site-wpcom-atomic';
+import { isTrialSite } from 'calypso/state/sites/plans/selectors';
 import { getSite, isJetpackSite } from 'calypso/state/sites/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
 
@@ -19,60 +20,68 @@ class PlansNavigation extends Component {
 		path: PropTypes.string.isRequired,
 		shouldShowNavigation: PropTypes.bool,
 		site: PropTypes.object,
+		isTrial: PropTypes.bool,
 	};
 
+	static planPaths = [
+		'/plans',
+		'/plans/monthly',
+		'/plans/yearly',
+		'/plans/2yearly',
+		'/plans/3yearly',
+	];
+
 	getSectionTitle( path ) {
-		switch ( path ) {
-			case '/plans/my-plan':
-				return 'My Plan';
+		const { translate } = this.props;
 
-			case '/plans':
-			case '/plans/monthly':
-			case '/plans/yearly':
-			case '/plans/2yearly':
-				return 'Plans';
-
-			default:
-				return path.split( '?' )[ 0 ].replace( /\//g, ' ' );
+		if ( path === '/plans/my-plan' ) {
+			return translate( 'My Plan' );
 		}
+
+		if ( PlansNavigation.planPaths.includes( path ) ) {
+			return translate( 'Plans' );
+		}
+
+		return path.split( '?' )[ 0 ].replace( /\//g, ' ' );
+	}
+
+	isSiteOn100YearPlan() {
+		const { site } = this.props;
+		return site?.plan?.product_slug === PLAN_100_YEARS;
 	}
 
 	render() {
-		const { site, shouldShowNavigation, translate } = this.props;
+		const { site, shouldShowNavigation, translate, isTrial } = this.props;
 		const path = sectionify( this.props.path );
 		const sectionTitle = this.getSectionTitle( path );
 		const hasPinnedItems = Boolean( site ) && isMobile();
-		const currentPlanSlug = site?.plan?.product_slug;
-		const isEcommerceTrial = currentPlanSlug === PLAN_ECOMMERCE_TRIAL_MONTHLY;
-		const myPlanItemTitle = isEcommerceTrial ? translate( 'Free trial' ) : translate( 'My Plan' );
+		const myPlanItemTitle = isTrial ? translate( 'Free trial' ) : translate( 'My Plan' );
+
+		if ( ! site || ! shouldShowNavigation ) {
+			return;
+		}
 
 		return (
-			site &&
-			shouldShowNavigation && (
-				<div className="navigation">
-					<SectionNav hasPinnedItems={ hasPinnedItems } selectedText={ sectionTitle }>
-						<NavTabs label="Section" selectedText={ sectionTitle }>
-							<NavItem
-								path={ `/plans/my-plan/${ site.slug }` }
-								selected={ path === '/plans/my-plan' }
-							>
-								{ myPlanItemTitle }
-							</NavItem>
+			<div className="navigation">
+				<SectionNav hasPinnedItems={ hasPinnedItems } selectedText={ sectionTitle }>
+					<NavTabs label={ translate( 'Section' ) } selectedText={ sectionTitle }>
+						<NavItem
+							path={ `/plans/my-plan/${ site.slug }` }
+							selected={ path === '/plans/my-plan' }
+						>
+							{ myPlanItemTitle }
+						</NavItem>
+						{ ! this.isSiteOn100YearPlan() && (
 							<NavItem
 								path={ `/plans/${ site.slug }` }
-								selected={
-									path === '/plans' ||
-									path === '/plans/monthly' ||
-									path === '/plans/yearly' ||
-									path === '/plans/2yearly'
-								}
+								selected={ PlansNavigation.planPaths.includes( path ) }
 							>
 								{ translate( 'Plans' ) }
 							</NavItem>
-						</NavTabs>
-					</SectionNav>
-				</div>
-			)
+						) }
+					</NavTabs>
+				</SectionNav>
+			</div>
 		);
 	}
 }
@@ -88,5 +97,6 @@ export default connect( ( state ) => {
 		isJetpack,
 		shouldShowNavigation: ! isOnFreePlan || ( isJetpack && ! isAtomic ),
 		site,
+		isTrial: isTrialSite( state, siteId ),
 	};
 } )( localize( PlansNavigation ) );

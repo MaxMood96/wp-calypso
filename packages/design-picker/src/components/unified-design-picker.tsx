@@ -1,23 +1,24 @@
 import { recordTracksEvent } from '@automattic/calypso-analytics';
-import { FEATURE_WOOP } from '@automattic/calypso-products';
+import { Button } from '@automattic/components';
 import { MShotsImage } from '@automattic/onboarding';
 import { useViewportMatch } from '@wordpress/compose';
-import { useI18n } from '@wordpress/react-i18n';
-import classnames from 'classnames';
+import clsx from 'clsx';
+import photon from 'photon';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { SHOW_ALL_SLUG } from '../constants';
 import {
+	getAssemblerDesign,
 	getDesignPreviewUrl,
 	getMShotOptions,
 	isBlankCanvasDesign,
+	isDefaultGlobalStylesVariationSlug,
 	filterDesignsByCategory,
 } from '../utils';
+import { isLockedStyleVariation } from '../utils/is-locked-style-variation';
 import { UnifiedDesignPickerCategoryFilter } from './design-picker-category-filter/unified-design-picker-category-filter';
-import PatternAssemblerCta from './pattern-assembler-cta';
-import PremiumBadge from './premium-badge';
+import PatternAssemblerCta, { usePatternAssemblerCtaData } from './pattern-assembler-cta';
 import ThemeCard from './theme-card';
-import WooCommerceBundledBadge from './woocommerce-bundled-badge';
 import type { Categorization } from '../hooks/use-categorization';
 import type { Design, StyleVariation } from '../types';
 import type { RefCallback } from 'react';
@@ -27,27 +28,62 @@ const makeOptionId = ( { slug }: Design ): string => `design-picker__option-name
 
 interface DesignPreviewImageProps {
 	design: Design;
-	locale: string;
+	imageOptimizationExperiment?: boolean;
+	locale?: string;
 	styleVariation?: StyleVariation;
+	oldHighResImageLoading?: boolean; // Temporary for A/B test.
 }
 
 const DesignPreviewImage: React.FC< DesignPreviewImageProps > = ( {
 	design,
 	locale,
 	styleVariation,
+	oldHighResImageLoading,
 } ) => {
 	const isMobile = useViewportMatch( 'small', '<' );
+
+	if ( design?.design_tier === 'partner' && design.screenshot ) {
+		const fit = '479,360';
+		// We're stubbing out the high res version here as part of a size reduction experiment.
+		// See #88786 and TODO for discussion / info.
+		const themeImgSrc = photon( design.screenshot, { fit } ) || design.screenshot;
+		const themeImgSrcDoubleDpi = photon( design.screenshot, { fit, zoom: 2 } ) || design.screenshot;
+
+		if ( oldHighResImageLoading ) {
+			return (
+				<img
+					src={ themeImgSrc }
+					srcSet={ `${ themeImgSrcDoubleDpi } 2x` }
+					alt={ design.description }
+				/>
+			);
+		}
+
+		return (
+			<img
+				loading="lazy"
+				src={ themeImgSrc }
+				srcSet={ `${ themeImgSrc }` }
+				alt={ design.description }
+			/>
+		);
+	}
 
 	return (
 		<MShotsImage
 			url={ getDesignPreviewUrl( design, {
-				language: locale,
 				use_screenshot_overrides: true,
 				style_variation: styleVariation,
+				...( locale && { language: locale } ),
 			} ) }
 			aria-labelledby={ makeOptionId( design ) }
 			alt=""
-			options={ getMShotOptions( { scrollable: false, highRes: ! isMobile, isMobile } ) }
+			options={ getMShotOptions( {
+				scrollable: false,
+				highRes: ! isMobile,
+				isMobile,
+				oldHighResImageLoading,
+			} ) }
 			scrollable={ false }
 		/>
 	);
@@ -64,7 +100,6 @@ interface TrackDesignViewProps {
  * that MUST be used as the `ref` prop on a `div` element.
  * The hook ensures that we generate theme display Tracks events when the user views
  * the underlying `div` element.
- *
  * @param { TrackDesignViewProps } designDetails Details around the design and current context.
  * @returns { Function } A callback ref that MUST be used on a div element for tracking.
  */
@@ -107,11 +142,13 @@ const useTrackDesignView = ( {
 
 				recordTracksEvent( 'calypso_design_picker_design_display', {
 					category: trackingCategory,
-					design_type: design.design_type,
-					is_premium: design.is_premium,
+					...( design?.design_tier && { design_tier: design.design_tier } ),
+					is_premium: design?.design_tier === 'premium',
+					// TODO: Better to track whether already available on this sites plan.
 					is_premium_available: isPremiumThemeAvailable,
 					slug: design.slug,
 					is_virtual: design.is_virtual,
+					is_externally_managed: design?.design_tier === 'partner',
 				} );
 
 				if ( category ) {
@@ -135,136 +172,105 @@ interface DesignCardProps {
 	design: Design;
 	locale: string;
 	category?: string | null;
-	currentPlanFeatures?: string[];
-	hasPurchasedTheme?: boolean;
 	isPremiumThemeAvailable?: boolean;
 	shouldLimitGlobalStyles?: boolean;
 	onChangeVariation: ( design: Design, variation?: StyleVariation ) => void;
 	onPreview: ( design: Design, variation?: StyleVariation ) => void;
+	getBadge: ( themeId: string, isLockedStyleVariation: boolean ) => React.ReactNode;
+	oldHighResImageLoading?: boolean; // Temporary for A/B test.
+	isActive: boolean;
 }
 
 const DesignCard: React.FC< DesignCardProps > = ( {
 	design,
 	locale,
 	category,
-	currentPlanFeatures,
-	hasPurchasedTheme = false,
 	isPremiumThemeAvailable,
 	shouldLimitGlobalStyles,
 	onChangeVariation,
 	onPreview,
+	getBadge,
+	oldHighResImageLoading,
+	isActive,
 } ) => {
-	const { __ } = useI18n();
 	const [ selectedStyleVariation, setSelectedStyleVariation ] = useState< StyleVariation >();
 
 	const { style_variations = [] } = design;
 	const trackingDivRef = useTrackDesignView( { category, design, isPremiumThemeAvailable } );
-	const isDefaultVariation = ! selectedStyleVariation || selectedStyleVariation.slug === 'default';
+	const isDefaultVariation = isDefaultGlobalStylesVariationSlug( selectedStyleVariation?.slug );
 
-	const currentSiteCanInstallWoo = currentPlanFeatures?.includes( FEATURE_WOOP ) ?? false;
-	const designIsBundledWithWoo = design.is_bundled_with_woo_commerce;
-	const isPremium = design.is_premium || ( shouldLimitGlobalStyles && ! isDefaultVariation );
-	const shouldUpgrade = isPremium && ! isPremiumThemeAvailable && ! hasPurchasedTheme;
+	const isLocked = isLockedStyleVariation( {
+		isPremiumTheme: design?.design_tier === 'premium',
+		styleVariationSlug: selectedStyleVariation?.slug,
+		shouldLimitGlobalStyles,
+	} );
 
-	function getPricingDescription() {
-		let text: React.ReactNode = null;
-
-		if ( designIsBundledWithWoo ) {
-			text = currentSiteCanInstallWoo
-				? __( 'Included in your plan' )
-				: __( 'Available with WordPress.com Business' );
-		} else if ( isPremium && shouldUpgrade ) {
-			text = __( 'Included in WordPress.com Premium' );
-		} else if ( isPremium && ! shouldUpgrade && hasPurchasedTheme ) {
-			text = __( 'Purchased on an annual subscription' );
-		} else if ( isPremium && ! shouldUpgrade && ! hasPurchasedTheme ) {
-			text = __( 'Included in your plan' );
-		} else if ( ! isPremium ) {
-			text = __( 'Free' );
-		}
-
-		let badge: React.ReactNode = null;
-		if ( designIsBundledWithWoo ) {
-			badge = <WooCommerceBundledBadge />;
-		} else if ( isPremium ) {
-			const showStyleVariationTooltip =
-				! isDefaultVariation && shouldUpgrade && ! design.is_premium;
-			const tooltipText = showStyleVariationTooltip
-				? __( 'Unlock this style, and tons of other features, by upgrading to a Premium plan.' )
-				: undefined;
-			badge = (
-				<PremiumBadge
-					tooltipPosition="bottom right"
-					isPremiumThemeAvailable={ isPremiumThemeAvailable }
-					tooltipContent={ tooltipText }
-				/>
-			);
-		}
-
-		return (
-			<>
-				{ badge }
-				<span>{ text }</span>
-			</>
-		);
-	}
+	const conditionalProps =
+		! isLocked && isActive
+			? {}
+			: { onImageClick: () => onPreview( design, selectedStyleVariation ) };
 
 	return (
 		<ThemeCard
 			className="design-button-container"
 			ref={ trackingDivRef }
 			name={
-				isDefaultVariation ? design.title : `${ design.title } – ${ selectedStyleVariation.title }`
+				isDefaultVariation ? design.title : `${ design.title } – ${ selectedStyleVariation?.title }`
 			}
 			image={
 				<DesignPreviewImage
 					design={ design }
 					locale={ locale }
 					styleVariation={ selectedStyleVariation }
+					oldHighResImageLoading={ oldHighResImageLoading }
 				/>
 			}
-			badge={ getPricingDescription() }
+			badge={ getBadge( design.slug, isLocked ) }
 			styleVariations={ style_variations }
 			selectedStyleVariation={ selectedStyleVariation }
-			onImageClick={ () => onPreview( design, selectedStyleVariation ) }
 			onStyleVariationClick={ ( variation ) => {
 				onChangeVariation( design, variation );
 				setSelectedStyleVariation( variation );
 			} }
 			onStyleVariationMoreClick={ () => onPreview( design ) }
+			isActive={ isActive && ! isLocked }
+			{ ...conditionalProps }
 		/>
 	);
 };
 
-const wasThemePurchased = ( purchasedThemes: string[] | undefined, design: Design ) =>
-	purchasedThemes
-		? purchasedThemes.some( ( themeId ) => design?.recipe?.stylesheet?.endsWith( '/' + themeId ) )
-		: false;
-
 interface DesignPickerProps {
 	locale: string;
-	onSelectBlankCanvas: ( design: Design, shouldGoToAssemblerStep: boolean ) => void;
+	onDesignYourOwn: ( design: Design ) => void;
+	onClickDesignYourOwnTopButton: ( design: Design ) => void;
 	onPreview: ( design: Design, variation?: StyleVariation ) => void;
 	onChangeVariation: ( design: Design, variation?: StyleVariation ) => void;
 	designs: Design[];
 	categorization?: Categorization;
 	isPremiumThemeAvailable?: boolean;
-	purchasedThemes?: string[];
-	currentPlanFeatures?: string[];
 	shouldLimitGlobalStyles?: boolean;
+	getBadge: ( themeId: string, isLockedStyleVariation: boolean ) => React.ReactNode;
+	oldHighResImageLoading?: boolean; // Temporary for A/B test
+	isSiteAssemblerEnabled?: boolean; // Temporary for A/B test
+	siteActiveTheme?: string | null;
+	showActiveThemeBadge?: boolean;
 }
 
 const DesignPicker: React.FC< DesignPickerProps > = ( {
 	locale,
-	onSelectBlankCanvas,
+	onDesignYourOwn,
+	onClickDesignYourOwnTopButton,
 	onPreview,
 	onChangeVariation,
 	designs,
 	categorization,
 	isPremiumThemeAvailable,
-	purchasedThemes,
-	currentPlanFeatures,
 	shouldLimitGlobalStyles,
+	getBadge,
+	oldHighResImageLoading,
+	isSiteAssemblerEnabled,
+	siteActiveTheme = null,
+	showActiveThemeBadge = false,
 } ) => {
 	const hasCategories = !! Object.keys( categorization?.categories || {} ).length;
 	const filteredDesigns = useMemo( () => {
@@ -275,43 +281,58 @@ const DesignPicker: React.FC< DesignPickerProps > = ( {
 		return designs;
 	}, [ designs, categorization?.selection ] );
 
+	// Pick design
+
+	const assemblerCtaData = usePatternAssemblerCtaData();
+
 	return (
 		<div>
-			{ categorization && hasCategories && (
-				<UnifiedDesignPickerCategoryFilter
-					categories={ categorization.categories }
-					onSelect={ categorization.onSelect }
-					selectedSlug={ categorization.selection }
-				/>
-			) }
+			<div className="design-picker__filters">
+				{ categorization && hasCategories && (
+					<UnifiedDesignPickerCategoryFilter
+						className="design-picker__category-filter"
+						categories={ categorization.categories }
+						onSelect={ categorization.onSelect }
+						selectedSlug={ categorization.selection }
+					/>
+				) }
+				{ assemblerCtaData.shouldGoToAssemblerStep && isSiteAssemblerEnabled && (
+					<Button
+						className={ clsx( 'design-picker__design-your-own-button', {
+							'design-picker__design-your-own-button-without-categories': ! hasCategories,
+						} ) }
+						onClick={ () => onClickDesignYourOwnTopButton( getAssemblerDesign() ) }
+					>
+						{ assemblerCtaData.title }
+					</Button>
+				) }
+			</div>
+
 			<div className="design-picker__grid">
 				{ filteredDesigns.map( ( design, index ) => {
 					if ( isBlankCanvasDesign( design ) ) {
-						return (
-							<PatternAssemblerCta
-								key={ index }
-								onButtonClick={ ( shouldGoToAssemblerStep ) =>
-									onSelectBlankCanvas( design, shouldGoToAssemblerStep )
-								}
-							/>
-						);
+						return null;
 					}
 
 					return (
 						<DesignCard
-							key={ index }
+							key={ design.recipe?.slug ?? design.slug ?? index }
 							category={ categorization?.selection }
 							design={ design }
 							locale={ locale }
-							currentPlanFeatures={ currentPlanFeatures }
-							hasPurchasedTheme={ wasThemePurchased( purchasedThemes, design ) }
 							isPremiumThemeAvailable={ isPremiumThemeAvailable }
 							shouldLimitGlobalStyles={ shouldLimitGlobalStyles }
 							onChangeVariation={ onChangeVariation }
 							onPreview={ onPreview }
+							getBadge={ getBadge }
+							oldHighResImageLoading={ oldHighResImageLoading }
+							isActive={ showActiveThemeBadge && design.recipe?.stylesheet === siteActiveTheme }
 						/>
 					);
 				} ) }
+				{ isSiteAssemblerEnabled && (
+					<PatternAssemblerCta onButtonClick={ () => onDesignYourOwn( getAssemblerDesign() ) } />
+				) }
 			</div>
 		</div>
 	);
@@ -319,7 +340,8 @@ const DesignPicker: React.FC< DesignPickerProps > = ( {
 
 export interface UnifiedDesignPickerProps {
 	locale: string;
-	onSelectBlankCanvas: ( design: Design, shouldGoToAssemblerStep: boolean ) => void;
+	onDesignYourOwn: ( design: Design ) => void;
+	onClickDesignYourOwnTopButton: ( design: Design ) => void;
 	onPreview: ( design: Design, variation?: StyleVariation ) => void;
 	onChangeVariation: ( design: Design, variation?: StyleVariation ) => void;
 	onViewAllDesigns: () => void;
@@ -327,14 +349,18 @@ export interface UnifiedDesignPickerProps {
 	categorization?: Categorization;
 	heading?: React.ReactNode;
 	isPremiumThemeAvailable?: boolean;
-	purchasedThemes?: string[];
-	currentPlanFeatures?: string[];
 	shouldLimitGlobalStyles?: boolean;
+	getBadge: ( themeId: string, isLockedStyleVariation: boolean ) => React.ReactNode;
+	oldHighResImageLoading?: boolean; // Temporary for A/B test
+	isSiteAssemblerEnabled?: boolean; // Temporary for A/B test
+	siteActiveTheme?: string | null;
+	showActiveThemeBadge?: boolean;
 }
 
 const UnifiedDesignPicker: React.FC< UnifiedDesignPickerProps > = ( {
 	locale,
-	onSelectBlankCanvas,
+	onDesignYourOwn,
+	onClickDesignYourOwnTopButton,
 	onPreview,
 	onChangeVariation,
 	onViewAllDesigns,
@@ -342,9 +368,12 @@ const UnifiedDesignPicker: React.FC< UnifiedDesignPickerProps > = ( {
 	heading,
 	categorization,
 	isPremiumThemeAvailable,
-	purchasedThemes,
-	currentPlanFeatures,
 	shouldLimitGlobalStyles,
+	getBadge,
+	oldHighResImageLoading,
+	isSiteAssemblerEnabled,
+	siteActiveTheme = null,
+	showActiveThemeBadge = false,
 } ) => {
 	const hasCategories = !! Object.keys( categorization?.categories || {} ).length;
 
@@ -360,28 +389,27 @@ const UnifiedDesignPicker: React.FC< UnifiedDesignPickerProps > = ( {
 
 	return (
 		<div
-			className={ classnames(
-				'design-picker',
-				`design-picker--theme-light`,
-				'design-picker__unified',
-				{
-					'design-picker--has-categories': hasCategories,
-				}
-			) }
+			className={ clsx( 'design-picker', `design-picker--theme-light`, 'design-picker__unified', {
+				'design-picker--has-categories': hasCategories,
+			} ) }
 		>
 			{ heading }
 			<div className="unified-design-picker__designs">
 				<DesignPicker
 					locale={ locale }
-					onSelectBlankCanvas={ onSelectBlankCanvas }
+					onDesignYourOwn={ onDesignYourOwn }
+					onClickDesignYourOwnTopButton={ onClickDesignYourOwnTopButton }
 					onPreview={ onPreview }
 					onChangeVariation={ onChangeVariation }
 					designs={ designs }
 					categorization={ categorization }
 					isPremiumThemeAvailable={ isPremiumThemeAvailable }
-					purchasedThemes={ purchasedThemes }
-					currentPlanFeatures={ currentPlanFeatures }
 					shouldLimitGlobalStyles={ shouldLimitGlobalStyles }
+					getBadge={ getBadge }
+					oldHighResImageLoading={ oldHighResImageLoading }
+					isSiteAssemblerEnabled={ isSiteAssemblerEnabled }
+					siteActiveTheme={ siteActiveTheme }
+					showActiveThemeBadge={ showActiveThemeBadge }
 				/>
 				{ bottomAnchorContent }
 			</div>

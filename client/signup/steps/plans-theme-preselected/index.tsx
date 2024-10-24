@@ -1,4 +1,12 @@
 import { Button } from '@automattic/components';
+import {
+	FREE_THEME,
+	PERSONAL_THEME,
+	PREMIUM_THEME,
+	DOT_ORG_THEME,
+	BUNDLED_THEME,
+	MARKETPLACE_THEME,
+} from '@automattic/design-picker';
 import { isDesktop } from '@automattic/viewport';
 import { localize, translate } from 'i18n-calypso';
 import { recordTracksEvent } from 'calypso/lib/analytics/tracks';
@@ -14,7 +22,6 @@ type SignupDependencies = {
  * Determine which plans should be displayed based on the signupDependencies.
  *
  * Instead of making an API call (which is expensive), we are retrieving the information based on the query Params that were passed when the flow started.
- *
  * @param signupDependencies
  */
 function getHidePlanPropsBasedOnSignupDependencies(
@@ -24,18 +31,25 @@ function getHidePlanPropsBasedOnSignupDependencies(
 	 * Marketplace themes: Display only Business and eCommerce plans.
 	 */
 	if (
-		signupDependencies.themeType === 'dot-org' ||
-		signupDependencies.themeType === 'managed-externally' ||
-		signupDependencies.themeType === 'woocommerce'
+		signupDependencies.themeType === DOT_ORG_THEME ||
+		signupDependencies.themeType === MARKETPLACE_THEME ||
+		signupDependencies.themeType === BUNDLED_THEME
 	) {
-		return { hidePremiumPlan: true, hidePersonalPlan: true };
+		return { hidePremiumPlan: true, hidePersonalPlan: true, hideFreePlan: true };
 	}
 
 	/**
 	 * Premium themes: Display Premium, Business and eCommerce
 	 */
-	if ( signupDependencies.themeType === 'premium' ) {
-		return { hidePersonalPlan: true };
+	if ( signupDependencies.themeType === PREMIUM_THEME ) {
+		return { hidePersonalPlan: true, hideFreePlan: true };
+	}
+
+	/**
+	 * Personal themes: Display Personal, Premium, Business and eCommerce
+	 */
+	if ( signupDependencies.themeType === PERSONAL_THEME ) {
+		return { hideFreePlan: true };
 	}
 
 	return {};
@@ -66,7 +80,9 @@ function PlansThemePreselectedStep( props: object & { signupDependencies: Signup
 	 * Keep the default subheader text for free themes.
 	 */
 	const fallbackSubheaderTextProps =
-		'free' === props.signupDependencies.themeType ? {} : { fallbackSubHeaderText: subHeaderText };
+		FREE_THEME === props.signupDependencies.themeType
+			? {}
+			: { fallbackSubHeaderText: subHeaderText };
 
 	return <PlansStep { ...props } { ...hidePlanProps } { ...fallbackSubheaderTextProps } />;
 }

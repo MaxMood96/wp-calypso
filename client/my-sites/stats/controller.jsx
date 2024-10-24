@@ -1,9 +1,7 @@
-import config from '@automattic/calypso-config';
-import { Spinner } from '@automattic/components';
+import page from '@automattic/calypso-router';
 import i18n from 'i18n-calypso';
 import { find, pick } from 'lodash';
 import moment from 'moment';
-import page from 'page';
 import AsyncLoad from 'calypso/components/async-load';
 import { bumpStat } from 'calypso/lib/analytics/mc';
 import { getSiteFragment, getStatsDefaultSitePage } from 'calypso/lib/route';
@@ -11,51 +9,12 @@ import { getSite, getSiteOption } from 'calypso/state/sites/selectors';
 import { setNextLayoutFocus } from 'calypso/state/ui/layout-focus/actions';
 import { getCurrentLayoutFocus } from 'calypso/state/ui/layout-focus/selectors';
 import { getSelectedSiteId } from 'calypso/state/ui/selectors';
+import { rangeOfPeriod, getSiteFilters } from './pages/shared/helpers';
+import PageLoading from './pages/shared/page-loading';
 import StatsSite from './site';
 import StatsEmailDetail from './stats-email-detail';
 import StatsEmailSummary from './stats-email-summary';
-
-const isOdysseyStats = config.isEnabled( 'is_running_in_jetpack_site' );
-
-const PageLoading = (
-	<div
-		style={ {
-			minHeight: 'calc( 100vh - 100px )',
-			width: '100%',
-			display: 'flex',
-			justifyContent: 'center',
-			alignItems: 'center',
-		} }
-	>
-		{ isOdysseyStats ? (
-			<img width="32" height="32" alt="Loading" src="//en.wordpress.com/i/loading/loading-64.gif" />
-		) : (
-			<Spinner />
-		) }
-	</div>
-);
-
-function rangeOfPeriod( period, date ) {
-	const periodRange = {
-		period: period,
-		startOf: date.clone().startOf( period ),
-		endOf: date.clone().endOf( period ),
-	};
-
-	if ( 'week' === period ) {
-		if ( '0' === date.format( 'd' ) ) {
-			periodRange.startOf.subtract( 6, 'd' );
-			periodRange.endOf.subtract( 6, 'd' );
-		} else {
-			periodRange.startOf.add( 1, 'd' );
-			periodRange.endOf.add( 1, 'd' );
-		}
-	}
-
-	periodRange.key = period + ':' + periodRange.endOf.format( 'YYYY-MM-DD' );
-
-	return periodRange;
-}
+import StatsPageLoader from './stats-page-loader';
 
 function getNumPeriodAgo( momentSiteZone, date, period ) {
 	const endOfCurrentPeriod = momentSiteZone.endOf( period );
@@ -77,107 +36,6 @@ function getNumPeriodAgo( momentSiteZone, date, period ) {
 			break;
 	}
 	return numPeriodAgo;
-}
-
-function getSiteFilters( siteId ) {
-	return [
-		//TODO: This Insights route could be removed since it has been set routing as below.
-		// statsPage( '/stats/insights/:site', insights );
-		{
-			title: i18n.translate( 'Insights' ),
-			path: '/stats/insights/' + siteId,
-			id: 'stats-insights',
-		},
-		{
-			title: i18n.translate( 'Subscribers' ),
-			path: '/stats/subscribers/' + siteId,
-			id: 'stats-subscribers',
-		},
-		{
-			title: i18n.translate( 'Days' ),
-			path: '/stats/subscribers/day/' + siteId,
-			id: 'stats-subscribers-day',
-			period: 'day',
-		},
-		{
-			title: i18n.translate( 'Weeks' ),
-			path: '/stats/subscribers/week/' + siteId,
-			id: 'stats-subscribers-week',
-			period: 'week',
-		},
-		{
-			title: i18n.translate( 'Months' ),
-			path: '/stats/subscribers/month/' + siteId,
-			id: 'stats-subscribers-month',
-			period: 'month',
-		},
-		{
-			title: i18n.translate( 'Years' ),
-			path: '/stats/subscribers/year/' + siteId,
-			id: 'stats-subscribers-year',
-			period: 'year',
-		},
-		{
-			title: i18n.translate( 'Hours' ),
-			path: '/stats/hour/' + siteId,
-			id: 'stats-hour',
-			period: 'hour',
-		},
-		{
-			title: i18n.translate( 'Days' ),
-			path: '/stats/day/' + siteId,
-			id: 'stats-day',
-			period: 'day',
-		},
-		{
-			title: i18n.translate( 'Weeks' ),
-			path: '/stats/week/' + siteId,
-			id: 'stats-week',
-			period: 'week',
-		},
-		{
-			title: i18n.translate( 'Months' ),
-			path: '/stats/month/' + siteId,
-			id: 'stats-month',
-			period: 'month',
-		},
-		{
-			title: i18n.translate( 'Years' ),
-			path: '/stats/year/' + siteId,
-			id: 'stats-year',
-			period: 'year',
-		},
-		{
-			title: i18n.translate( 'Hours' ),
-			path: `/stats/email/opens/hour/`,
-			id: 'stats-email-opens-hour',
-			period: 'hour',
-		},
-		{
-			title: i18n.translate( 'Days' ),
-			path: `/stats/email/opens/day/`,
-			id: 'stats-email-opens-day',
-			period: 'day',
-		},
-		{
-			title: i18n.translate( 'Hours' ),
-			path: `/stats/email/clicks/hour/`,
-			id: 'stats-email-clicks-hour',
-			period: 'hour',
-		},
-		{
-			title: i18n.translate( 'Days' ),
-			path: `/stats/email/clicks/day/`,
-			id: 'stats-email-clicks-day',
-			period: 'day',
-		},
-		{
-			title: i18n.translate( 'Days' ),
-			path: `/stats/day/emails`,
-			id: 'stats-email-summary',
-			period: 'day',
-		},
-	];
 }
 
 function getWordAdsFilters( siteId ) {
@@ -246,33 +104,6 @@ export function redirectToDefaultModulePage( context ) {
 	page.redirect( `/stats/day/${ context.params.module }/${ context.params.site }` );
 }
 
-export function insights( context, next ) {
-	context.primary = (
-		<AsyncLoad require="calypso/my-sites/stats/stats-insights" placeholder={ PageLoading } />
-	);
-	next();
-}
-
-export function subscribers( context, next ) {
-	const givenSiteId = context.params.site;
-	const filters = getSiteFilters( givenSiteId );
-	const activeFilter = find( filters, ( filter ) => {
-		return (
-			context.path.indexOf( filter.path ) >= 0 ||
-			( filter.altPaths && context.path.indexOf( filter.altPaths ) >= 0 )
-		);
-	} );
-
-	context.primary = (
-		<AsyncLoad
-			require="calypso/my-sites/stats/stats-subscribers"
-			placeholder={ PageLoading }
-			period={ activeFilter.period } // TODO: investigate rangeOfPeriod() for date changes
-		/>
-	);
-	next();
-}
-
 export function overview( context, next ) {
 	const filters = function () {
 		return [
@@ -306,14 +137,26 @@ export function overview( context, next ) {
 
 	bumpStat( 'calypso_stats_overview_period', activeFilter.period );
 
-	context.primary = (
-		<AsyncLoad
-			require="calypso/my-sites/stats/overview"
-			placeholder={ PageLoading }
-			period={ activeFilter.period }
-			path={ context.pathname }
-		/>
-	);
+	const siteId = getSelectedSiteId( context.store.getState() );
+
+	context.primary =
+		siteId !== null ? (
+			<StatsPageLoader>
+				<AsyncLoad
+					require="calypso/my-sites/stats/overview"
+					placeholder={ PageLoading }
+					period={ activeFilter.period }
+					path={ context.pathname }
+				/>
+			</StatsPageLoader>
+		) : (
+			<AsyncLoad
+				require="calypso/my-sites/stats/overview"
+				placeholder={ PageLoading }
+				period={ activeFilter.period }
+				path={ context.pathname }
+			/>
+		);
 	next();
 }
 
@@ -359,13 +202,15 @@ export function site( context, next ) {
 	const chartTab = validTabs.includes( queryOptions.tab ) ? queryOptions.tab : 'views';
 
 	context.primary = (
-		<StatsSite
-			path={ context.pathname }
-			date={ date }
-			chartTab={ chartTab }
-			context={ context }
-			period={ rangeOfPeriod( activeFilter.period, date ) }
-		/>
+		<StatsPageLoader>
+			<StatsSite
+				path={ context.pathname }
+				date={ date }
+				chartTab={ chartTab }
+				context={ context }
+				period={ rangeOfPeriod( activeFilter.period, date ) }
+			/>
+		</StatsPageLoader>
 	);
 
 	next();
@@ -398,6 +243,8 @@ export function summary( context, next ) {
 		'filedownloads',
 		'searchterms',
 		'annualstats',
+		'utm',
+		'devices',
 	];
 	let momentSiteZone = moment();
 
@@ -439,16 +286,18 @@ export function summary( context, next ) {
 	}
 
 	context.primary = (
-		<AsyncLoad
-			require="calypso/my-sites/stats/summary"
-			placeholder={ PageLoading }
-			path={ context.pathname }
-			statsQueryOptions={ statsQueryOptions }
-			date={ date }
-			context={ context }
-			period={ period }
-			{ ...extraProps }
-		/>
+		<StatsPageLoader>
+			<AsyncLoad
+				require="calypso/my-sites/stats/summary"
+				placeholder={ PageLoading }
+				path={ context.pathname }
+				statsQueryOptions={ statsQueryOptions }
+				date={ date }
+				context={ context }
+				period={ period }
+				{ ...extraProps }
+			/>
+		</StatsPageLoader>
 	);
 
 	next();
@@ -466,13 +315,15 @@ export function post( context, next ) {
 	}
 
 	context.primary = (
-		<AsyncLoad
-			require="calypso/my-sites/stats/stats-post-detail"
-			placeholder={ PageLoading }
-			path={ context.path }
-			postId={ postId }
-			context={ context }
-		/>
+		<StatsPageLoader>
+			<AsyncLoad
+				require="calypso/my-sites/stats/stats-post-detail"
+				placeholder={ PageLoading }
+				path={ context.path }
+				postId={ postId }
+				context={ context }
+			/>
+		</StatsPageLoader>
 	);
 
 	next();
@@ -502,16 +353,18 @@ export function follows( context, next ) {
 	}
 
 	context.primary = (
-		<AsyncLoad
-			require="calypso/my-sites/stats/comment-follows"
-			placeholder={ PageLoading }
-			path={ context.path }
-			page={ pageNum }
-			perPage="20"
-			total="10"
-			domain={ siteDomain }
-			siteId={ siteId }
-		/>
+		<StatsPageLoader>
+			<AsyncLoad
+				require="calypso/my-sites/stats/comment-follows"
+				placeholder={ PageLoading }
+				path={ context.path }
+				page={ pageNum }
+				perPage="20"
+				total="10"
+				domain={ siteDomain }
+				siteId={ siteId }
+			/>
+		</StatsPageLoader>
 	);
 
 	next();
@@ -635,3 +488,7 @@ export function emailSummary( context, next ) {
 
 	next();
 }
+
+export { default as insights } from './pages/insights/controller';
+export { default as subscribers } from './pages/subscribers/controller';
+export { default as purchase } from './pages/purchase/controller';
