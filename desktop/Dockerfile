@@ -1,4 +1,4 @@
-FROM debian:latest
+FROM debian:12.10
 
 ARG NODE_VERSION=16.11.1
 
