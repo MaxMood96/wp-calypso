@@ -217,7 +217,7 @@
 		"@babel/register": "^7.17.0",
 		"@babel/runtime": "^7.17.2",
 		"@bartekbp/typescript-checkstyle": "^5.0.0",
-		"@pmmmwh/react-refresh-webpack-plugin": "^0.5.10",
+		"@pmmmwh/react-refresh-webpack-plugin": "^0.6.0",
 		"@signal-noise/stylelint-scales": "^2.0.3",
 		"@storybook/react": "^6.4.18",
 		"@testing-library/jest-dom": "^5.16.2",
