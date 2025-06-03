@@ -30,7 +30,7 @@
 		"watch": "tsc --build ./tsconfig.json --watch"
 	},
 	"dependencies": {
-		"@automattic/load-script": "workspace:^",
+		"@automattic/load-script": "1.0.0",
 		"cookie": "^0.4.1",
 		"debug": "^4.3.3",
 		"hash.js": "^1.1.7",
