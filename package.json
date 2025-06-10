@@ -182,7 +182,7 @@
 		"@wordpress/primitives": "^3.20.0",
 		"@wordpress/url": "^3.23.0",
 		"browserslist": "^4.16.0",
-		"calypso": "workspace:^",
+		"calypso": "0.0.0",
 		"calypso-codemods": "workspace:^",
 		"config": "^3.3.6",
 		"debug": "^4.3.3",
