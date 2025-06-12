@@ -29,7 +29,7 @@
 	"devDependencies": {
 		"@automattic/calypso-eslint-overrides": "workspace:^",
 		"@automattic/calypso-typescript-config": "workspace:^",
-		"@automattic/languages": "workspace:^",
+		"@automattic/languages": "1.0.0",
 		"@jest/globals": "^27.3.1",
 		"@types/jest": "^27.4.0",
 		"@types/node": "^18.11.18",
