@@ -147,7 +147,7 @@
 	},
 	"dependencies": {
 		"@automattic/calypso-babel-config": "workspace:^",
-		"@automattic/calypso-build": "workspace:^",
+		"@automattic/calypso-build": "1.0.0",
 		"@automattic/calypso-color-schemes": "workspace:^",
 		"@automattic/calypso-doctor": "workspace:^",
 		"@automattic/calypso-products": "workspace:^",
@@ -156,16 +156,16 @@
 		"@automattic/charts": "^0.11.4",
 		"@automattic/color-studio": "^4.1.0",
 		"@automattic/command-palette": "workspace:^",
-		"@automattic/components": "workspace:^",
-		"@automattic/data-stores": "workspace:^",
+		"@automattic/components": "2.0.0",
+		"@automattic/data-stores": "2.0.0",
 		"@automattic/domain-search": "workspace:^",
 		"@automattic/help-center": "workspace:^",
-		"@automattic/i18n-utils": "workspace:^",
+		"@automattic/i18n-utils": "1.0.0",
 		"@automattic/languages": "workspace:^",
-		"@automattic/launchpad": "workspace:^",
+		"@automattic/launchpad": "1.0.0",
 		"@automattic/number-formatters": "^1.0.1",
 		"@automattic/plans-grid-next": "workspace:^",
-		"@automattic/privacy-toolset": "workspace:^",
+		"@automattic/privacy-toolset": "1.0.0",
 		"@automattic/typography": "workspace:^",
 		"@automattic/urls": "workspace:^",
 		"@automattic/verbum-block-editor": "workspace:^",
@@ -211,7 +211,7 @@
 		"@wp-playground/client": "^1.1.0",
 		"animate.css": "^4.1.1",
 		"browserslist": "^4.24.5",
-		"calypso": "workspace:^",
+		"calypso": "0.0.0",
 		"cmdk": "^0.2.1",
 		"d3-time-format": "^4.1.0",
 		"debug": "^4.4.1",
@@ -231,7 +231,7 @@
 		"react-modal": "^3.16.3",
 		"redux": "^5.0.1",
 		"swiper": "^10.3.1",
-		"wpcom": "workspace:^"
+		"wpcom": "0.2.3"
 	},
 	"optionalDependencies": {
 		"fsevents": "^2.3.3"
