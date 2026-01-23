@@ -42,7 +42,7 @@
 		"prepack": "yarn run clean && yarn run build"
 	},
 	"dependencies": {
-		"@automattic/popup-monitor": "workspace:^",
+		"@automattic/popup-monitor": "1.0.0",
 		"@babel/runtime": "^7.27.1",
 		"debug": "^4.4.1"
 	},
