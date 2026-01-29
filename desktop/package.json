@@ -41,7 +41,7 @@
 		"copy-webpack-plugin": "^10.2.4",
 		"electron": "26.2.4",
 		"electron-builder": "23.0.3",
-		"electron-rebuild": "^2.3.5",
+		"electron-rebuild": "^3.2.9",
 		"jest": "^29.7.0",
 		"lodash": "^4.17.21",
 		"playwright": "1.48.2",
