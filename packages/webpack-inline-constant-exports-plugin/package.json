@@ -24,7 +24,7 @@
 		"@automattic/calypso-eslint-overrides": "workspace:^",
 		"@automattic/calypso-typescript-config": "workspace:^",
 		"rimraf": "^3.0.2",
-		"webpack": "^5.99.8"
+		"webpack": "^5.104.1"
 	},
 	"files": [
 		"index.js"
