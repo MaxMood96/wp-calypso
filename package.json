@@ -148,7 +148,7 @@
 		"whybundled:server": "NODE_ENV=production CALYPSO_ENV=production EMIT_STATS=withreasons CONCATENATE_MODULES=false yarn run build-server && whybundled client/stats-server.json"
 	},
 	"dependencies": {
-		"@automattic/calypso-babel-config": "workspace:^",
+		"@automattic/calypso-babel-config": "1.0.0",
 		"@automattic/calypso-build": "workspace:^",
 		"@automattic/calypso-color-schemes": "workspace:^",
 		"@automattic/calypso-doctor": "workspace:^",
@@ -157,11 +157,11 @@
 		"@automattic/calypso-router": "workspace:^",
 		"@automattic/charts": "^1.3.0",
 		"@automattic/color-studio": "^4.1.0",
-		"@automattic/components": "workspace:^",
+		"@automattic/components": "2.0.0",
 		"@automattic/data-stores": "workspace:^",
 		"@automattic/domain-search": "workspace:^",
 		"@automattic/help-center": "workspace:^",
-		"@automattic/i18n-utils": "workspace:^",
+		"@automattic/i18n-utils": "1.0.0",
 		"@automattic/languages": "workspace:^",
 		"@automattic/launchpad": "workspace:^",
 		"@automattic/number-formatters": "^1.1.0",
@@ -218,7 +218,7 @@
 		"@zip.js/zip.js": "2.8.17",
 		"animate.css": "^4.1.1",
 		"browserslist": "^4.24.5",
-		"calypso": "workspace:^",
+		"calypso": "0.0.0",
 		"canvas-confetti": "^1.6.0",
 		"cmdk": "^0.2.1",
 		"d3-time-format": "^4.1.0",
@@ -239,7 +239,7 @@
 		"react-modal": "^3.16.3",
 		"redux": "^5.0.1",
 		"swiper": "^10.3.1",
-		"wpcom": "workspace:^"
+		"wpcom": "0.2.3"
 	},
 	"optionalDependencies": {
 		"fsevents": "^2.3.3"
