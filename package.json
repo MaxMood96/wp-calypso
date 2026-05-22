@@ -217,7 +217,7 @@
 		"@zip.js/zip.js": "2.8.17",
 		"animate.css": "^4.1.1",
 		"browserslist": "^4.24.5",
-		"calypso": "workspace:^",
+		"calypso": "0.0.0",
 		"canvas-confetti": "^1.6.0",
 		"cmdk": "^0.2.1",
 		"d3-time-format": "^4.1.0",
@@ -238,7 +238,7 @@
 		"react-modal": "^3.16.3",
 		"redux": "^5.0.1",
 		"swiper": "^10.3.1",
-		"wpcom": "workspace:^"
+		"wpcom": "0.2.3"
 	},
 	"optionalDependencies": {
 		"fsevents": "^2.3.3"
